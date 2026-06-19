@@ -866,6 +866,40 @@ function TierTerminalImpl({
     return () => root.removeEventListener('scroll', onScroll, { capture: true });
   }, []);
 
+  // ── macOS Cmd+C copy fix ─────────────────────────────────────────────────
+  // On macOS, Tauri installs a default app menu (we set none — see
+  // server.rs `tauri::Builder::default()`), and its Edit ▸ Copy item binds
+  // ⌘C to the native `copy:` action. Menu key-equivalents are handled by
+  // AppKit BEFORE the keystroke ever reaches the webview, so the ⌘C branch of
+  // `attachCustomKeyEventHandler` above NEVER runs on macOS — that handler is
+  // why copy works on Windows/Linux (no menu bar intercepts Ctrl+C). Worse,
+  // native `copy:` copies the DOM text selection, but xterm paints its
+  // selection on a WebGL/canvas layer (not a DOM selection), so the menu copies
+  // nothing and the user's clipboard is left untouched. That's issue #35.
+  //
+  // We can't easily stop the menu, but WebKit's `copy:` still dispatches a DOM
+  // `copy` event first. We intercept it (capture phase, scoped to this
+  // terminal's subtree so HTML inputs elsewhere keep their native copy), inject
+  // xterm's real selection into the event's clipboardData, and preventDefault
+  // so the empty native copy can't overwrite it. macOS-only and purely
+  // additive: Windows/Linux keep using the keydown handler unchanged, and if
+  // the event ever lacks clipboardData we bail without preventing the native
+  // copy, so the worst case is today's behavior (plus right-click ▸ Copy).
+  useEffect(() => {
+    const isMac = navigator.userAgent.toLowerCase().includes('mac');
+    if (!isMac) return;
+    const root = wrapRef.current;
+    if (!root) return;
+    const onCopy = (e: ClipboardEvent) => {
+      const term = xtermRef.current;
+      if (!term || !term.hasSelection() || !e.clipboardData) return;
+      e.clipboardData.setData('text/plain', term.getSelection());
+      e.preventDefault();
+    };
+    root.addEventListener('copy', onCopy, { capture: true });
+    return () => root.removeEventListener('copy', onCopy, { capture: true });
+  }, []);
+
   // ── Tab actions registry ────────────────────────────────────────────────
   // Expose "paste into this tab's xterm" and "where is the cursor on screen"
   // to the app-level Gambit overlay. Gambit is rendered outside the
