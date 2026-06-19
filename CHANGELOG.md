@@ -7,6 +7,17 @@ For releases prior to v1.5.5, see the
 [GitHub Releases page](https://github.com/edison7009/Coffee-CLI/releases)
 and `git tag --list "v*"`.
 
+## [2.8.0] — 2026-06-19
+
+### Fixed
+- **macOS: `Cmd+C` now copies the terminal selection.** The default
+  macOS app menu bound `Cmd+C` to the native `copy:` action, which fires
+  before the terminal's own key handler and copies the DOM selection —
+  but xterm paints its selection on a WebGL/canvas layer, so nothing
+  reached the clipboard. The terminal now intercepts the `copy` event
+  and writes its real selection, matching the copy behaviour Windows and
+  Linux already had. Right-click ▸ Copy is unchanged. (#35)
+
 ## [2.7.9] — 2026-05-20
 
 ### Changed
