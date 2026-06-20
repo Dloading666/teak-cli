@@ -677,6 +677,26 @@ fn get_baseline_content(path: String) -> Option<String> {
     Some(String::from_utf8_lossy(bytes).into_owned())
 }
 
+/// On-disk metadata for the right-side Diff panel's size guards, fetched
+/// BEFORE the (possibly multi-MB) file contents so the frontend can bail to a
+/// summary without first marshalling a huge string across the IPC boundary.
+/// `current_bytes` is the real UTF-8 byte size — the JS guard no longer
+/// approximates it from `String.length` (UTF-16 units), which under-counts
+/// multibyte CJK and let large CJK files slip through to a main-thread freeze.
+#[derive(serde::Serialize)]
+pub struct DiffMeta {
+    current_bytes: u64,
+    current_exists: bool,
+}
+
+#[tauri::command]
+fn get_diff_meta(path: String) -> DiffMeta {
+    match std::fs::metadata(&path) {
+        Ok(meta) if meta.is_file() => DiffMeta { current_bytes: meta.len(), current_exists: true },
+        _ => DiffMeta { current_bytes: 0, current_exists: false },
+    }
+}
+
 /// Save a base64-encoded clipboard image to a temp file.
 /// Used by the Gambit compose window so pasted screenshots can be referenced
 /// by path when forwarded to AI CLI agents (Claude Code, etc.).
@@ -2150,6 +2170,39 @@ fn read_opencode_session(session_id: String) -> Result<String, String> {
     Err("OpenCode session storage not found".to_string())
 }
 
+/// Resolve MiMo Code's SQLite db (Xiaomi's OpenCode fork — identical Drizzle
+/// schema). Primary path is `~/.local/share/mimocode/mimocode.db`, with the
+/// older/atypical `~/.config/mimocode/mimocode.db` as fallback. None when
+/// neither exists.
+fn mimocode_db(home: &std::path::Path) -> Option<std::path::PathBuf> {
+    // Primary root honors any tools.json history-path override (the field
+    // ToolConfigModal surfaces for MiMo Code), defaulting to the descriptor's
+    // declared `.local/share/mimocode` root — same contract as opencode_root /
+    // hermes_state_db. `.config/mimocode` stays a secondary fallback for
+    // atypical installs that the single override path can't express.
+    let primary_root = crate::tools::find("mimocode")
+        .and_then(|tool| {
+            tool.history_shape
+                .as_ref()
+                .map(|shape| crate::tool_config::history_path_for(tool.id, shape.join_under(home)))
+        })
+        .unwrap_or_else(|| home.join(".local").join("share").join("mimocode"));
+    let candidates = [
+        primary_root.join("mimocode.db"),
+        home.join(".config").join("mimocode").join("mimocode.db"),
+    ];
+    candidates.into_iter().find(|p| p.is_file())
+}
+
+/// Read one MiMo Code session transcript. Same schema as OpenCode, so this
+/// just points `read_opencode_sqlite_session` at `mimocode.db`.
+#[tauri::command]
+fn read_mimocode_session(session_token: String) -> Result<String, String> {
+    let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
+    let db = mimocode_db(&home).ok_or("MiMo Code session storage not found")?;
+    read_opencode_sqlite_session(&db, &session_token)
+}
+
 fn collect_jsonl_paths_with_mtime(
     dir: std::path::PathBuf,
     depth: u8,
@@ -2288,7 +2341,7 @@ fn find_opencode_sessions(base_dir: std::path::PathBuf, result: &mut Vec<SavedSe
     // Prefer SQLite DB (current OpenCode format) over legacy JSON files
     let db_path = base_dir.join("opencode.db");
     if db_path.is_file() {
-        find_opencode_sessions_sqlite(&db_path, result);
+        find_drizzle_sessions_sqlite(&db_path, "opencode", "OpenCode Session", result);
         return;
     }
 
@@ -2317,7 +2370,15 @@ fn find_opencode_sessions(base_dir: std::path::PathBuf, result: &mut Vec<SavedSe
     }
 }
 
-fn find_opencode_sessions_sqlite(db_path: &std::path::Path, result: &mut Vec<SavedSession>) {
+/// Read sessions from a Drizzle-schema SQLite db (`session` + `message`
+/// tables). Shared by OpenCode and its forks — MiMo Code uses the identical
+/// schema, so it passes its own `tool_id` / `default_title` and db path.
+fn find_drizzle_sessions_sqlite(
+    db_path: &std::path::Path,
+    tool_id: &str,
+    default_title: &str,
+    result: &mut Vec<SavedSession>,
+) {
     let conn = match rusqlite::Connection::open_with_flags(
         db_path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
@@ -2346,7 +2407,7 @@ fn find_opencode_sessions_sqlite(db_path: &std::path::Path, result: &mut Vec<Sav
         let title: String = row.get::<_, Option<String>>(1)
             .unwrap_or(None)
             .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "OpenCode Session".to_string());
+            .unwrap_or_else(|| default_title.to_string());
         let directory: String = row.get::<_, Option<String>>(2)
             .unwrap_or(None)
             .unwrap_or_default();
@@ -2355,9 +2416,9 @@ fn find_opencode_sessions_sqlite(db_path: &std::path::Path, result: &mut Vec<Sav
         let turn_count = std::cmp::max(1, msg_count / 2) as u32;
 
         Ok(SavedSession {
-            id: format!("opencode_native_{}", id),
+            id: format!("{}_native_{}", tool_id, id),
             name: title,
-            tool: "opencode".to_string(),
+            tool: tool_id.to_string(),
             cwd: directory,
             session_token: Some(id),
             saved_at: time_updated.to_string(),
@@ -2390,6 +2451,18 @@ fn collect_hermes_paths_with_mtime(
     if !dir.is_dir() {
         return;
     }
+    // Newer Hermes Agent keeps the authoritative session store in
+    // `<sessions>/state.db` (SQLite); the per-session `session_*.json` files
+    // are a legacy/export layout that may be absent. When the db is present
+    // AND actually yields sessions, `find_hermes_sessions_sqlite` is the
+    // source of truth — skip the JSON candidates so the two paths can't
+    // double-count. But if the db is empty / locked / corrupt / wrong-schema,
+    // keep scanning JSON: suppressing it unconditionally would silently empty
+    // the History board for a user whose legacy sessions are still on disk.
+    let state_db = dir.join("state.db");
+    if state_db.is_file() && hermes_db_has_sessions(&state_db) {
+        return;
+    }
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -2404,6 +2477,226 @@ fn collect_hermes_paths_with_mtime(
             }
         }
     }
+}
+
+/// Resolve `<HERMES_HOME>/sessions/state.db` (honouring any `tools.json`
+/// history-path override), or None if Hermes Agent isn't in the registry.
+/// Mirrors `opencode_root` so the history + heatmap passes resolve the
+/// identical db path.
+fn hermes_state_db(home: &std::path::Path) -> Option<std::path::PathBuf> {
+    let tool = crate::tools::find("hermes")?;
+    let shape = tool.history_shape.as_ref()?;
+    let dir = crate::tool_config::history_path_for(tool.id, shape.join_under(home));
+    Some(dir.join("state.db"))
+}
+
+/// Cheap probe: does `state.db` open and hold at least one non-archived
+/// session row? Drives the decision to suppress the legacy `session_*.json`
+/// scan — if the db is missing, empty, locked, corrupt, or has an unexpected
+/// schema this returns false and the JSON path stays as a fallback, so Hermes
+/// history never silently empties out from under a usable legacy store.
+fn hermes_db_has_sessions(db_path: &std::path::Path) -> bool {
+    let Ok(conn) = rusqlite::Connection::open_with_flags(
+        db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) else {
+        return false;
+    };
+    conn.query_row("SELECT 1 FROM sessions WHERE archived = 0 LIMIT 1", [], |_| Ok(()))
+        .is_ok()
+}
+
+/// Normalize a Hermes `started_at` to epoch SECONDS. Hermes is documented to
+/// store float seconds, but the unit is unverified across versions; treat any
+/// value past ~year-5138-in-seconds (i.e. a millisecond timestamp) as ms so the
+/// history sort and the seconds-based heatmap stay correct either way.
+fn hermes_started_at_secs(raw: f64) -> f64 {
+    if raw > 1e11 { raw / 1000.0 } else { raw }
+}
+
+/// Read Hermes Agent sessions from the SQLite `state.db`. Newer Hermes
+/// stores everything here (sessions + messages + FTS5 search); the
+/// `session_*.json` files our legacy path reads may be absent.
+///
+/// Schema (sessions table): `id`, `title`, `cwd`, `started_at` (epoch
+/// SECONDS, REAL), `message_count`, `archived`. Best-effort: any error
+/// (missing table, renamed column, locked db) yields zero rows and the
+/// caller falls back to the JSON scan — no regression for older Hermes.
+///
+/// `file_path` is intentionally None: these sessions live in the shared db,
+/// not a per-session file, so ChatReader routes them through
+/// `read_hermes_session` instead of `read_native_session`.
+fn find_hermes_sessions_sqlite(db_path: &std::path::Path, result: &mut Vec<SavedSession>) {
+    let conn = match rusqlite::Connection::open_with_flags(
+        db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let query = "SELECT id, title, cwd, started_at, message_count \
+                 FROM sessions \
+                 WHERE archived = 0 \
+                 ORDER BY started_at DESC \
+                 LIMIT 200";
+    let mut stmt = match conn.prepare(query) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    let iter = stmt.query_map([], |row| {
+        // id is the resume token (TEXT). Read tolerantly: if a Hermes version
+        // stores it as INTEGER rowid, fall back to stringifying it rather than
+        // erroring the row (which `?` would, silently dropping EVERY session).
+        let id: String = row
+            .get::<_, String>(0)
+            .or_else(|_| row.get::<_, i64>(0).map(|n| n.to_string()))?;
+        let title: Option<String> = row.get::<_, Option<String>>(1).unwrap_or(None);
+        let cwd: String = row.get::<_, Option<String>>(2).unwrap_or(None).unwrap_or_default();
+        // started_at → epoch ms for the saved_at string the frontend sorts on.
+        // hermes_started_at_secs normalizes a seconds-or-ms value to seconds.
+        let started_at: f64 = row.get(3).unwrap_or(0.0);
+        let msg_count: i64 = row.get(4).unwrap_or(0);
+        // Title fallback: explicit title → cwd basename → placeholder.
+        let name = title
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| {
+                std::path::Path::new(&cwd)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "Hermes Agent Session".to_string())
+            });
+        let turn_count = if msg_count > 0 { std::cmp::max(1, (msg_count / 2) as u32) } else { 0 };
+        Ok(SavedSession {
+            id: format!("hermes_native_{}", id),
+            name,
+            tool: "hermes".to_string(),
+            cwd,
+            session_token: Some(id),
+            saved_at: ((hermes_started_at_secs(started_at) * 1000.0) as i64).to_string(),
+            file_path: None,
+            turn_count: Some(turn_count),
+        })
+    });
+    if let Ok(iter) = iter {
+        for session in iter.flatten() {
+            result.push(session);
+        }
+    }
+}
+
+/// Heatmap second pass for Hermes `state.db` — one entry per session
+/// (started_at seconds + message_count). Mirrors
+/// `collect_opencode_heatmap_entries`. Best-effort.
+fn collect_hermes_heatmap_entries(
+    db_path: &std::path::Path,
+    cutoff_secs: i64,
+    out: &mut Vec<HeatmapEntry>,
+) {
+    let conn = match rusqlite::Connection::open_with_flags(
+        db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let query = "SELECT started_at, message_count FROM sessions \
+                 WHERE archived = 0 AND started_at >= ?1";
+    let mut stmt = match conn.prepare(query) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    let rows = match stmt.query_map([cutoff_secs as f64], |row| {
+        let started_at: f64 = row.get(0)?;
+        let count: i64 = row.get(1).unwrap_or(0);
+        // Normalize seconds-or-ms → seconds (HeatmapEntry.ts is seconds; the
+        // frontend does `new Date(ts*1000)`). The WHERE filter above uses the
+        // raw value, so an ms store just over-fetches slightly — still correct.
+        Ok((hermes_started_at_secs(started_at) as i64, count))
+    }) {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+    for row in rows.flatten() {
+        let (ts, count) = row;
+        if count > 0 {
+            out.push(HeatmapEntry { ts, count: count.clamp(0, u32::MAX as i64) as u32 });
+        }
+    }
+}
+
+/// Decode one Hermes `messages.content` cell. Plain text is stored raw;
+/// structured / multimodal content is `"\x00json:"` + JSON (Hermes'
+/// `_encode_content`). Strip the marker and pull the text back out.
+fn hermes_decode_content(raw: &str) -> String {
+    let Some(json_part) = raw.strip_prefix("\u{0}json:") else {
+        return raw.to_string();
+    };
+    match serde_json::from_str::<serde_json::Value>(json_part) {
+        Ok(v) => hermes_extract_text(&v),
+        Err(_) => raw.to_string(),
+    }
+}
+
+/// Best-effort text extraction from a decoded Hermes content value — a bare
+/// string, `{text: ...}`, or an array of `{type, text}` blocks. Anything
+/// else collapses to compact JSON so the turn still shows something.
+fn hermes_extract_text(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Array(items) => items
+            .iter()
+            .filter_map(|it| it.get("text").and_then(|t| t.as_str()))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        serde_json::Value::Object(_) => v
+            .get("text")
+            .and_then(|t| t.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| v.to_string()),
+        _ => v.to_string(),
+    }
+}
+
+/// Read one Hermes session's transcript from `state.db` for the ChatReader
+/// preview. Emits the same newline-delimited `{"message":{role,content}}`
+/// shape `read_native_session` returns for JSONL tools, so the existing
+/// frontend parser handles it unchanged.
+///
+/// Schema (messages table): `session_id`, `role`, `content`, ordered by
+/// rowid (insertion order). Best-effort.
+#[tauri::command]
+fn read_hermes_session(session_token: String) -> Result<String, String> {
+    let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
+    let db = hermes_state_db(&home).ok_or_else(|| "hermes not in registry".to_string())?;
+    let conn = rusqlite::Connection::open_with_flags(
+        &db,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|e| format!("open hermes state.db: {e}"))?;
+    let mut stmt = conn
+        .prepare("SELECT role, content FROM messages WHERE session_id = ?1 ORDER BY rowid")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([&session_token], |row| {
+            let role: String = row.get(0)?;
+            let content: String =
+                row.get::<_, Option<String>>(1).unwrap_or(None).unwrap_or_default();
+            Ok((role, content))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut out = String::new();
+    for r in rows.flatten() {
+        let (role, content) = r;
+        let line = serde_json::json!({
+            "message": { "role": role, "content": hermes_decode_content(&content) }
+        });
+        out.push_str(&line.to_string());
+        out.push('\n');
+    }
+    Ok(out)
 }
 
 #[tauri::command]
@@ -2465,6 +2758,26 @@ fn load_native_history_blocking() -> Result<Vec<SavedSession>, String> {
     if let Some(home) = home.as_ref() {
         if let Some(opencode_dir) = opencode_root(home) {
             find_opencode_sessions(opencode_dir, &mut result);
+        }
+    }
+
+    // Hermes second pass — read state.db when present (newer Hermes). The
+    // JSON candidates were already skipped in collect_hermes_paths_with_mtime
+    // when the db exists, so this is the sole Hermes source then; with no db,
+    // the JSON path already populated `result` and this is a no-op.
+    if let Some(home) = home.as_ref() {
+        if let Some(db) = hermes_state_db(home) {
+            if db.is_file() {
+                find_hermes_sessions_sqlite(&db, &mut result);
+            }
+        }
+    }
+
+    // MiMo Code second pass — Xiaomi's OpenCode fork, identical Drizzle schema,
+    // so it reuses find_drizzle_sessions_sqlite with its own db path + labels.
+    if let Some(home) = home.as_ref() {
+        if let Some(db) = mimocode_db(home) {
+            find_drizzle_sessions_sqlite(&db, "mimocode", "MiMo Code Session", &mut result);
         }
     }
 
@@ -2651,6 +2964,33 @@ fn load_message_heatmap_blocking() -> Result<Vec<HeatmapEntry>, String> {
                     .unwrap_or(0);
                 collect_opencode_heatmap_entries(&db_path, cutoff_secs, &mut out);
             }
+        }
+    }
+
+    // Hermes heatmap second pass — state.db when present, same shape as
+    // OpenCode. The JSON candidate path was skipped above when the db exists,
+    // so there's no double-counting.
+    if let Some(home) = home.as_ref() {
+        if let Some(db) = hermes_state_db(home) {
+            if db.is_file() {
+                let cutoff_secs = cutoff
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+                collect_hermes_heatmap_entries(&db, cutoff_secs, &mut out);
+            }
+        }
+    }
+
+    // MiMo Code heatmap second pass — identical schema to OpenCode, so it
+    // reuses collect_opencode_heatmap_entries with the mimocode.db path.
+    if let Some(home) = home.as_ref() {
+        if let Some(db) = mimocode_db(home) {
+            let cutoff_secs = cutoff
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            collect_opencode_heatmap_entries(&db, cutoff_secs, &mut out);
         }
     }
 
@@ -3279,6 +3619,8 @@ pub fn start_ui() -> anyhow::Result<()> {
             get_message_heatmap,
             read_native_session,
             read_opencode_session,
+            read_hermes_session,
+            read_mimocode_session,
             check_network_port,
             check_tools_installed,
             crate::tools::list_tools,
@@ -3291,6 +3633,7 @@ pub fn start_ui() -> anyhow::Result<()> {
             compute_folder_stats,
             clear_folder_snapshot,
             get_baseline_content,
+            get_diff_meta,
             read_text_file,
             show_in_folder,
             fs_delete,

@@ -46,6 +46,11 @@ const TOOL_DEFAULTS: Record<string, ToolConfigEntry> = {
   antigravity: { command: 'agy', extra_args: [], default_cwd: '', history_path: '~/.gemini/tmp' },
   qwen:     { command: 'qwen',     extra_args: [], default_cwd: '', history_path: '' },
   opencode: { command: 'opencode', extra_args: [], default_cwd: '', history_path: '~/.local/share/opencode' },
+  // MiMo Code — Xiaomi's OpenCode fork. `command` is a best guess (could be
+  // `mimocode`). Show the primary db root like OpenCode does (clarity — an
+  // empty field reads as a bug); the backend also probes `~/.config/mimocode`
+  // as a fallback, and treats an empty override as "use this default" anyway.
+  mimocode: { command: 'mimo',     extra_args: [], default_cwd: '', history_path: '~/.local/share/mimocode' },
   openclaw: { command: 'openclaw', extra_args: [], default_cwd: '', history_path: '~/.openclaw/agents' },
   // Hermes data root is platform-dependent (`%LOCALAPPDATA%\hermes` on
   // Windows, `~/.hermes` elsewhere; `$HERMES_HOME` overrides both); leave
@@ -60,7 +65,7 @@ const TOOL_DEFAULTS: Record<string, ToolConfigEntry> = {
 // no Qwen scanner has been written), the field is hidden — letting the
 // user fill a path that nothing ever scans would just be a footgun.
 const HISTORY_SCANNED_TOOLS = new Set([
-  'claude', 'codex', 'antigravity', 'hermes', 'opencode', 'openclaw',
+  'claude', 'codex', 'antigravity', 'hermes', 'opencode', 'openclaw', 'mimocode',
 ]);
 
 const defaultsFor = (key: string): ToolConfigEntry => TOOL_DEFAULTS[key] ?? EMPTY;

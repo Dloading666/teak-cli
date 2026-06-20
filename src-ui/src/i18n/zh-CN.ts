@@ -69,6 +69,8 @@ export const zhCN = {
   'diff.loading': '加载中…',
   'diff.error': '无法加载差异',
   'diff.no_changes': '与基线一致',
+  'diff.too_large': '文件较大,未渲染逐行差异',
+  'diff.unchanged_lines': '⋯ {count} 行未改动',
   'task.default_title': '新任务',
   'task.search_sessions': '搜索历史对话...',
   'menu.no_recent': '没有任何近期会话',

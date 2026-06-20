@@ -102,6 +102,11 @@ const QWEN_SVG      = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 2
 // so multiple mounts don't clash.
 const OPENCLAW_SVG  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 2.568c-6.33 0-9.495 5.275-9.495 9.495 0 4.22 3.165 8.44 6.33 9.494v2.11h2.11v-2.11s1.055.422 2.11 0v2.11h2.11v-2.11c3.165-1.055 6.33-5.274 6.33-9.494S18.33 2.568 12 2.568z" fill="url(#oc0)"/><path d="M3.56 9.953C.396 8.898-.66 11.008.396 13.118c1.055 2.11 3.164 1.055 4.22-1.055.632-1.477 0-2.11-1.056-2.11z" fill="url(#oc1)"/><path d="M20.44 9.953c3.164-1.055 4.22 1.055 3.164 3.165-1.055 2.11-3.164 1.055-4.22-1.055-.632-1.477 0-2.11 1.056-2.11z" fill="url(#oc2)"/><path d="M5.507 1.875c.476-.285 1.036-.233 1.615.037.577.27 1.223.774 1.937 1.488a.316.316 0 01-.447.447c-.693-.693-1.279-1.138-1.757-1.361-.475-.222-.795-.205-1.022-.069a.317.317 0 01-.326-.542zM16.877 1.913c.58-.27 1.14-.323 1.616-.038a.317.317 0 01-.326.542c-.227-.136-.547-.153-1.022.069-.478.223-1.064.668-1.756 1.361a.316.316 0 11-.448-.447c.714-.714 1.36-1.218 1.936-1.487z" fill="#FF4D4D"/><path d="M8.835 9.109a1.266 1.266 0 100-2.532 1.266 1.266 0 000 2.532zM15.165 9.109a1.266 1.266 0 100-2.532 1.266 1.266 0 000 2.532z" fill="#050810"/><path d="M9.046 8.16a.527.527 0 100-1.056.527.527 0 000 1.055zM15.376 8.16a.527.527 0 100-1.055.527.527 0 000 1.054z" fill="#00E5CC"/><defs><linearGradient gradientUnits="userSpaceOnUse" id="oc0" x1="-.659" x2="27.023" y1=".458" y2="22.855"><stop stop-color="#FF4D4D"/><stop offset="1" stop-color="#991B1B"/></linearGradient><linearGradient gradientUnits="userSpaceOnUse" id="oc1" x1="0" x2="4.311" y1="9.672" y2="14.949"><stop stop-color="#FF4D4D"/><stop offset="1" stop-color="#991B1B"/></linearGradient><linearGradient gradientUnits="userSpaceOnUse" id="oc2" x1="19.385" x2="24.399" y1="9.953" y2="14.462"><stop stop-color="#FF4D4D"/><stop offset="1" stop-color="#991B1B"/></linearGradient></defs></svg>';
 
+// MiMo Code (Xiaomi's OpenCode fork) — official orange squircle mark, from
+// EchoBird's icons/tools/mimocode.svg. Inline SVG so it renders synchronously
+// (no flash on tab switch — same rationale as OPENCODE_SVG).
+const MIMOCODE_SVG  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-200.008 -199.727 512 512" width="100%" height="100%"><path fill="#FF6900" d="M258.626-146.231c-48.304-48.118-117.759-53.496-202.634-53.496c-84.982,0-154.542,5.44-202.826,53.688c-48.277,48.228-53.174,117.676-53.174,202.561c0,84.899,4.897,154.368,53.194,202.613c48.281,48.255,117.833,53.139,202.806,53.139c84.974,0,154.514-4.884,202.795-53.139c48.294-48.254,53.205-117.714,53.205-202.613C311.992-28.472,307.028-97.995,258.626-146.231L258.626-146.231z"/><path fill="#FFFFFF" d="M204.546-41.122c1.759,0,3.223,1.417,3.223,3.161v189.386c0,1.715-1.464,3.139-3.223,3.139H163.05c-1.781,0-3.228-1.424-3.228-3.139V-37.961c0-1.743,1.446-3.161,3.228-3.161H204.546z M24.468-41.122c31.303,0,64.033,1.435,80.176,17.589c15.871,15.897,17.59,47.549,17.656,78.286v96.671c0,1.715-1.446,3.139-3.219,3.139h-41.49c-1.777,0-3.229-1.424-3.229-3.139V53.09c-0.044-17.167-1.031-34.81-9.884-43.692c-7.62-7.641-21.839-9.391-36.625-9.754h-75.21c-1.764,0-3.208,1.419-3.208,3.136v148.645c0,1.715-1.462,3.139-3.237,3.139h-41.516c-1.774,0-3.201-1.424-3.201-3.139V-37.961c0-1.743,1.426-3.161,3.201-3.161H24.468z M33.755,34.305c1.766,0,3.201,1.413,3.201,3.143v113.977c0,1.715-1.436,3.139-3.201,3.139H-9.829c-1.792,0-3.228-1.424-3.228-3.139V37.448c0-1.73,1.436-3.143,3.228-3.143H33.755z"/></svg>';
+
 const inlineSvgIcon = (markup: string, size = '1em', extra: React.CSSProperties = {}) => (
   <span
     aria-hidden
@@ -131,6 +136,7 @@ const SvgQwen      = () => inlineSvgIcon(QWEN_SVG);
 // trade-off (fixed flash-on-mount in WebView2) wasn't worth it; the inline
 // SVG with rounded outer rect matches the brand visually within a pixel or two.
 const SvgOpenCode  = () => inlineSvgIcon(OPENCODE_SVG);
+const SvgMimo      = () => inlineSvgIcon(MIMOCODE_SVG, '1em', { borderRadius: 'var(--radius-xs)', overflow: 'hidden' });
 const SvgOpenClaw  = () => inlineSvgIcon(OPENCLAW_SVG);
 const SvgCodex       = () => inlineSvgIcon(CODEX_SVG);
 const SvgAntigravity = () => inlineSvgIcon(ANTIGRAVITY_SVG);
@@ -407,7 +413,7 @@ const SvgPlus = ({ active }: { active: boolean }) => (
 // still count. Update this set when adding or removing AGENT_CATALOG
 // entries below.
 const VALID_PIN_KEYS = new Set<string>([
-  'claude', 'opencode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes', 'terminal',
+  'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes', 'terminal',
   'multi-agent', 'three-agent', 'two-agent', 'installer',
   'four-split', 'three-split', 'two-split', 'hyper-agent',
 ]);
@@ -499,6 +505,7 @@ export function CenterPanel() {
   const BUILTIN_ICONS: Record<string, React.ReactNode> = {
     claude: <SvgClaude />,
     opencode: <SvgOpenCode />,
+    mimocode: <SvgMimo />,
     openclaw: <SvgOpenClaw />,
     codex: <SvgCodex />,
     antigravity: <SvgAntigravity />,
@@ -510,7 +517,7 @@ export function CenterPanel() {
   // names are sourced from the Rust registry (see lib/tool-info.ts);
   // the order here is the launchpad's preferred presentation order.
   const BUILTIN_AI_CLI_FALLBACK: { key: ToolType; label: string }[] = [
-    'claude', 'opencode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes',
+    'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes',
   ].map((key) => ({ key: key as ToolType, label: getToolDisplayName(key) }));
 
   // Unified agent catalog — fully local. The remote catalog fetch
@@ -1077,6 +1084,7 @@ export function CenterPanel() {
       // stays as the tool name regardless of any inherited folderPath.
       case 'hermes': return { icon: <SvgHermes />, title: getToolDisplayName('hermes'), tooltip: undefined };
       case 'opencode': return { icon: <SvgOpenCode />, title: cwd ?? getToolDisplayName('opencode'), tooltip: pathTip };
+      case 'mimocode': return { icon: <SvgMimo />, title: cwd ?? getToolDisplayName('mimocode'), tooltip: pathTip };
       case 'openclaw': return { icon: <SvgOpenClaw />, title: getToolDisplayName('openclaw'), tooltip: undefined };
       case 'codex': return { icon: <SvgCodex />, title: cwd ?? getToolDisplayName('codex'), tooltip: pathTip };
       case 'antigravity': return { icon: <SvgAntigravity />, title: cwd ?? getToolDisplayName('antigravity'), tooltip: pathTip };
@@ -1660,7 +1668,7 @@ export function CenterPanel() {
                           {AGENT_CATALOG.filter(item => item.type === 'ai-cli').map(item => {
                             const pinId = `agent:${item.key}`;
                             const isPinned = pinnedItems.includes(pinId);
-                            const hasGear = (['claude', 'codex', 'antigravity', 'qwen', 'opencode', 'openclaw', 'hermes'] as const).includes(item.key as any);
+                            const hasGear = (['claude', 'codex', 'antigravity', 'qwen', 'opencode', 'mimocode', 'openclaw', 'hermes'] as const).includes(item.key as any);
                             return (
                               <div
                                 key={item.key}

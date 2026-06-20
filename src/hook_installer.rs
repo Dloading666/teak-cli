@@ -300,9 +300,17 @@ fn install_hermes(home: &Path) {
     // the user's comments / quoted strings / anchor references. The call
     // is idempotent: running it twice does not duplicate the entry.
     use std::process::Command;
-    match Command::new("hermes")
-        .args(["plugins", "enable", HERMES_PLUGIN_NAME])
-        .output()
+    let mut cmd = Command::new("hermes");
+    cmd.args(["plugins", "enable", HERMES_PLUGIN_NAME]);
+    // CREATE_NO_WINDOW (0x08000000): install_all() runs in Tauri's setup hook
+    // every launch, so without this flag spawning the `hermes` CLI flashes a
+    // console window on Windows at startup. No-op on other platforms.
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    match cmd.output()
     {
         Ok(out) if out.status.success() => {}
         Ok(out) => {

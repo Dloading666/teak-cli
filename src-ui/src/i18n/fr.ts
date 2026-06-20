@@ -69,6 +69,8 @@ export const fr = {
   'diff.loading': 'Chargement…',
   'diff.error': 'Échec du chargement du diff',
   'diff.no_changes': 'Identique à la baseline',
+  'diff.too_large': 'Fichier trop volumineux pour afficher le diff',
+  'diff.unchanged_lines': '⋯ {count} lignes inchangées',
   'task.default_title': 'Nouvelle tâche',
   'task.search_sessions': 'Rechercher des sessions...',
   'menu.no_recent': 'Aucune session récente',

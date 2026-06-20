@@ -69,6 +69,8 @@ export const zhTW = {
   'diff.loading': '載入中…',
   'diff.error': '無法載入差異',
   'diff.no_changes': '與基線一致',
+  'diff.too_large': '檔案較大,未渲染逐行差異',
+  'diff.unchanged_lines': '⋯ {count} 行未變更',
   'task.default_title': '新任務',
   'task.search_sessions': '搜尋歷史對話...',
   'menu.no_recent': '沒有任何近期對話',

@@ -9,7 +9,7 @@
 // Theme tracks `data-theme` via MutationObserver so theme switches re-tint
 // the tokens without a remount.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { diffLines } from 'diff';
@@ -32,10 +32,47 @@ type DiffLine = {
   tokens: LineTokens | null;
 };
 
+/** A rendered row in the collapsed (hunk) view: either a single diff line,
+ *  or a "gap" standing in for a run of unchanged lines folded away. The gap
+ *  carries its hidden lines so expanding it is a pure render-time toggle —
+ *  no recompute, no re-tokenize. */
+type DiffRow =
+  | { type: 'line'; line: DiffLine }
+  | { type: 'gap'; key: string; lines: DiffLine[] };
+
 type DiffResult =
   | { state: 'loading' }
   | { state: 'error'; reason: string }
-  | { state: 'ok'; lines: DiffLine[]; added: number; deleted: number };
+  | { state: 'too_large'; added: number; deleted: number }
+  | { state: 'ok'; rows: DiffRow[]; added: number; deleted: number };
+
+// Render guards. Past these a per-line diff is both unhelpful and a
+// main-thread hazard: computeUnifiedDiff allocates one object per line and
+// Shiki tokenizes BOTH full texts, so a multi-MB file — a lockfile, a
+// minified bundle, or any file whose baseline content was never stored
+// (oldText '' → the whole file renders as additions, nothing to fold) —
+// would freeze the UI the instant it opens. Above either threshold we show
+// a summary card instead.
+//
+// DIFF_MAX_BYTES is checked against the file's REAL on-disk byte size,
+// fetched up front via commands.getDiffMeta (see the load effect), so an
+// oversized file is rejected BEFORE its contents are marshalled across IPC.
+// Using real UTF-8 bytes — not the decoded String.length, whose UTF-16 units
+// under-count multibyte CJK — is what keeps large CJK files from slipping
+// through. DIFF_MAX_CHANGED_LINES catches huge rewrites from the Rust
+// folder-stats badge, before any IPC at all.
+const DIFF_MAX_BYTES = 1_000_000;
+const DIFF_MAX_CHANGED_LINES = 5000;
+
+// Unchanged-line folding (hunk view). Runs of equal lines far from any
+// change collapse to one clickable gap, so a 2-line edit in a 3000-line
+// file renders ~10 rows instead of 3000 (DOM nodes are the real cost once
+// the size guards above let a diff through). CONTEXT lines are kept on each
+// side of every change for orientation; a run is folded only when it would
+// hide at least MIN_HIDDEN lines — folding 1-2 lines just swaps rows for a
+// marker of equal height and saves nothing.
+const DIFF_CONTEXT_LINES = 3;
+const DIFF_COLLAPSE_MIN_HIDDEN = 4;
 
 interface DiffPanelProps {
   path: string;
@@ -46,12 +83,40 @@ interface DiffPanelProps {
    *  Ignored in expanded mode (which uses fixed-inset modal sizing).
    *  When omitted, the CSS default (55%) applies. */
   heightPercent?: number;
+  /** Baseline→current change magnitude from the Rust folder-stats badge
+   *  (multiset line diff). Used to short-circuit the render for very large
+   *  diffs before the expensive jsdiff + Shiki pass (see the size guard in
+   *  the load effect) and to label the summary card when we do. */
+  added?: number;
+  deleted?: number;
 }
 
-export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPercent }: DiffPanelProps) {
+export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
   const t = useT();
   const dataTheme = useDataAttr('data-theme');
   const [result, setResult] = useState<DiffResult>({ state: 'loading' });
+
+  // Latest badge counts (Rust multiset deltas), mirrored into a ref so the
+  // open-time size guard can read them WITHOUT the load effect depending on
+  // them. They are live-polled — file-stats refreshes on every agent-status /
+  // fs-refresh while an agent edits the open file — so as effect deps they
+  // blanked the diff to 'loading' and re-ran both IPC reads + double Shiki
+  // tokenization on every tick. The guard only needs the value at open time.
+  const badgeRef = useRef({ added: 0, deleted: 0 });
+  badgeRef.current = { added: added ?? 0, deleted: deleted ?? 0 };
+
+  // Which folded gaps the user has expanded in place. Keyed by gap.key
+  // (stable per file). Reset when the file changes so a new diff starts
+  // fully folded.
+  const [expandedGaps, setExpandedGaps] = useState<Set<string>>(() => new Set());
+  useEffect(() => { setExpandedGaps(new Set()); }, [path]);
+  const toggleGap = (key: string) =>
+    setExpandedGaps(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // Keyboard handling — same DiffPanel element across two visual sizes:
   //   half (default): bottom-anchored overlay covering ~55% of the panel
@@ -79,8 +144,35 @@ export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPer
     let cancelled = false;
     setResult({ state: 'loading' });
 
+    // Cheap pre-read guard: the Rust badge already knows the change
+    // magnitude (multiset line diff). If it's huge, skip the IPC reads,
+    // jsdiff, and Shiki entirely — go straight to the summary card. Read
+    // from the ref (see badgeRef above) so this effect needn't depend on the
+    // live-polled counts.
+    const { added: badgeAdded, deleted: badgeDeleted } = badgeRef.current;
+    if (badgeAdded + badgeDeleted > DIFF_MAX_CHANGED_LINES) {
+      setResult({ state: 'too_large', added: badgeAdded, deleted: badgeDeleted });
+      return;
+    }
+
     (async () => {
       try {
+        // Pre-read size guard: ask Rust for the file's on-disk byte size and
+        // bail to the summary for oversized files BEFORE marshalling their
+        // (possibly multi-MB) contents across IPC. current_bytes is real UTF-8
+        // bytes, so this catches large multibyte CJK files that a decoded
+        // String.length check (UTF-16 units) under-measured.
+        const meta = await commands.getDiffMeta(path);
+        if (cancelled) return;
+        if (!meta.current_exists) {
+          setResult({ state: 'error', reason: 'unreadable' });
+          return;
+        }
+        if (meta.current_bytes > DIFF_MAX_BYTES) {
+          setResult({ state: 'too_large', added: badgeAdded, deleted: badgeDeleted });
+          return;
+        }
+
         const [baseline, current] = await Promise.all([
           commands.getBaselineContent(path),
           commands.readTextFile(path),
@@ -92,9 +184,13 @@ export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPer
         }
         const oldText = baseline ?? '';
         const newText = current;
+
         const lines = computeUnifiedDiff(oldText, newText);
-        const added = lines.filter(l => l.kind === 'add').length;
-        const deleted = lines.filter(l => l.kind === 'del').length;
+        // Renderer-side counts (order-sensitive jsdiff), distinct from the
+        // Rust badge props of the same name — name them apart to avoid
+        // shadowing those props.
+        const addedLines = lines.filter(l => l.kind === 'add').length;
+        const deletedLines = lines.filter(l => l.kind === 'del').length;
 
         // Tokenize BEFORE the first 'ok' render. Painting plain text first
         // and then swapping in Shiki tokens caused a visible color flip on
@@ -113,7 +209,10 @@ export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPer
             })
           : lines;
 
-        setResult({ state: 'ok', lines: tokenized, added, deleted });
+        // Fold unchanged runs into gaps for rendering; counts stay sourced
+        // from the full flat list above.
+        const rows = collapseToHunks(tokenized);
+        setResult({ state: 'ok', rows, added: addedLines, deleted: deletedLines });
       } catch {
         if (cancelled) return;
         setResult({ state: 'error', reason: 'ipc' });
@@ -173,26 +272,44 @@ export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPer
         {result.state === 'error' && (
           <div className="diff-empty">{t('diff.error' as any) || 'Failed to load diff'}</div>
         )}
-        {result.state === 'ok' && result.lines.length === 0 && (
+        {result.state === 'too_large' && (
+          <div className="diff-toolarge">
+            <div className="diff-toolarge-msg">
+              {t('diff.too_large' as any) || 'File too large to show inline diff'}
+            </div>
+            <div className="diff-toolarge-stats">
+              <span className="diff-add">+{result.added}</span>
+              <span className="diff-del">-{result.deleted}</span>
+            </div>
+          </div>
+        )}
+        {result.state === 'ok' && result.added === 0 && result.deleted === 0 && (
           <div className="diff-empty">{t('diff.no_changes' as any) || 'Identical to baseline'}</div>
         )}
-        {result.state === 'ok' && result.lines.length > 0 && (
+        {result.state === 'ok' && (result.added > 0 || result.deleted > 0) && (
           <pre className="diff-pre">
-            {result.lines.map((line, i) => (
-              <div key={i} className={`diff-line diff-line-${line.kind}`}>
-                <span className="diff-line-num">{line.lineNum}</span>
-                <span className="diff-marker">
-                  {line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ' '}
-                </span>
-                <span className="diff-text">
-                  {line.tokens
-                    ? line.tokens.map((tok, j) => (
-                        <span key={j} style={{ color: tok.color }}>{tok.content}</span>
-                      ))
-                    : line.text}
-                </span>
-              </div>
-            ))}
+            {result.rows.map(row => {
+              if (row.type === 'line') return renderDiffLine(row.line);
+              if (expandedGaps.has(row.key)) return row.lines.map(renderDiffLine);
+              return (
+                <div
+                  key={row.key}
+                  className="diff-gap"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleGap(row.key)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleGap(row.key);
+                    }
+                  }}
+                >
+                  {t('diff.unchanged_lines' as any, { count: row.lines.length }) ||
+                    `⋯ ${row.lines.length} unchanged lines`}
+                </div>
+              );
+            })}
           </pre>
         )}
       </div>
@@ -209,10 +326,70 @@ export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPer
   );
 }
 
+// Render one diff line. Module-level so it can be reused for both ordinary
+// rows and the lines revealed when a gap is expanded. Self-keyed by
+// kind+lineNum, which is unique within a single file's diff (new-file line
+// numbers for add/eq, old-file for del; the kind prefix separates the two
+// numbering spaces), so React reconciles stably as gaps expand/collapse.
+function renderDiffLine(line: DiffLine) {
+  return (
+    <div key={`${line.kind}-${line.lineNum}`} className={`diff-line diff-line-${line.kind}`}>
+      <span className="diff-line-num">{line.lineNum}</span>
+      <span className="diff-marker">
+        {line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ' '}
+      </span>
+      <span className="diff-text">
+        {line.tokens
+          ? line.tokens.map((tok, j) => (
+              <span key={j} style={{ color: tok.color }}>{tok.content}</span>
+            ))
+          : line.text}
+      </span>
+    </div>
+  );
+}
+
+// Fold runs of unchanged lines that sit more than DIFF_CONTEXT_LINES from
+// any change into a single gap row. Keeps up to CONTEXT lines of orientation
+// on each side of every change; the leading run before the first change and
+// the trailing run after the last change have only one inner side, so they
+// keep context on that side only. A run is folded only when it would hide at
+// least DIFF_COLLAPSE_MIN_HIDDEN lines.
+function collapseToHunks(lines: DiffLine[]): DiffRow[] {
+  const CONTEXT = DIFF_CONTEXT_LINES;
+  const rows: DiffRow[] = [];
+  const n = lines.length;
+  let i = 0;
+  while (i < n) {
+    if (lines[i].kind !== 'eq') {
+      rows.push({ type: 'line', line: lines[i] });
+      i++;
+      continue;
+    }
+    // Equal run spans [i, j).
+    let j = i;
+    while (j < n && lines[j].kind === 'eq') j++;
+    const head = i > 0 ? CONTEXT : 0; // trailing context for the change above
+    const tail = j < n ? CONTEXT : 0; // leading context for the change below
+    const hidden = j - i - head - tail;
+    if (hidden < DIFF_COLLAPSE_MIN_HIDDEN) {
+      for (let k = i; k < j; k++) rows.push({ type: 'line', line: lines[k] });
+    } else {
+      for (let k = i; k < i + head; k++) rows.push({ type: 'line', line: lines[k] });
+      const hiddenLines = lines.slice(i + head, j - tail);
+      rows.push({ type: 'gap', key: `gap-${lines[i + head].lineNum}-${hiddenLines.length}`, lines: hiddenLines });
+      for (let k = j - tail; k < j; k++) rows.push({ type: 'line', line: lines[k] });
+    }
+    i = j;
+  }
+  return rows;
+}
+
 // Convert two text blobs into a flat list of unified-diff lines. We don't
 // emit @@ hunk headers — for an in-app audit panel users don't need
 // summary headers, just the +/- flow with line numbers. jsdiff returns
 // chunks (added/removed/eq); we flatten each into individual rows.
+// (collapseToHunks then folds the unchanged stretches for rendering.)
 function computeUnifiedDiff(oldText: string, newText: string): DiffLine[] {
   const out: DiffLine[] = [];
   const parts = diffLines(oldText, newText);

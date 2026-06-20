@@ -72,6 +72,8 @@ export const vi = {
   'diff.loading': 'Đang tải…',
   'diff.error': 'Không thể tải diff',
   'diff.no_changes': 'Giống với baseline',
+  'diff.too_large': 'Tệp quá lớn để hiển thị khác biệt từng dòng',
+  'diff.unchanged_lines': '⋯ {count} dòng không đổi',
   'task.default_title': 'Nhiệm vụ mới',
   'task.search_sessions': 'Tìm phiên làm việc...',
   'menu.no_recent': 'Không tìm thấy phiên gần đây',

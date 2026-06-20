@@ -34,6 +34,7 @@ const TOOL_ICON_SRC: Record<string, string> = {
   antigravity: '/icons/tools/antigravity.svg',
   hermes:      HERMES_DATA_URL,
   opencode:    OPENCODE_DATA_URL,
+  mimocode:    '/icons/tools/mimocode.svg',
 };
 
 const getToolIcon = (tool: string) => {

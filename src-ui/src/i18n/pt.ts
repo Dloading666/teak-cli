@@ -70,6 +70,8 @@ export const pt = {
   'diff.loading': 'Carregando…',
   'diff.error': 'Falha ao carregar diff',
   'diff.no_changes': 'Idêntico à baseline',
+  'diff.too_large': 'Arquivo muito grande para exibir o diff',
+  'diff.unchanged_lines': '⋯ {count} linhas inalteradas',
   'task.default_title': 'Nova tarefa',
   'task.search_sessions': 'Buscar sessões...',
   'menu.no_recent': 'Nenhuma sessão recente',

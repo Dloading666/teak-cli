@@ -217,6 +217,7 @@ mod antigravity;
 mod claude;
 mod codex;
 pub mod hermes;
+mod mimocode;
 mod openclaw;
 mod opencode;
 mod qwen;
@@ -232,6 +233,11 @@ pub static TOOLS: &[&ToolDescriptor] = &[
     &qwen::DESCRIPTOR,
     &openclaw::DESCRIPTOR,
     &hermes::DESCRIPTOR,
+    // MiMo Code is fully wired (launchpad tile in CenterPanel's AGENT_CATALOG,
+    // resume preset in terminal.rs, history/heatmap second pass in server.rs).
+    // Order here doesn't affect the launchpad (that list is hardcoded in the
+    // frontend); it only needs to be in the registry for list_tools + scanning.
+    &mimocode::DESCRIPTOR,
 ];
 
 /// Lookup by id. `None` if the id isn't registered. Used by hook

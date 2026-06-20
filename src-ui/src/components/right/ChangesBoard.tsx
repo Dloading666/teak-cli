@@ -250,6 +250,8 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
             expanded={diffExpanded}
             onToggleExpanded={onToggleDiffExpanded}
             heightPercent={diffHeight}
+            added={selectedRow?.added}
+            deleted={selectedRow?.deleted}
           />
         </>
       )}

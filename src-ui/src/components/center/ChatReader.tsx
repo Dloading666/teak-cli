@@ -64,7 +64,15 @@ export function ChatReader({ sessionId }: { sessionId: string }) {
     // jsonl shape the parser below already handles. All other tools
     // (Claude / Codex / Qwen / Hermes) keep their direct file path.
     const isOpencode = session.tool === 'opencode' && !!session.session_token;
-    if (!isOpencode && !session.file_path) {
+    // Newer Hermes sessions live in SQLite state.db with no per-session file:
+    // tool is hermes, a session_token is set, and there's no file_path. Legacy
+    // Hermes JSON sessions keep their file_path and use readNativeSession.
+    const isHermesDb = session.tool === 'hermes' && !!session.session_token && !session.file_path;
+    // MiMo Code stores its transcript in mimocode.db (same Drizzle schema as
+    // OpenCode); its file_path points at the shared db, so route it to the
+    // SQLite reader rather than readNativeSession.
+    const isMimocode = session.tool === 'mimocode' && !!session.session_token;
+    if (!isOpencode && !isHermesDb && !isMimocode && !session.file_path) {
       setLoading(false);
       return;
     }
@@ -74,7 +82,11 @@ export function ChatReader({ sessionId }: { sessionId: string }) {
 
     const readPromise = isOpencode
       ? commands.readOpencodeSession(session.session_token!)
-      : commands.readNativeSession(session.file_path!);
+      : isHermesDb
+        ? commands.readHermesSession(session.session_token!)
+        : isMimocode
+          ? commands.readMimocodeSession(session.session_token!)
+          : commands.readNativeSession(session.file_path!);
 
     readPromise
       .then((raw) => {

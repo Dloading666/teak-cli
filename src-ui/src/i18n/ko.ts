@@ -69,6 +69,8 @@ export const ko = {
   'diff.loading': '로딩 중…',
   'diff.error': '차이 로드 실패',
   'diff.no_changes': '베이스라인과 동일',
+  'diff.too_large': '파일이 너무 커서 인라인 차이를 표시하지 않음',
+  'diff.unchanged_lines': '⋯ 변경되지 않은 {count}줄',
   'task.default_title': '새 작업',
   'task.search_sessions': '세션 검색...',
   'menu.no_recent': '최근 세션이 없습니다',

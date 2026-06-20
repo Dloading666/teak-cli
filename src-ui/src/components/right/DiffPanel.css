@@ -189,6 +189,31 @@
   font-size: 12px;
 }
 
+/* Summary shown in place of a per-line diff when the file is too large to
+ * render inline (see DIFF_MAX_BYTES / DIFF_MAX_CHANGED_LINES). Centered
+ * like .diff-empty, but still surfaces the Rust badge's +N/-M so the user
+ * sees the change magnitude even when the lines aren't rendered. Add/del
+ * hues match the changes-list badge (ChangesBoard.css). */
+.diff-toolarge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-3, var(--text-2));
+  font-size: 12px;
+}
+.diff-toolarge-stats {
+  display: inline-flex;
+  gap: 10px;
+  font-family: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+}
+.diff-toolarge-stats .diff-add { color: #4ec76b; }
+.diff-toolarge-stats .diff-del { color: #e07070; }
+
 /* inline-block + min-width:100% lets the pre grow as wide as its widest line
  * (so horizontal scrollbar works) while still filling the panel for short
  * content (so row backgrounds span full width, not just the text). */
@@ -210,6 +235,31 @@
    * backgrounds (red/green tints on add/del lines) stretch panel-edge
    * to panel-edge, no left/right whitespace gaps. */
   white-space: pre;
+}
+
+/* Folded run of unchanged lines (hunk view). Click / Enter / Space to
+ * reveal the hidden lines in place. Deliberately text-only — no
+ * background, border, or shadow — so it renders identically under the
+ * glass shape, whose nuclear-transparent rule (global.css:1218) strips
+ * descendant bg/border/shadow but never touches text color. The italic
+ * dim text + hover brighten signal "this is a control" without chrome. */
+.diff-gap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 0;
+  font-family: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  font-style: italic;
+  white-space: normal;
+  color: var(--text-3, var(--text-2));
+  opacity: 0.8;
+  cursor: pointer;
+  user-select: none;
+}
+.diff-gap:hover {
+  color: var(--text-1);
+  opacity: 1;
 }
 /* Line number column. Right-aligned so 1-digit and 4-digit line numbers
  * line up against the marker. Dimmed via opacity so it doesn't compete

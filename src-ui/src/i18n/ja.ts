@@ -69,6 +69,8 @@ export const ja = {
   'diff.loading': '読み込み中…',
   'diff.error': '差分を読み込めません',
   'diff.no_changes': 'ベースラインと同一',
+  'diff.too_large': 'ファイルが大きいため差分を表示しません',
+  'diff.unchanged_lines': '⋯ 未変更 {count} 行',
   'task.default_title': '新しいタスク',
   'task.search_sessions': 'セッションを検索...',
   'menu.no_recent': '最近のセッションはありません',

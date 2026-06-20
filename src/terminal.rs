@@ -342,6 +342,20 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         token_format: Some(r"^ses_[A-Za-z0-9]{20,40}$"),
         prompt_markers: &["┃"],
     },
+    // MiMo Code — Xiaomi's OpenCode fork. Same resume contract as OpenCode
+    // (`<bin> --session ses_<...>`), same `ses_` token shape and idle prompt
+    // border. Only the binary differs; `resume_program: "mimo"` is the
+    // best-guess command name — correct it here AND in tools/mimocode.rs
+    // (binary_name) if MiMo Code actually ships as `mimocode`.
+    AgentPreset {
+        tool_name: "mimocode",
+        resume_program: Some("mimo"),
+        resume_args_before: &["--session"],
+        resume_args_after: &[],
+        session_id_pattern: None,
+        token_format: Some(r"^ses_[A-Za-z0-9]{20,40}$"),
+        prompt_markers: &["┃"],
+    },
     // Codex CLI resume: `codex resume <id>` is a positional subcommand,
     // not a `--resume` flag. Token is the rollout filename stem (UUID).
     AgentPreset {
@@ -536,7 +550,7 @@ pub fn spawn(
     // it — maximum benefit, zero risk for those that do.
     let is_ai_cli = matches!(
         tool_name.as_deref(),
-        Some("claude") | Some("qwen") | Some("opencode") | Some("hermes") | Some("codex") | Some("antigravity")
+        Some("claude") | Some("qwen") | Some("opencode") | Some("mimocode") | Some("hermes") | Some("codex") | Some("antigravity")
     );
 
     if is_ai_cli {

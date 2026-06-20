@@ -106,6 +106,14 @@ export const commands = {
   readNativeSession: (filePath: string) => invoke<string>('read_native_session', { filePath }),
   readOpencodeSession: (sessionId: string) =>
     invoke<string>('read_opencode_session', { sessionId }),
+  // Hermes Agent sessions from the newer SQLite state.db (no per-session
+  // file). Returns the same newline-delimited {message:{role,content}} shape
+  // as readNativeSession so ChatReader's parser handles it unchanged.
+  readHermesSession: (sessionToken: string) =>
+    invoke<string>('read_hermes_session', { sessionToken }),
+  // MiMo Code (OpenCode fork) — same SQLite schema, read from mimocode.db.
+  readMimocodeSession: (sessionToken: string) =>
+    invoke<string>('read_mimocode_session', { sessionToken }),
   tierTerminalResume: (sessionId: string, savedSessionId: string, tool: string, sessionToken: string, cols: number, rows: number, cwd: string) =>
     invoke<void>('tier_terminal_resume', { sessionId, savedSessionId, tool, sessionToken, cols, rows, cwd }),
   checkNetworkPort: (host: string, port: number) => invoke<boolean>('check_network_port', { host, port }),
@@ -166,6 +174,12 @@ export const commands = {
     invoke<string | null>('get_baseline_content', { path }),
   readTextFile: (path: string) =>
     invoke<string | null>('read_text_file', { path }),
+  // Cheap pre-read probe for the Diff panel: the file's on-disk byte size
+  // (real UTF-8 bytes) so the panel can reject oversized files for an inline
+  // diff BEFORE marshalling their contents over IPC. `current_exists` is
+  // false when the path is missing or not a regular file.
+  getDiffMeta: (path: string) =>
+    invoke<{ current_bytes: number; current_exists: boolean }>('get_diff_meta', { path }),
 
   // File system operations
   fsDelete: (path: string) => invoke<void>('fs_delete', { path }),

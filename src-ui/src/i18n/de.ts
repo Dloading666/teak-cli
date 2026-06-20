@@ -70,6 +70,8 @@ export const de = {
   'diff.loading': 'Wird geladen…',
   'diff.error': 'Diff konnte nicht geladen werden',
   'diff.no_changes': 'Identisch mit Baseline',
+  'diff.too_large': 'Datei zu groß für die Inline-Diff-Ansicht',
+  'diff.unchanged_lines': '⋯ {count} unveränderte Zeilen',
   'task.default_title': 'Neue Aufgabe',
   'task.search_sessions': 'Sitzungen durchsuchen...',
   'menu.no_recent': 'Keine aktuellen Sitzungen',

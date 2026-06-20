@@ -70,6 +70,8 @@ export const ru = {
   'diff.loading': 'Загрузка…',
   'diff.error': 'Не удалось загрузить diff',
   'diff.no_changes': 'Идентично базовой версии',
+  'diff.too_large': 'Файл слишком большой для построчного просмотра',
+  'diff.unchanged_lines': '⋯ {count} строк без изменений',
   'task.default_title': 'Новая задача',
   'task.search_sessions': 'Поиск сессий...',
   'menu.no_recent': 'Нет недавних сессий',

@@ -71,6 +71,8 @@ export const en = {
   'diff.loading': 'Loading…',
   'diff.error': 'Failed to load diff',
   'diff.no_changes': 'Identical to baseline',
+  'diff.too_large': 'File too large to show inline diff',
+  'diff.unchanged_lines': '⋯ {count} unchanged lines',
   'task.default_title': 'New Task',
   'task.search_sessions': 'Search sessions...',
   'menu.no_recent': 'No recent sessions found',
