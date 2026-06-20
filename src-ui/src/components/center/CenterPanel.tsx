@@ -1245,13 +1245,16 @@ export function CenterPanel() {
                     claude/codex/opencode each have a forwarder (Python
                     script for claude+codex, Bun plugin for opencode)
                     wired to the same agent-status bus; color follows
-                    session.agentStatus. Hyper-Agent is the MCP admin
+                    session.agentStatus. MiMo Code (OpenCode fork) has no
+                    forwarder, but the status ticker is preset-driven, so its
+                    `┃` prompt-marker + silence detection feeds the same bus —
+                    same mechanism, just no plugin. Hyper-Agent is the MCP admin
                     tab — its job is "stay open so OpenClaw / Hermes
                     Agent can drive the team", so the tab being open
                     *is* the alive signal: always green idle, no agent
                     state to read. Anything else (terminal, history,
                     multi-agent, etc.) gets no indicator. */}
-                {(session.tool === 'claude' || session.tool === 'codex' || session.tool === 'opencode' || session.tool === 'hermes' || session.tool === 'hyper-agent') && (
+                {(session.tool === 'claude' || session.tool === 'codex' || session.tool === 'opencode' || session.tool === 'mimocode' || session.tool === 'hermes' || session.tool === 'hyper-agent') && (
                   <div className={`tab-status-grid status-${
                     session.tool === 'hyper-agent'
                       ? 'idle'
