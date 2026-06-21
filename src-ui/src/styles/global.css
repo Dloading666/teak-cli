@@ -262,7 +262,6 @@ textarea,
     /* How strongly the mesh + accent read. Lower = more matte/subtle.
        Kept low so the centre glow never washes out terminal text. */
     --carbon-mesh-opacity: 0.38;
-    --carbon-tint: color-mix(in oklab, var(--bg-app) 68%, transparent);
 }
 
 /* ─── Dark Theme (Claude-inspired & Espresso) ──────────── */
@@ -1653,30 +1652,35 @@ body.gambit-docked .chat-reader-container {
 
 /* ═══════════════════════════════════════════════════════
    CARBON — matte hexagonal honeycomb material (experimental)
-   Layering (bottom → top), all painted behind the app chrome:
-     1. body background  — cold dark base + soft accent wash + vignette
-     2. body::before     — the accent hex MESH (mask = SVG hexagons),
-                           brightest in the centre, fading out (matte)
-     3. #root            — translucent tint so the mesh reads through
-     4. titlebar/panels  — transparent so #root's tinted mesh shows
+   Painted ENTIRELY on #root, which owns the 10px rounded clip.
+   body MUST stay transparent: WebView2 promotes a body background to
+   its own GPU layer that ignores clip-path, leaking square corners
+   (see the body{} comment up top — same trap Glass avoids by also
+   painting on #root). Layering (bottom → top):
+     1. #root background — theme base + accent wash + edge vignette
+     2. #root::before    — the accent hex MESH (SVG-hexagon mask),
+                           bright centre → matte edges, behind chrome
+     3. titlebar/panels  — transparent so the mesh reads through
    Static only: gradients + one alpha-mask, no JS / animation / blur.
    ═══════════════════════════════════════════════════════ */
-[data-shape="carbon"] body {
+[data-shape="carbon"] #root {
     position: relative;
     background:
+        /* centre accent wash */
         radial-gradient(130% 100% at 50% 36%,
-            color-mix(in oklab, var(--accent) 7%, transparent), transparent 52%),
+            color-mix(in oklab, var(--accent) 9%, transparent), transparent 54%),
+        /* edge vignette for focal depth */
         radial-gradient(150% 120% at 50% 36%,
-            transparent 26%, rgba(0, 0, 0, 0.66) 100%),
-        #0a0708;
+            transparent 30%, rgba(0, 0, 0, 0.42) 100%),
+        var(--bg-app);
 }
 
-/* The hexagon mesh. Its background is an accent radial that is bright at
-   the centre and fades to nothing; the SVG hex-outline mask carves that
-   glow into honeycomb lines → accent-coloured mesh, brighter in the
-   middle, matte at the edges. z-index:-1 keeps it above body's own
-   background but behind #root (which is translucent over it). */
-[data-shape="carbon"] body::before {
+/* The hex mesh — an accent radial (bright centre + faint ambient floor)
+   carved into a honeycomb by the SVG hexagon mask. z-index:-1 sits it
+   above #root's own background but below the flex children (chrome), and
+   #root's clip-path rounds it together with the rest of the surface so
+   the four window corners stay rounded like every other shape. */
+[data-shape="carbon"] #root::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -1698,12 +1702,6 @@ body.gambit-docked .chat-reader-container {
     -webkit-mask-repeat: repeat;
             mask-repeat: repeat;
     opacity: var(--carbon-mesh-opacity);
-}
-
-/* #root drops from opaque --bg-app to a translucent tint so the mesh on
-   body shows through; keeps the rounded clip + flex layout untouched. */
-[data-shape="carbon"] #root {
-    background: var(--carbon-tint);
 }
 
 /* Chrome goes transparent so the unified carbon backdrop reads across the

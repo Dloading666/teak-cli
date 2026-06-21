@@ -473,13 +473,6 @@
   padding: 2px;
 }
 
-/* Carbon (experimental 6th form) drops to its own full-width row,
-   sitting on a new line after Panel. flex-basis:100% can't share a
-   line, so it wraps below the first five chips. */
-.theme-shape-chip--break {
-  flex-basis: 100%;
-}
-
 .theme-shape-chip {
   flex: 1 1 auto;
   padding: 6px 8px;

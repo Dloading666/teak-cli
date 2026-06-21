@@ -422,7 +422,7 @@ function ThemeMenu({ anchorRef, currentTheme, currentShape, currentIconTheme, ha
         {THEME_SHAPES.map(s => (
           <button
             key={s.code}
-            className={`theme-shape-chip ${s.code === 'carbon' ? 'theme-shape-chip--break' : ''} ${s.code === currentShape ? 'active' : ''}`}
+            className={`theme-shape-chip ${s.code === currentShape ? 'active' : ''}`}
             onClick={() => onSelectShape(s.code)}
           >
             {s.label}
