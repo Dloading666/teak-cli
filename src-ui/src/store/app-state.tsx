@@ -451,7 +451,7 @@ const VALID_ICON_THEMES: IconTheme[] = [
 
 function getInitialState(): AppState {
   let theme: ThemeColor = 'dark';
-  let shape: ThemeShape = 'panel';
+  let shape: ThemeShape = 'carbon';
   let iconTheme: IconTheme = 'devicon';
   let lang = 'zh-CN';
   let folderPath: string | null = null;
