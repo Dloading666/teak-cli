@@ -1657,43 +1657,40 @@ body.gambit-docked .chat-reader-container {
    its own GPU layer that ignores clip-path, leaking square corners
    (see the body{} comment up top — same trap Glass avoids by also
    painting on #root). Layering (bottom → top):
-     1. #root background — theme base + accent wash + edge vignette
-     2. #root::before    — the accent hex MESH (SVG-hexagon mask),
-                           bright centre → matte edges, behind chrome
-     3. titlebar/panels  — transparent so the mesh reads through
+     1. #root background — cold dark base + accent wash + edge vignette
+     2. #root::before    — the accent hex MESH (SVG-hexagon mask)
+     3. #root::after     — theme-coloured veil (light theme reads light,
+                           mutes the mesh to a tasteful strength)
+     4. titlebar/panels  — transparent so the veiled mesh reads through
+   This reproduces the original body-based stack exactly, just moved onto
+   #root so the rounded clip owns the corners.
    Static only: gradients + one alpha-mask, no JS / animation / blur.
    ═══════════════════════════════════════════════════════ */
+/* Layer 1 (bottom): cold dark base + soft accent wash + edge vignette. */
 [data-shape="carbon"] #root {
     position: relative;
     background:
-        /* centre accent wash */
         radial-gradient(130% 100% at 50% 36%,
-            color-mix(in oklab, var(--accent) 9%, transparent), transparent 54%),
-        /* edge vignette for focal depth */
+            color-mix(in oklab, var(--accent) 7%, transparent), transparent 52%),
         radial-gradient(150% 120% at 50% 36%,
-            transparent 30%, rgba(0, 0, 0, 0.42) 100%),
-        var(--bg-app);
+            transparent 26%, rgba(0, 0, 0, 0.66) 100%),
+        #0a0708;
 }
 
-/* The hex mesh — an accent radial (bright centre + faint ambient floor)
-   carved into a honeycomb by the SVG hexagon mask. z-index:-1 sits it
-   above #root's own background but below the flex children (chrome), and
-   #root's clip-path rounds it together with the rest of the surface so
-   the four window corners stay rounded like every other shape. */
+/* Layer 2: the accent hex MESH (glow centre + ambient floor), carved by
+   the SVG hexagon mask. z-index:-2 → above #root's base, below the veil
+   and the chrome. */
 [data-shape="carbon"] #root::before {
     content: '';
     position: absolute;
     inset: 0;
-    z-index: -1;
+    z-index: -2;
     pointer-events: none;
     background:
-        /* centre glow — the bright focal pop */
         radial-gradient(120% 95% at 50% 36%,
             color-mix(in oklab, var(--accent) 46%, transparent),
             color-mix(in oklab, var(--accent) 14%, transparent) 42%,
             transparent 64%),
-        /* ambient floor — keeps the mesh faintly lit across the whole
-           window (left rail / tab strip / menus), not only the centre */
         color-mix(in oklab, var(--accent) 15%, transparent);
     -webkit-mask-image: var(--carbon-hex);
             mask-image: var(--carbon-hex);
@@ -1702,6 +1699,19 @@ body.gambit-docked .chat-reader-container {
     -webkit-mask-repeat: repeat;
             mask-repeat: repeat;
     opacity: var(--carbon-mesh-opacity);
+}
+
+/* Layer 3: the theme-coloured VEIL over base+mesh (z-index:-1, above the
+   mesh, below the chrome). This is what makes the light theme read light
+   and mutes the mesh to its tasteful, un-busy strength — the exact role
+   the old #root --carbon-tint played, just kept inside #root's clip now. */
+[data-shape="carbon"] #root::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: color-mix(in oklab, var(--bg-app) 68%, transparent);
 }
 
 /* Chrome goes transparent so the unified carbon backdrop reads across the
