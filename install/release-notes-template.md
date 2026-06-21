@@ -1,24 +1,11 @@
-## Install
+<!-- 发版前把下面替换成本版真正的更新内容（手写、面向用户、精炼）。
+     不要写安装/下载——GitHub 页面下方的 Assets 和 README 已自带。
+     这份骨架只是草稿占位，发布前务必填好。 -->
 
-**Windows**
-```powershell
-irm https://raw.githubusercontent.com/edison7009/Coffee-CLI/main/install/install.ps1 | iex
-```
+## ✨ 新增
 
-**macOS / Linux**
-```bash
-curl -fsSL https://raw.githubusercontent.com/edison7009/Coffee-CLI/main/install/install.sh | sh
-```
+-
 
-Or download the matching asset for your platform below.
+## 🐛 修复 / 打磨
 
-| Platform | File |
-|---|---|
-| Windows x64 | `Coffee.CLI_*_Windows_x64-setup.exe` (or `.msi`) |
-| macOS Apple Silicon | `Coffee.CLI_*_macOS_arm64.dmg` |
-| Linux x64 (Debian/Ubuntu) | `Coffee.CLI_*_Linux_x64.deb` |
-| Linux x64 (Fedora/RHEL/openSUSE) | `Coffee.CLI_*_Linux_x64.rpm` |
-| Linux x64 (universal) | `Coffee.CLI_*_Linux_x64.AppImage` |
-| Linux arm64 (Debian/Ubuntu) | `Coffee.CLI_*_Linux_arm64.deb` |
-| Linux arm64 (Fedora/RHEL/openSUSE) | `Coffee.CLI_*_Linux_arm64.rpm` |
-| Linux arm64 (universal) | `Coffee.CLI_*_Linux_arm64.AppImage` |
+-
