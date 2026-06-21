@@ -235,7 +235,7 @@ textarea,
 }
 
 /* Carbon — matte hexagonal honeycomb mesh (Spider-Man micro-material).
-   EXPERIMENTAL 6th form. Same rounded radii as Soft; the visual identity
+   The 6th shape form, and the default. Same rounded radii as Soft; the visual identity
    comes from a code-drawn hex mesh painted behind translucent chrome. The
    mesh is a single SVG hexagon-outline used as a `mask` so its colour
    follows the theme --accent (no baked-in image, recolours per palette).
@@ -255,7 +255,7 @@ textarea,
     --shape-radius-pill: 9999px;
     /* Hexagon-outline tile (Hero Patterns geometry) used as an alpha mask.
        Tile is 28×49; scale via --carbon-hex-size keeping that 28:49 ratio
-       or the honeycomb won't tile seamlessly. ~22px ≈ the fine density we
+       or the honeycomb won't tile seamlessly. 13px ≈ the fine density we
        tuned in the preview. */
     --carbon-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23fff'/%3E%3C/svg%3E");
     --carbon-hex-size: 13px 22.75px;
@@ -1651,7 +1651,7 @@ body.gambit-docked .chat-reader-container {
 }
 
 /* ═══════════════════════════════════════════════════════
-   CARBON — matte hexagonal honeycomb material (experimental)
+   CARBON — matte hexagonal honeycomb material (default shape)
    Painted ENTIRELY on #root, which owns the 10px rounded clip.
    body MUST stay transparent: WebView2 promotes a body background to
    its own GPU layer that ignores clip-path, leaking square corners
@@ -1716,8 +1716,8 @@ body.gambit-docked .chat-reader-container {
 
 /* Chrome goes transparent so the unified carbon backdrop reads across the
    whole window (same idea as Glass, minus the blur). Inner content keeps
-   its own surfaces for readability — this is the first test pass; tighten
-   per-region tints later. */
+   its own surfaces for readability; per-region tints can be tightened
+   later. */
 [data-shape="carbon"] .titlebar,
 [data-shape="carbon"] .panel-left,
 [data-shape="carbon"] .panel-right,
