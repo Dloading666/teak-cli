@@ -1736,3 +1736,12 @@ body.gambit-docked .chat-reader-container {
     background-image: none !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
+
+/* Active-tab corner "flares" paint opaque var(--bg-terminal) (cream in the
+   light theme) to bridge the tab into the terminal below. On carbon the
+   content area is transparent mesh, so those arcs read as stray white
+   corners. Hide them — same as glass/slab/sharp/panel already do. */
+[data-shape="carbon"] .chrome-tab.active::before,
+[data-shape="carbon"] .chrome-tab.active::after {
+    display: none;
+}
