@@ -1716,6 +1716,14 @@ body.gambit-docked .chat-reader-container {
 [data-shape="carbon"] .panel-center,
 [data-shape="carbon"] .main-content {
     background: transparent;
+    /* --glass-blur is defined per-theme (not only in the glass shape),
+       so .panel-left's backdrop-filter is otherwise active under carbon.
+       That blur isolates the left rail into its own backdrop root and it
+       samples black instead of the mesh behind #root — the reason the
+       left panel stayed flat while the centre showed through. Kill it;
+       carbon is a static, no-blur material. */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 /* Floating menus (theme/settings popover, right-click menus) drop to a
