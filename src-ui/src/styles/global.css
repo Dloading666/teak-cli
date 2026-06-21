@@ -1238,9 +1238,9 @@ body.gambit-docked .chat-reader-container {
    Buttons / inputs / textareas / anchors aren't matched by the
    element list at all, so their own hover/focus bgs are
    untouched. */
-[data-shape="glass"] .panel-left :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-tabs, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
-[data-shape="glass"] .panel-right :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-tabs, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
-[data-shape="glass"] .panel-center :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-tabs, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line) {
+:is([data-shape="glass"], [data-shape="carbon"]) .panel-left :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-tabs, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
+:is([data-shape="glass"], [data-shape="carbon"]) .panel-right :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-tabs, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
+:is([data-shape="glass"], [data-shape="carbon"]) .panel-center :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-tabs, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line) {
     background: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;
@@ -1682,10 +1682,15 @@ body.gambit-docked .chat-reader-container {
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background: radial-gradient(120% 95% at 50% 36%,
-        color-mix(in oklab, var(--accent) 52%, transparent),
-        color-mix(in oklab, var(--accent) 16%, transparent) 40%,
-        transparent 56%);
+    background:
+        /* centre glow — the bright focal pop */
+        radial-gradient(120% 95% at 50% 36%,
+            color-mix(in oklab, var(--accent) 46%, transparent),
+            color-mix(in oklab, var(--accent) 14%, transparent) 42%,
+            transparent 64%),
+        /* ambient floor — keeps the mesh faintly lit across the whole
+           window (left rail / tab strip / menus), not only the centre */
+        color-mix(in oklab, var(--accent) 15%, transparent);
     -webkit-mask-image: var(--carbon-hex);
             mask-image: var(--carbon-hex);
     -webkit-mask-size: var(--carbon-hex-size);
@@ -1711,4 +1716,15 @@ body.gambit-docked .chat-reader-container {
 [data-shape="carbon"] .panel-center,
 [data-shape="carbon"] .main-content {
     background: transparent;
+}
+
+/* Floating menus (theme/settings popover, right-click menus) drop to a
+   smoked translucent fill so the carbon mesh reads behind them while the
+   items stay legible. No blur — keeps carbon's static/zero-cost rule. */
+[data-shape="carbon"] .ctx-menu,
+[data-shape="carbon"] .gambit-skill-popover,
+[data-shape="carbon"] .term-ctx-menu {
+    background-color: color-mix(in oklab, var(--bg-app) 76%, transparent) !important;
+    background-image: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
