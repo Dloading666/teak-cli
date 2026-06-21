@@ -234,6 +234,36 @@ textarea,
     --shape-border-strength: 2;
 }
 
+/* Carbon — matte hexagonal honeycomb mesh (Spider-Man micro-material).
+   EXPERIMENTAL 6th form. Same rounded radii as Soft; the visual identity
+   comes from a code-drawn hex mesh painted behind translucent chrome. The
+   mesh is a single SVG hexagon-outline used as a `mask` so its colour
+   follows the theme --accent (no baked-in image, recolours per palette).
+   Fully static: no JS, no animation, no backdrop-filter — just layered
+   gradients + one mask, so zero runtime/CPU cost.
+   See the matte-mesh derivation: dark cold base, accent only bleeding
+   from the centre, low-contrast lines (matte, not glossy). */
+[data-shape="carbon"] {
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+    --radius-pill: 9999px;
+    --shape-radius-tab: 10px 10px 0 0;
+    --shape-radius-panel: 16px;
+    --shape-radius-btn: 8px;
+    --shape-radius-pill: 9999px;
+    /* Hexagon-outline tile (Hero Patterns geometry) used as an alpha mask.
+       Tile is 28×49; scale via --carbon-hex-size keeping that 28:49 ratio
+       or the honeycomb won't tile seamlessly. ~22px ≈ the fine density we
+       tuned in the preview. */
+    --carbon-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23fff'/%3E%3C/svg%3E");
+    --carbon-hex-size: 22px 38.5px;
+    /* How strongly the mesh + accent read. Lower = more matte/subtle. */
+    --carbon-mesh-opacity: 0.62;
+    --carbon-tint: color-mix(in oklab, var(--bg-app) 52%, transparent);
+}
+
 /* ─── Dark Theme (Claude-inspired & Espresso) ──────────── */
 [data-theme="dark"] {
     --bg-app: #1a1917; /* Deep Espresso */
@@ -1618,4 +1648,66 @@ body.gambit-docked .chat-reader-container {
 
 [data-shape="panel"] .launchpad-card:hover {
     background: var(--bg-hover);
+}
+
+/* ═══════════════════════════════════════════════════════
+   CARBON — matte hexagonal honeycomb material (experimental)
+   Layering (bottom → top), all painted behind the app chrome:
+     1. body background  — cold dark base + soft accent wash + vignette
+     2. body::before     — the accent hex MESH (mask = SVG hexagons),
+                           brightest in the centre, fading out (matte)
+     3. #root            — translucent tint so the mesh reads through
+     4. titlebar/panels  — transparent so #root's tinted mesh shows
+   Static only: gradients + one alpha-mask, no JS / animation / blur.
+   ═══════════════════════════════════════════════════════ */
+[data-shape="carbon"] body {
+    position: relative;
+    background:
+        radial-gradient(130% 100% at 50% 36%,
+            color-mix(in oklab, var(--accent) 12%, transparent), transparent 56%),
+        radial-gradient(150% 120% at 50% 36%,
+            transparent 28%, rgba(0, 0, 0, 0.62) 100%),
+        #0a0708;
+}
+
+/* The hexagon mesh. Its background is an accent radial that is bright at
+   the centre and fades to nothing; the SVG hex-outline mask carves that
+   glow into honeycomb lines → accent-coloured mesh, brighter in the
+   middle, matte at the edges. z-index:-1 keeps it above body's own
+   background but behind #root (which is translucent over it). */
+[data-shape="carbon"] body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(120% 95% at 50% 36%,
+        color-mix(in oklab, var(--accent) 85%, transparent),
+        color-mix(in oklab, var(--accent) 32%, transparent) 42%,
+        transparent 70%);
+    -webkit-mask-image: var(--carbon-hex);
+            mask-image: var(--carbon-hex);
+    -webkit-mask-size: var(--carbon-hex-size);
+            mask-size: var(--carbon-hex-size);
+    -webkit-mask-repeat: repeat;
+            mask-repeat: repeat;
+    opacity: var(--carbon-mesh-opacity);
+}
+
+/* #root drops from opaque --bg-app to a translucent tint so the mesh on
+   body shows through; keeps the rounded clip + flex layout untouched. */
+[data-shape="carbon"] #root {
+    background: var(--carbon-tint);
+}
+
+/* Chrome goes transparent so the unified carbon backdrop reads across the
+   whole window (same idea as Glass, minus the blur). Inner content keeps
+   its own surfaces for readability — this is the first test pass; tighten
+   per-region tints later. */
+[data-shape="carbon"] .titlebar,
+[data-shape="carbon"] .panel-left,
+[data-shape="carbon"] .panel-right,
+[data-shape="carbon"] .panel-center,
+[data-shape="carbon"] .main-content {
+    background: transparent;
 }

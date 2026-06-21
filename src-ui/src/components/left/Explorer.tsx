@@ -343,6 +343,7 @@ const THEME_SHAPES: { code: ThemeShape; label: string }[] = [
   { code: 'sharp', label: 'Sharp' },
   { code: 'glass', label: 'Glass' },
   { code: 'panel', label: 'Panel' },
+  { code: 'carbon', label: 'Carbon' },
 ];
 
 import { TERM_COLOR_SCHEMES } from '../center/TierTerminal';
@@ -421,7 +422,7 @@ function ThemeMenu({ anchorRef, currentTheme, currentShape, currentIconTheme, ha
         {THEME_SHAPES.map(s => (
           <button
             key={s.code}
-            className={`theme-shape-chip ${s.code === currentShape ? 'active' : ''}`}
+            className={`theme-shape-chip ${s.code === 'carbon' ? 'theme-shape-chip--break' : ''} ${s.code === currentShape ? 'active' : ''}`}
             onClick={() => onSelectShape(s.code)}
           >
             {s.label}
