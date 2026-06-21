@@ -258,10 +258,11 @@ textarea,
        or the honeycomb won't tile seamlessly. ~22px ≈ the fine density we
        tuned in the preview. */
     --carbon-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z' fill='%23fff'/%3E%3C/svg%3E");
-    --carbon-hex-size: 22px 38.5px;
-    /* How strongly the mesh + accent read. Lower = more matte/subtle. */
-    --carbon-mesh-opacity: 0.62;
-    --carbon-tint: color-mix(in oklab, var(--bg-app) 52%, transparent);
+    --carbon-hex-size: 13px 22.75px;
+    /* How strongly the mesh + accent read. Lower = more matte/subtle.
+       Kept low so the centre glow never washes out terminal text. */
+    --carbon-mesh-opacity: 0.38;
+    --carbon-tint: color-mix(in oklab, var(--bg-app) 68%, transparent);
 }
 
 /* ─── Dark Theme (Claude-inspired & Espresso) ──────────── */
@@ -1664,9 +1665,9 @@ body.gambit-docked .chat-reader-container {
     position: relative;
     background:
         radial-gradient(130% 100% at 50% 36%,
-            color-mix(in oklab, var(--accent) 12%, transparent), transparent 56%),
+            color-mix(in oklab, var(--accent) 7%, transparent), transparent 52%),
         radial-gradient(150% 120% at 50% 36%,
-            transparent 28%, rgba(0, 0, 0, 0.62) 100%),
+            transparent 26%, rgba(0, 0, 0, 0.66) 100%),
         #0a0708;
 }
 
@@ -1682,9 +1683,9 @@ body.gambit-docked .chat-reader-container {
     z-index: -1;
     pointer-events: none;
     background: radial-gradient(120% 95% at 50% 36%,
-        color-mix(in oklab, var(--accent) 85%, transparent),
-        color-mix(in oklab, var(--accent) 32%, transparent) 42%,
-        transparent 70%);
+        color-mix(in oklab, var(--accent) 52%, transparent),
+        color-mix(in oklab, var(--accent) 16%, transparent) 40%,
+        transparent 56%);
     -webkit-mask-image: var(--carbon-hex);
             mask-image: var(--carbon-hex);
     -webkit-mask-size: var(--carbon-hex-size);
