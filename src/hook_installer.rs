@@ -119,8 +119,12 @@ fn dispatch_install(tool: &crate::tools::ToolDescriptor, home: &Path) {
         "codex" => install_codex(home),
         "opencode" => {
             install_opencode(home);
-            ensure_opencode_tui_theme_default(home);
+            ensure_opencode_tui_theme_default(home, "opencode");
         }
+        // MiMo Code (Xiaomi OpenCode fork) ships the same opaque #000 default
+        // canvas, so it needs the identical tui.json transparency override. It
+        // does NOT get the OpenCode island plugin — only the theme write.
+        "mimocode" => ensure_opencode_tui_theme_default(home, "mimocode"),
         "hermes" => install_hermes(home),
         other => {
             eprintln!(
@@ -132,11 +136,13 @@ fn dispatch_install(tool: &crate::tools::ToolDescriptor, home: &Path) {
     }
 }
 
-/// OpenCode TUI theme we default users into. `lucent-orng` sets all four
-/// background slots (background / backgroundPanel / backgroundElement /
-/// backgroundMenu) to `"transparent"`, which is what makes Coffee CLI's
-/// terminal bg — and the Glass theme's wallpaper blur — actually visible
-/// behind the OpenCode TUI. Confirmed working 2026-05-09.
+/// TUI theme we default OpenCode-family tools (OpenCode, MiMo Code) into.
+/// `lucent-orng` sets all four background slots (background / backgroundPanel
+/// / backgroundElement / backgroundMenu) to `"transparent"`, which is what
+/// makes Coffee CLI's terminal bg — and the Glass theme's wallpaper blur —
+/// actually visible behind the TUI. Confirmed working for OpenCode 2026-05-09;
+/// MiMo Code is a Xiaomi OpenCode fork that ships the same bundled themes and
+/// the same opaque #000 default canvas, so it needs the identical override.
 const OPENCODE_DEFAULT_THEME: &str = "lucent-orng";
 
 /// Theme value Coffee CLI used to write into tui.json before we discovered
@@ -331,11 +337,12 @@ fn install_hermes(home: &Path) {
     }
 }
 
-/// Ensure ~/.config/opencode/tui.json has `"theme": "lucent-orng"` so the
-/// OpenCode TUI's four bg slots resolve to "transparent" — which is what
-/// actually lets Coffee CLI's terminal bg (and the Glass theme's wallpaper
-/// blur) show through. Without this, OpenCode picks its bundled `opencode`
-/// theme that paints an opaque #000 canvas no terminal setting can override.
+/// Ensure ~/.config/<config_subdir>/tui.json has `"theme": "lucent-orng"` so
+/// the OpenCode-family TUI's four bg slots resolve to "transparent" — which is
+/// what actually lets Coffee CLI's terminal bg (and the Glass theme's wallpaper
+/// blur) show through. Without this the TUI picks its bundled opaque theme that
+/// paints a #000 canvas no terminal setting can override. Shared by OpenCode
+/// (`opencode`) and its Xiaomi fork MiMo Code (`mimocode`).
 ///
 /// Policy:
 ///   - File missing                              → create with default theme.
@@ -348,8 +355,8 @@ fn install_hermes(home: &Path) {
 ///   - File unparseable                          → leave alone.
 ///
 /// All failures are logged, never fatal.
-fn ensure_opencode_tui_theme_default(home: &Path) {
-    let config_dir = home.join(".config").join("opencode");
+fn ensure_opencode_tui_theme_default(home: &Path, config_subdir: &str) {
+    let config_dir = home.join(".config").join(config_subdir);
     let tui_path = config_dir.join("tui.json");
 
     if let Err(e) = fs::create_dir_all(&config_dir) {

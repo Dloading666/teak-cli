@@ -7,11 +7,13 @@
 //! See server.rs `mimocode_db`, `find_drizzle_sessions_sqlite`, and
 //! `read_mimocode_session`.
 //!
-//! Two deliberate divergences from OpenCode:
-//!   - `has_hook_surface: false` — unlike OpenCode, MiMo Code adapts its TUI
-//!     background on launch on its own, so it must stay OUT of the install
-//!     dispatch (no `ensure_opencode_tui_theme_default` write). OpenCode still
-//!     needs that override; MiMo Code does not.
+//! Divergences / notes vs OpenCode:
+//!   - `has_hook_surface: true` — MiMo Code does NOT self-theme its TUI (an
+//!     earlier assumption, disproven 2026-06-22: it ships the same opaque #000
+//!     default canvas as OpenCode). So it joins the install dispatch purely to
+//!     get the `ensure_opencode_tui_theme_default(home, "mimocode")` write that
+//!     stamps `~/.config/mimocode/tui.json` with the transparent `lucent-orng`
+//!     theme. It does not get the OpenCode island/notify plugin.
 //!   - `binary_name: "mimo"` is a best-guess pending confirmation; correct it
 //!     here if MiMo Code ships under a different command name.
 //!
@@ -29,8 +31,9 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     // Skills mirror not wired for MiMo Code yet (would be
     // `.config/mimocode/skills` if it mirrors OpenCode's layout).
     skill_dir_relative: None,
-    // See module doc — MiMo Code self-themes; keep it out of hook dispatch.
-    has_hook_surface: false,
+    // See module doc — MiMo Code ships an opaque #000 TUI default just like
+    // OpenCode, so it needs the tui.json transparency write via dispatch.
+    has_hook_surface: true,
     // Same shape as OpenCode so the registry scan skips it (its SQLite
     // second pass in server.rs emits finished SavedSessions instead).
     history_shape: Some(HistoryShape::OpenCodeMixed {
