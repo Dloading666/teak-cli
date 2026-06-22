@@ -11,6 +11,7 @@
 
 import { commands, isTauri } from '../../tauri';
 import { useAppState, useAppDispatch } from '../../store/app-state';
+import { IS_MACOS } from '../../lib/platform';
 import './TitleBar.css';
 
 export function TitleBar() {
@@ -136,23 +137,30 @@ export function TitleBar() {
         </button>
       </div>
 
-      <div className="titlebar-controls">
-        <button className="titlebar-btn" onClick={minimize} id="t-min">
-          <svg width="10" height="10" viewBox="0 0 10 10">
-            <rect x="1" y="4.5" width="8" height="1" fill="currentColor"/>
-          </svg>
-        </button>
-        <button className="titlebar-btn" onClick={maximize} id="t-max">
-          <svg width="10" height="10" viewBox="0 0 10 10">
-            <rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1"/>
-          </svg>
-        </button>
-        <button className="titlebar-btn close" onClick={close} id="t-close">
-          <svg width="10" height="10" viewBox="0 0 10 10">
-            <path d="M1.5 1.5 l7 7 M1.5 8.5 l7 -7" fill="none" stroke="currentColor" strokeWidth="1"/>
-          </svg>
-        </button>
-      </div>
+      {/* Custom min/max/close — Windows/Linux only. On macOS the OS draws the
+          native traffic lights on the LEFT (titleBarStyle: "Overlay" in
+          tauri.macos.conf.json), so we omit our own controls; the layout
+          toggles above stay on the right and the left drag region hosts the
+          native lights. */}
+      {!IS_MACOS && (
+        <div className="titlebar-controls">
+          <button className="titlebar-btn" onClick={minimize} id="t-min">
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <rect x="1" y="4.5" width="8" height="1" fill="currentColor"/>
+            </svg>
+          </button>
+          <button className="titlebar-btn" onClick={maximize} id="t-max">
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1"/>
+            </svg>
+          </button>
+          <button className="titlebar-btn close" onClick={close} id="t-close">
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <path d="M1.5 1.5 l7 7 M1.5 8.5 l7 -7" fill="none" stroke="currentColor" strokeWidth="1"/>
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

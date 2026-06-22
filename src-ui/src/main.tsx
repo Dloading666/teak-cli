@@ -7,6 +7,14 @@ import { App } from './App';
 import { invoke, commands } from './tauri';
 import { loadToolInfo } from './lib/tool-info';
 import { onWindowBackground, onWindowForeground } from './lib/window-focus-filter';
+import { IS_MACOS } from './lib/platform';
+
+// macOS uses native window decorations + traffic lights (titleBarStyle:
+// "Overlay" in tauri.macos.conf.json). Tag <html> before first paint so the
+// titlebar renders without our custom min/max/close and the #root corner clip
+// is dropped — the OS owns the corners there. Win/Linux keep the frameless
+// shell with custom controls on the right.
+if (IS_MACOS) document.documentElement.classList.add('is-macos');
 
 // Block React mount on the registry IPC so every component reads
 // canonical display names on first render (no 'claude' → 'Claude

@@ -905,6 +905,18 @@ body {
     overflow: hidden;
 }
 
+/* macOS: the native window decorations own the rounded corners (see
+   tauri.macos.conf.json — decorations:true + titleBarStyle:"Overlay", with
+   transparent:false). Drop our custom 10px clip so content fills the native
+   window flush; keeping it would inset a 10px-rounded canvas inside the OS's
+   square content frame, leaving a dark gutter at every corner. !important so
+   it also overrides the per-shape `[data-shape] #root` rules. .is-macos is set
+   on <html> in main.tsx before first paint. */
+html.is-macos #root {
+    border-radius: 0 !important;
+    clip-path: none !important;
+}
+
 
 /* ─── Custom Titlebar ────────────────────────────────── */
 .titlebar {
