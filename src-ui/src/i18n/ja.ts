@@ -101,6 +101,13 @@ export const ja = {
   'theme.color.obsidian': 'オブシディアン',
   'theme.color.cobalt': 'コバルト',
   'theme.color.moss': 'モス',
+  'theme.color.crimson': 'クリムゾン',
+  'theme.color.sunset': 'サンセット',
+  'theme.color.amber': 'アンバー',
+  'theme.color.emerald': 'エメラルド',
+  'theme.color.teal': 'ティール',
+  'theme.color.indigo': 'インディゴ',
+  'theme.color.fuchsia': 'フューシャ',
 
   // Gambit · 一手
   'gambit.title': '一手',

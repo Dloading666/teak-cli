@@ -72,6 +72,13 @@ const THEME_TERMINAL_BG: Record<string, string> = {
   obsidian:   '#0a0a0a',
   cobalt:     '#0a1020',
   moss:       '#0b1612',
+  crimson:    '#2a0d10',
+  sunset:     '#241408',
+  amber:      '#20180a',
+  emerald:    '#0a1c12',
+  teal:       '#0a2125',
+  indigo:     '#12142e',
+  fuchsia:    '#210f1d',
 };
 
 // Per-theme selection accent. Picked so each theme's selection highlight
@@ -88,6 +95,13 @@ const THEME_SELECTION_ACCENT: Record<string, string> = {
   obsidian:   '#9ca8b8',
   cobalt:     '#5a8cd0',
   moss:       '#88b87a',
+  crimson:    '#e23b42',
+  sunset:     '#f5803b',
+  amber:      '#e8a72c',
+  emerald:    '#24c281',
+  teal:       '#2bc4c4',
+  indigo:     '#6172f0',
+  fuchsia:    '#d94aa0',
 };
 
 // Collapse any mix of CRLF / bare CR into plain LF before handing text to

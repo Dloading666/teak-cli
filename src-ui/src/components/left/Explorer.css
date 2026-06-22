@@ -428,7 +428,9 @@
 
 .theme-swatch-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* 4 columns × 4 rows = 16 themes (9 muted + 7 vibrant). Was repeat(3,…)
+     when there were 9; widened to keep the picker a clean square. */
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   padding: 2px;
 }

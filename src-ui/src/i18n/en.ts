@@ -103,6 +103,13 @@ export const en = {
   'theme.color.obsidian': 'Obsidian',
   'theme.color.cobalt': 'Cobalt',
   'theme.color.moss': 'Moss',
+  'theme.color.crimson': 'Crimson',
+  'theme.color.sunset': 'Sunset',
+  'theme.color.amber': 'Amber',
+  'theme.color.emerald': 'Emerald',
+  'theme.color.teal': 'Teal',
+  'theme.color.indigo': 'Indigo',
+  'theme.color.fuchsia': 'Fuchsia',
 
   // Gambit — floating compose window. Chess term for a calculated opening move.
   'gambit.title': 'GAMBIT',

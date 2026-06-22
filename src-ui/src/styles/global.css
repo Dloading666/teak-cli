@@ -603,6 +603,262 @@ textarea,
     --bg-terminal: #0b1612; /* Match bg-app */
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   VIBRANT BATCH (暗红 / 落日橙 / 琥珀 / 翠绿 / 青碧 / 靛蓝 / 品红)
+   Unlike the muted "near-black, hue felt not seen" set above, these
+   pair a tinted-dark base with a saturated accent so they read as
+   genuinely colourful. Same token recipe as the colored themes
+   (sakura/lavender/mint): every surface/border fill derives from the
+   accent's RGB; --bg-terminal matches --bg-app for the unified-surface
+   rule. 暗红 is the hero — its blood-red base + accent glow under the
+   carbon hex mesh gives the Spider-Man read.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── Crimson (暗红) — saturated red on blood-dark base (Spider-Man) ─ */
+[data-theme="crimson"] {
+    --bg-app: #2a0d10;
+    --bg-panel: #341216;
+    --bg-card: rgba(226, 59, 66, 0.035);
+    --bg-input: #3a181c;
+    --bg-input-focus: #441f23;
+    --bg-hover: rgba(226, 59, 66, 0.06);
+    --bg-active: rgba(226, 59, 66, 0.1);
+
+    --border: rgba(226, 59, 66, 0.08);
+    --border-input: rgba(226, 59, 66, 0.11);
+    --border-focus: rgba(226, 59, 66, 0.42);
+
+    --text-1: #f2e2e3;
+    --text-2: #c8a8aa;
+    --text-3: #8a6e70;
+
+    --accent: #e23b42;
+    --accent-hover: #f25058;
+    --accent-active: #c82c34;
+    --accent-bg: rgba(226, 59, 66, 0.14);
+
+    --green: #86c98c;
+    --red: #ff6b6b;
+    --blue: #9aa8e8;
+
+    --shadow-panel: 0 16px 48px rgba(30, 5, 8, 0.55), 0 4px 16px rgba(15, 3, 4, 0.3);
+    --shadow-rgb: 226, 59, 66;
+    --glass-blur: blur(24px);
+
+    --bg-titlebar: rgba(0, 0, 0, 0.2);
+    --bg-terminal: #2a0d10; /* Match bg-app */
+}
+
+/* ─── Sunset (落日橙) — vivid orange on warm dark base ──────── */
+[data-theme="sunset"] {
+    --bg-app: #241408;
+    --bg-panel: #2e1b0c;
+    --bg-card: rgba(245, 128, 59, 0.035);
+    --bg-input: #36230f;
+    --bg-input-focus: #402c14;
+    --bg-hover: rgba(245, 128, 59, 0.06);
+    --bg-active: rgba(245, 128, 59, 0.1);
+
+    --border: rgba(245, 128, 59, 0.08);
+    --border-input: rgba(245, 128, 59, 0.11);
+    --border-focus: rgba(245, 128, 59, 0.42);
+
+    --text-1: #f4e6da;
+    --text-2: #c8b09c;
+    --text-3: #8a7866;
+
+    --accent: #f5803b;
+    --accent-hover: #ff9456;
+    --accent-active: #e06c28;
+    --accent-bg: rgba(245, 128, 59, 0.14);
+
+    --green: #9ad19a;
+    --red: #ff7a6a;
+    --blue: #88b4e0;
+
+    --shadow-panel: 0 16px 48px rgba(28, 14, 4, 0.5), 0 4px 16px rgba(14, 7, 2, 0.28);
+    --shadow-rgb: 245, 128, 59;
+    --glass-blur: blur(24px);
+
+    --bg-titlebar: rgba(0, 0, 0, 0.18);
+    --bg-terminal: #241408; /* Match bg-app */
+}
+
+/* ─── Amber (琥珀) — warm gold on dark amber base ──────── */
+[data-theme="amber"] {
+    --bg-app: #20180a;
+    --bg-panel: #2a200e;
+    --bg-card: rgba(232, 167, 44, 0.035);
+    --bg-input: #2e2410;
+    --bg-input-focus: #382e16;
+    --bg-hover: rgba(232, 167, 44, 0.06);
+    --bg-active: rgba(232, 167, 44, 0.1);
+
+    --border: rgba(232, 167, 44, 0.08);
+    --border-input: rgba(232, 167, 44, 0.11);
+    --border-focus: rgba(232, 167, 44, 0.42);
+
+    --text-1: #f2ead6;
+    --text-2: #c6bc9e;
+    --text-3: #88806a;
+
+    --accent: #e8a72c;
+    --accent-hover: #f7b945;
+    --accent-active: #d0921c;
+    --accent-bg: rgba(232, 167, 44, 0.14);
+
+    --green: #a8cf86;
+    --red: #ff8a6a;
+    --blue: #88b4e0;
+
+    --shadow-panel: 0 16px 48px rgba(24, 18, 4, 0.5), 0 4px 16px rgba(12, 9, 2, 0.28);
+    --shadow-rgb: 232, 167, 44;
+    --glass-blur: blur(24px);
+
+    --bg-titlebar: rgba(0, 0, 0, 0.18);
+    --bg-terminal: #20180a; /* Match bg-app */
+}
+
+/* ─── Emerald (翠绿) — vivid emerald on deep green base ──────── */
+[data-theme="emerald"] {
+    --bg-app: #0a1c12;
+    --bg-panel: #102619;
+    --bg-card: rgba(36, 194, 129, 0.035);
+    --bg-input: #16301f;
+    --bg-input-focus: #1c3a27;
+    --bg-hover: rgba(36, 194, 129, 0.06);
+    --bg-active: rgba(36, 194, 129, 0.1);
+
+    --border: rgba(36, 194, 129, 0.08);
+    --border-input: rgba(36, 194, 129, 0.11);
+    --border-focus: rgba(36, 194, 129, 0.42);
+
+    --text-1: #def0e6;
+    --text-2: #a0c4b0;
+    --text-3: #688476;
+
+    --accent: #24c281;
+    --accent-hover: #3cd494;
+    --accent-active: #18a86c;
+    --accent-bg: rgba(36, 194, 129, 0.14);
+
+    --green: #2cd68c;
+    --red: #ff8080;
+    --blue: #78c0d4;
+
+    --shadow-panel: 0 16px 48px rgba(2, 18, 10, 0.55), 0 4px 16px rgba(1, 9, 5, 0.3);
+    --shadow-rgb: 36, 194, 129;
+    --glass-blur: blur(24px);
+
+    --bg-titlebar: rgba(0, 0, 0, 0.22);
+    --bg-terminal: #0a1c12; /* Match bg-app */
+}
+
+/* ─── Teal (青碧) — bright cyan-teal on deep teal base ──────── */
+[data-theme="teal"] {
+    --bg-app: #0a2125;
+    --bg-panel: #102b30;
+    --bg-card: rgba(43, 196, 196, 0.035);
+    --bg-input: #163338;
+    --bg-input-focus: #1c3d42;
+    --bg-hover: rgba(43, 196, 196, 0.06);
+    --bg-active: rgba(43, 196, 196, 0.1);
+
+    --border: rgba(43, 196, 196, 0.08);
+    --border-input: rgba(43, 196, 196, 0.11);
+    --border-focus: rgba(43, 196, 196, 0.42);
+
+    --text-1: #def0f0;
+    --text-2: #a0c4c4;
+    --text-3: #688484;
+
+    --accent: #2bc4c4;
+    --accent-hover: #45d6d6;
+    --accent-active: #1ca8a8;
+    --accent-bg: rgba(43, 196, 196, 0.14);
+
+    --green: #4ad6b8;
+    --red: #ff8080;
+    --blue: #5ec8d8;
+
+    --shadow-panel: 0 16px 48px rgba(2, 18, 20, 0.55), 0 4px 16px rgba(1, 9, 10, 0.3);
+    --shadow-rgb: 43, 196, 196;
+    --glass-blur: blur(24px);
+
+    --bg-titlebar: rgba(0, 0, 0, 0.22);
+    --bg-terminal: #0a2125; /* Match bg-app */
+}
+
+/* ─── Indigo (靛蓝) — electric indigo on deep blue base ──────── */
+[data-theme="indigo"] {
+    --bg-app: #12142e;
+    --bg-panel: #1a1d3c;
+    --bg-card: rgba(97, 114, 240, 0.035);
+    --bg-input: #20244a;
+    --bg-input-focus: #282d56;
+    --bg-hover: rgba(97, 114, 240, 0.06);
+    --bg-active: rgba(97, 114, 240, 0.1);
+
+    --border: rgba(97, 114, 240, 0.08);
+    --border-input: rgba(97, 114, 240, 0.11);
+    --border-focus: rgba(97, 114, 240, 0.42);
+
+    --text-1: #e4e6f4;
+    --text-2: #b0b4d4;
+    --text-3: #76799a;
+
+    --accent: #6172f0;
+    --accent-hover: #7886ff;
+    --accent-active: #4f5ed8;
+    --accent-bg: rgba(97, 114, 240, 0.14);
+
+    --green: #8ad0a0;
+    --red: #ff8080;
+    --blue: #7e9cf0;
+
+    --shadow-panel: 0 16px 48px rgba(6, 8, 28, 0.55), 0 4px 16px rgba(3, 4, 14, 0.3);
+    --shadow-rgb: 97, 114, 240;
+    --glass-blur: blur(24px);
+
+    --bg-titlebar: rgba(0, 0, 0, 0.22);
+    --bg-terminal: #12142e; /* Match bg-app */
+}
+
+/* ─── Fuchsia (品红) — saturated magenta on deep plum base ──────── */
+[data-theme="fuchsia"] {
+    --bg-app: #210f1d;
+    --bg-panel: #2c1428;
+    --bg-card: rgba(217, 74, 160, 0.035);
+    --bg-input: #361b2e;
+    --bg-input-focus: #402338;
+    --bg-hover: rgba(217, 74, 160, 0.06);
+    --bg-active: rgba(217, 74, 160, 0.1);
+
+    --border: rgba(217, 74, 160, 0.08);
+    --border-input: rgba(217, 74, 160, 0.11);
+    --border-focus: rgba(217, 74, 160, 0.42);
+
+    --text-1: #f0e2ec;
+    --text-2: #c6a8bc;
+    --text-3: #88707e;
+
+    --accent: #d94aa0;
+    --accent-hover: #e964b2;
+    --accent-active: #c03888;
+    --accent-bg: rgba(217, 74, 160, 0.14);
+
+    --green: #a0d0a8;
+    --red: #ff7090;
+    --blue: #a0a8e0;
+
+    --shadow-panel: 0 16px 48px rgba(24, 6, 18, 0.55), 0 4px 16px rgba(12, 3, 9, 0.3);
+    --shadow-rgb: 217, 74, 160;
+    --glass-blur: blur(24px);
+
+    --bg-titlebar: rgba(0, 0, 0, 0.2);
+    --bg-terminal: #210f1d; /* Match bg-app */
+}
+
 /* ─── App Shell ──────────────────────────────────────── */
 /* CRITICAL for Tauri WebView2: explicit height chain from root down.
    Without height:100% on every flex ancestor, child flex:1 resolves to 0
@@ -1752,4 +2008,38 @@ body.gambit-docked .chat-reader-container {
 [data-shape="carbon"] .chrome-tab.active::before,
 [data-shape="carbon"] .chrome-tab.active::after {
     display: none;
+}
+
+/* ── Carbon · light theme: let the hex material read through cards & inputs ──
+   The light palette's pure-white --bg-card/--bg-input (#fff) surfaces read as
+   cold cutouts pasted onto the warm, veiled honeycomb — flat and material-
+   ignoring. Drop them to a warm translucent fill so the muted mesh ghosts
+   faintly through, integrating them into the material the way Glass does. No
+   backdrop-filter — carbon stays a static, zero-cost, no-blur material; the
+   veil already mutes the mesh enough that an un-blurred ghost reads as texture,
+   not noise. Light theme only (the dark carbon never had the cold-white clash).
+
+   Launchpad cards: the fill lives on the rounded .launchpad-card-group WRAPPER
+   (not the inner square .launchpad-card) per the corner-leak rule documented in
+   CenterPanel.css — a translucent surface on the inner card would spill past
+   the wrapper's overflow:hidden radius. The inner card clears to transparent so
+   the wrapper's fill is the single surface. A hairline border + whisper shadow
+   give the now-translucent card a defined edge against the mesh. */
+[data-shape="carbon"][data-theme="light"] .launchpad-card-group {
+    background: color-mix(in oklab, #fffdf9 64%, transparent);
+    border-color: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+[data-shape="carbon"][data-theme="light"] .launchpad-card {
+    background: transparent;
+}
+
+/* Session search box (shared by the left Sessions rail and the right
+   HistoryBoard) — same warm translucent fill so it reads as part of the
+   material, not a white slab. Focus lifts opacity for input legibility. */
+[data-shape="carbon"][data-theme="light"] .agent-session-search {
+    background: color-mix(in oklab, #fffdf9 64%, transparent);
+}
+[data-shape="carbon"][data-theme="light"] .agent-session-search:focus {
+    background: color-mix(in oklab, #fffdf9 80%, transparent);
 }

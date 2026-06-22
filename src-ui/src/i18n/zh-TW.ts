@@ -101,6 +101,13 @@ export const zhTW = {
   'theme.color.obsidian': '黑曜石',
   'theme.color.cobalt': '鈷藍',
   'theme.color.moss': '苔蘚',
+  'theme.color.crimson': '暗紅',
+  'theme.color.sunset': '落日橙',
+  'theme.color.amber': '琥珀',
+  'theme.color.emerald': '翠綠',
+  'theme.color.teal': '青碧',
+  'theme.color.indigo': '靛藍',
+  'theme.color.fuchsia': '品紅',
 
   // Gambit · 妙手
   'gambit.title': '妙手',

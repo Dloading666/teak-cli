@@ -23,7 +23,10 @@ export type AgentStatus = 'idle' | 'working' | 'wait_input';
 // Theme: color palette (orthogonal to shape)
 export type ThemeColor =
   | 'dark' | 'light' | 'cappuccino' | 'sakura' | 'lavender' | 'mint'
-  | 'obsidian' | 'cobalt' | 'moss';
+  | 'obsidian' | 'cobalt' | 'moss'
+  // Vibrant batch — saturated accents on tinted-dark bases (crimson is the
+  // Spider-Man hero, intended to pair with the carbon shape).
+  | 'crimson' | 'sunset' | 'amber' | 'emerald' | 'teal' | 'indigo' | 'fuchsia';
 // Theme: shape form (orthogonal to color)
 export type ThemeShape = 'soft' | 'slab' | 'sharp' | 'glass' | 'panel' | 'carbon';
 // Icon theme: visual style for file/folder icons in the explorer.
@@ -442,6 +445,7 @@ function reducer(state: AppState, action: Action): AppState {
 const VALID_THEMES: ThemeColor[] = [
   'dark', 'light', 'cappuccino', 'sakura', 'lavender', 'mint',
   'obsidian', 'cobalt', 'moss',
+  'crimson', 'sunset', 'amber', 'emerald', 'teal', 'indigo', 'fuchsia',
 ];
 const VALID_SHAPES: ThemeShape[] = ['soft', 'slab', 'sharp', 'glass', 'panel', 'carbon'];
 const VALID_ICON_THEMES: IconTheme[] = [

@@ -101,6 +101,13 @@ export const es = {
   'theme.color.obsidian': 'Obsidiana',
   'theme.color.cobalt': 'Cobalto',
   'theme.color.moss': 'Musgo',
+  'theme.color.crimson': 'Carmesí',
+  'theme.color.sunset': 'Ocaso',
+  'theme.color.amber': 'Ámbar',
+  'theme.color.emerald': 'Esmeralda',
+  'theme.color.teal': 'Turquesa',
+  'theme.color.indigo': 'Índigo',
+  'theme.color.fuchsia': 'Fucsia',
 
 
   'gambit.send_failed_hint': 'Abre primero una sesión activa',

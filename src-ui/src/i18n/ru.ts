@@ -102,6 +102,13 @@ export const ru = {
   'theme.color.obsidian': 'Обсидиан',
   'theme.color.cobalt': 'Кобальт',
   'theme.color.moss': 'Мох',
+  'theme.color.crimson': 'Багровый',
+  'theme.color.sunset': 'Закат',
+  'theme.color.amber': 'Янтарь',
+  'theme.color.emerald': 'Изумруд',
+  'theme.color.teal': 'Бирюзовый',
+  'theme.color.indigo': 'Индиго',
+  'theme.color.fuchsia': 'Фуксия',
 
 
   'gambit.send_failed_hint': 'Сначала откройте активную сессию',

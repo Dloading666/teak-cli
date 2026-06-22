@@ -101,6 +101,13 @@ export const ko = {
   'theme.color.obsidian': '옵시디언',
   'theme.color.cobalt': '코발트',
   'theme.color.moss': '이끼',
+  'theme.color.crimson': '크림슨',
+  'theme.color.sunset': '노을',
+  'theme.color.amber': '호박',
+  'theme.color.emerald': '에메랄드',
+  'theme.color.teal': '청록',
+  'theme.color.indigo': '인디고',
+  'theme.color.fuchsia': '푸시아',
 
   // Gambit · 한 수
   'gambit.title': '한 수',

@@ -104,6 +104,13 @@ export const vi = {
   'theme.color.obsidian': 'Obsidian',
   'theme.color.cobalt': 'Cobalt',
   'theme.color.moss': 'Rêu',
+  'theme.color.crimson': 'Đỏ thẫm',
+  'theme.color.sunset': 'Hoàng hôn',
+  'theme.color.amber': 'Hổ phách',
+  'theme.color.emerald': 'Lục bảo',
+  'theme.color.teal': 'Mòng két',
+  'theme.color.indigo': 'Chàm',
+  'theme.color.fuchsia': 'Hồng sen',
 
   // Gambit · Nước cờ
   'gambit.title': 'Nước cờ',
