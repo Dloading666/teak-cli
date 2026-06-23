@@ -25,7 +25,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 #[cfg(windows)]
@@ -103,7 +102,10 @@ pub struct MarketplacePlugin {
     pub name: String,
     pub display_name: String,
     pub description: String,
-    pub icon_data_url: Option<String>,
+    /// Absolute path to the plugin's icon file (svg/png), or None. The
+    /// frontend loads it via the Tauri asset protocol (convertFileSrc) — no
+    /// base64 in the list payload, so a 178-plugin market stays cheap.
+    pub icon_path: Option<String>,
     /// Absolute on-disk path to the plugin directory — what the Gambit pill
     /// injects into the agent prompt.
     pub path: String,
@@ -154,35 +156,24 @@ fn repo_name_from_url(url: &str) -> String {
         .to_string()
 }
 
-/// Resolve a manifest-relative asset path (`./assets/icon.svg`) under
-/// `base`, read it, and return a base64 data URL. None if missing / too big.
-fn icon_data_url(base: &Path, rel: &str) -> Option<String> {
-    if rel.is_empty() {
-        return None;
+/// Resolve a plugin's icon to an absolute FILE path (first existing of the
+/// manifest's composerIcon / logo). No read, no base64 — the frontend loads
+/// it via the asset protocol, so listing a 178-plugin market stays cheap.
+fn resolve_icon_path(base: &Path, candidates: &[&str]) -> Option<String> {
+    for rel in candidates {
+        if rel.is_empty() {
+            continue;
+        }
+        let clean = rel.trim_start_matches("./").replace('\\', "/");
+        if clean.split('/').any(|seg| seg == "..") {
+            continue;
+        }
+        let p = base.join(&clean);
+        if p.is_file() {
+            return Some(p.to_string_lossy().to_string());
+        }
     }
-    let rel_clean = rel.trim_start_matches("./").replace('\\', "/");
-    // Reject path traversal — assets must live under the plugin dir.
-    if rel_clean.split('/').any(|seg| seg == "..") {
-        return None;
-    }
-    let path = base.join(&rel_clean);
-    let bytes = fs::read(&path).ok()?;
-    if bytes.len() > 256 * 1024 {
-        return None;
-    }
-    let mime = if rel_clean.ends_with(".svg") {
-        "image/svg+xml"
-    } else if rel_clean.ends_with(".png") {
-        "image/png"
-    } else if rel_clean.ends_with(".jpg") || rel_clean.ends_with(".jpeg") {
-        "image/jpeg"
-    } else if rel_clean.ends_with(".webp") {
-        "image/webp"
-    } else {
-        return None;
-    };
-    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-    Some(format!("data:{};base64,{}", mime, b64))
+    None
 }
 
 /// Run a git command; map non-zero exit / missing binary to a String error.
@@ -338,8 +329,7 @@ pub fn list_marketplaces() -> Result<Vec<Marketplace>, String> {
             } else {
                 pm.interface.display_name.clone()
             };
-            let icon = icon_data_url(&plugin_dir, &pm.interface.composer_icon)
-                .or_else(|| icon_data_url(&plugin_dir, &pm.interface.logo));
+            let icon = resolve_icon_path(&plugin_dir, &[&pm.interface.composer_icon, &pm.interface.logo]);
             let key = format!("{}::{}", id, p.name);
             let is_enabled = enabled.iter().any(|k| k == &key);
             plugins.push(MarketplacePlugin {
@@ -349,7 +339,7 @@ pub fn list_marketplaces() -> Result<Vec<Marketplace>, String> {
                 name: p.name.clone(),
                 display_name: display,
                 description: pm.interface.short_description.clone(),
-                icon_data_url: icon,
+                icon_path: icon,
             });
         }
 

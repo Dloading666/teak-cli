@@ -994,6 +994,34 @@
 .skills-manage-del:hover:not(:disabled) { color: #e85454; border-color: #e85454; }
 .skills-manage-del:disabled { opacity: 0.5; cursor: default; }
 
+/* ─── Skill card skeletons (first-load shimmer) + lazy sentinel ─ */
+.skills-card-skeleton { pointer-events: none; opacity: 0.7; }
+.skills-skel-icon,
+.skills-skel-bar {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text-3) 18%, transparent) 0%,
+    color-mix(in srgb, var(--text-3) 35%, transparent) 50%,
+    color-mix(in srgb, var(--text-3) 18%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: skills-skel-shimmer 1.4s ease-in-out infinite;
+}
+.skills-skel-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+}
+.skills-skel-bar { display: block; height: 12px; border-radius: var(--radius-xs, 4px); }
+.skills-skel-title { width: 55%; }
+.skills-skel-desc { width: 80%; height: 10px; margin-top: 6px; }
+@keyframes skills-skel-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skills-sentinel { width: 100%; height: 1px; }
+
 .skills-empty {
   padding: 60px 24px;
   text-align: center;

@@ -259,7 +259,8 @@ export interface MarketplacePlugin {
   name: string;
   displayName: string;
   description: string;
-  iconDataUrl: string | null;
+  /** Absolute path to the icon file; load via convertFileSrc (asset proto). */
+  iconPath: string | null;
   path: string;
   enabled: boolean;
 }

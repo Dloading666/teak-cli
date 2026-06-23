@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { commands } from '../../tauri';
 import type { Marketplace } from '../../tauri';
 import { useAppState } from '../../store/app-state';
@@ -11,12 +12,18 @@ interface DisplayCard {
   key: string;
   displayName: string;
   description: string;
-  iconDataUrl: string | null;
+  /** Ready-to-use <img src>: a data: URL (bundled) or asset:// (plugin). */
+  iconSrc: string | null;
   enabled: boolean;
   kind: 'bundled' | 'plugin';
 }
 
 const BUILTIN_TAB = '__builtin__';
+
+// Module-scoped cache so re-opening the Skills tab paints instantly while a
+// fresh list loads in the background — no skeleton flash on every re-open.
+let cachedBundled: DisplayCard[] | null = null;
+let cachedMarkets: Marketplace[] | null = null;
 
 interface Props {
   /** Top-of-screen iOS-style toast — owned by CenterPanel, wired through
@@ -52,11 +59,18 @@ export function SkillsPanel({ showToast }: Props) {
     close: zh ? '关闭' : 'Close',
   };
 
-  const [bundled, setBundled] = useState<DisplayCard[]>([]);
-  const [marketplaces, setMarketplaces] = useState<Marketplace[]>([]);
+  const [bundled, setBundled] = useState<DisplayCard[]>(() => cachedBundled ?? []);
+  const [marketplaces, setMarketplaces] = useState<Marketplace[]>(() => cachedMarkets ?? []);
   const [activeTab, setActiveTab] = useState<string>(BUILTIN_TAB);
-  const [loading, setLoading] = useState(true);
+  // Skeleton only on the very first load (no cache). Re-opens paint cached
+  // cards immediately and reconcile via refresh() in the background.
+  const [loading, setLoading] = useState(cachedBundled === null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  // Progressive render — big markets (Codex official ≈178 plugins) jank if
+  // every card mounts at once. Render PAGE, bump as a sentinel scrolls in.
+  const PAGE = 30;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   // ── Add-marketplace modal ──
   const [addOpen, setAddOpen] = useState(false);
@@ -91,19 +105,20 @@ export function SkillsPanel({ showToast }: Props) {
         commands.skillsList(),
         commands.listMarketplaces().catch(() => [] as Marketplace[]),
       ]);
-      setBundled(
-        raw.map(s => {
-          const fm = parseFrontmatter(s.skillMd);
-          return {
-            key: s.name,
-            displayName: localizedField(fm, 'name', lang) || s.name,
-            description: localizedField(fm, 'description', lang),
-            iconDataUrl: s.iconDataUrl,
-            enabled: s.enabled,
-            kind: 'bundled' as const,
-          };
-        }),
-      );
+      const nextBundled: DisplayCard[] = raw.map(s => {
+        const fm = parseFrontmatter(s.skillMd);
+        return {
+          key: s.name,
+          displayName: localizedField(fm, 'name', lang) || s.name,
+          description: localizedField(fm, 'description', lang),
+          iconSrc: s.iconDataUrl,
+          enabled: s.enabled,
+          kind: 'bundled' as const,
+        };
+      });
+      cachedBundled = nextBundled;
+      cachedMarkets = markets;
+      setBundled(nextBundled);
       setMarketplaces(markets);
     } catch (e) {
       showToast(`Skills load failed: ${e}`);
@@ -175,10 +190,28 @@ export function SkillsPanel({ showToast }: Props) {
         key: p.key,
         displayName: p.displayName,
         description: p.description,
-        iconDataUrl: p.iconDataUrl,
+        // Asset protocol — browser loads + caches + lazy-decodes; no base64.
+        iconSrc: p.iconPath ? convertFileSrc(p.iconPath) : null,
         enabled: p.enabled,
         kind: 'plugin' as const,
       }));
+  const visibleCards = cards.slice(0, visibleCount);
+  const hasMore = cards.length > visibleCount;
+
+  // Reset the render window when switching tabs.
+  useEffect(() => { setVisibleCount(PAGE); }, [activeTab]);
+  // Bump the window as the bottom sentinel scrolls into view.
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      entries => { if (entries.some(e => e.isIntersecting)) setVisibleCount(c => c + PAGE); },
+      { rootMargin: '300px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore]);
 
   return (
     <>
@@ -203,16 +236,26 @@ export function SkillsPanel({ showToast }: Props) {
       </div>
 
       {loading ? (
-        <div className="skills-empty">Loading…</div>
+        <div className="skills-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={`skel-${i}`} className="skills-card skills-card-skeleton" aria-hidden="true">
+              <span className="skills-skel-icon" />
+              <div className="skills-card-text">
+                <span className="skills-skel-bar skills-skel-title" />
+                <span className="skills-skel-bar skills-skel-desc" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : cards.length === 0 ? (
         <div className="skills-empty">{activeTab === BUILTIN_TAB ? L.none : L.empty}</div>
       ) : (
         <div className="skills-grid">
-          {cards.map(card => (
+          {visibleCards.map(card => (
             <div key={card.key} className="skills-card">
               <div className="skills-card-icon">
-                {card.iconDataUrl
-                  ? <img src={card.iconDataUrl} alt="" />
+                {card.iconSrc
+                  ? <img src={card.iconSrc} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
                   : <span className="skills-card-icon-fallback">{card.displayName.slice(0, 1).toUpperCase()}</span>}
               </div>
               <div
@@ -234,6 +277,7 @@ export function SkillsPanel({ showToast }: Props) {
               </button>
             </div>
           ))}
+          {hasMore && <div ref={sentinelRef} className="skills-sentinel" aria-hidden="true" />}
         </div>
       )}
 
