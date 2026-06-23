@@ -44,7 +44,7 @@ export function SkillsPanel({ showToast }: Props) {
     addHint: zh
       ? '兼容 Codex 插件市场规则:仓库需含 .agents/plugins/marketplace.json'
       : 'Codex-compatible: the repo must contain .agents/plugins/marketplace.json',
-    addPlaceholder: 'https://cnb.cool/echobird/codex-wps.git',
+    addPlaceholder: 'https://github.com/openai/plugins.git',
     cancel: zh ? '取消' : 'Cancel',
     confirm: zh ? '添加' : 'Add',
     adding: zh ? '克隆中…' : 'Cloning…',
