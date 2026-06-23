@@ -866,13 +866,33 @@
   gap: 12px;
   padding: 8px 4px;
   flex-wrap: wrap;
-  /* Pin the marketplace tabs just below the floating Agents/Skills pill so
-     only the card list scrolls. top:60 clears the pill (top:24 + h~36). */
-  position: sticky;
-  top: 60px;
-  z-index: 5;
-  background: var(--bg-app);
+  /* Stays put because the CARD LIST owns the scroll (see
+     .library-page--skills), not the page — so the header never moves and
+     cards can't bleed up into the floating Agents/Skills pill. */
+  flex-shrink: 0;
 }
+
+/* Skills tab: the card list scrolls internally instead of the whole page.
+   Without this, cards scroll up behind the semi-transparent Agents/Skills
+   pill and "bleed through" at the top. Making the grid the scroll area
+   clips cards below the (static) header. */
+.library-page--skills {
+  overflow: hidden;
+  align-items: stretch;
+}
+.library-page--skills .launchpad-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+  min-height: 0;
+}
+.library-page--skills .skills-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.library-page--skills .skills-empty { flex: 1; }
 .skills-tabs {
   display: flex;
   flex-wrap: wrap;

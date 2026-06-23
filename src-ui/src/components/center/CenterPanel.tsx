@@ -1471,7 +1471,7 @@ export function CenterPanel() {
                 </div>
 
                 {/* ─── Page 2: Library (Agents | Skills) ─── */}
-                <div className="launchpad-page library-page">
+                <div className={`launchpad-page library-page${libraryTab === 'skills' ? ' library-page--skills' : ''}`}>
                   <div className="launchpad-inner">
                     {libraryTab === 'agents' ? (
                       <>
