@@ -43,6 +43,13 @@ export function SkillsPanel({ showToast }: Props) {
     adding: zh ? '克隆中…' : 'Cloning…',
     empty: zh ? '这个市场暂无可显示的插件。' : 'No plugins to show here.',
     none: zh ? '暂无技能。' : 'No skills available yet.',
+    manageTitle: zh ? '管理技能市场' : 'Manage marketplaces',
+    upgrade: zh ? '升级' : 'Upgrade',
+    upgrading: zh ? '升级中…' : 'Upgrading…',
+    pluginsN: zh ? '个插件' : 'plugins',
+    noMarkets: zh ? '还没有添加任何市场。' : 'No marketplaces added yet.',
+    openDir: zh ? '打开目录' : 'Open folder',
+    close: zh ? '关闭' : 'Close',
   };
 
   const [bundled, setBundled] = useState<DisplayCard[]>([]);
@@ -55,6 +62,9 @@ export function SkillsPanel({ showToast }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [addUrl, setAddUrl] = useState('');
   const [adding, setAdding] = useState(false);
+  // ── Manage-marketplaces modal ──
+  const [manageOpen, setManageOpen] = useState(false);
+  const [busyMarket, setBusyMarket] = useState<string | null>(null);
 
   // ── Mouse-tracked description tooltip (portaled, viewport-clamped) ──
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
@@ -138,6 +148,25 @@ export function SkillsPanel({ showToast }: Props) {
     }
   };
 
+  const upgradeMarket = async (id: string) => {
+    if (busyMarket) return;
+    setBusyMarket(id);
+    try { await commands.updateMarketplace(id); await refresh(); }
+    catch (e) { showToast(`${e}`); }
+    finally { setBusyMarket(null); }
+  };
+
+  const deleteMarket = async (id: string) => {
+    if (busyMarket) return;
+    setBusyMarket(id);
+    try {
+      await commands.deleteMarketplace(id);
+      if (activeTab === id) setActiveTab(BUILTIN_TAB);
+      await refresh();
+    } catch (e) { showToast(`${e}`); }
+    finally { setBusyMarket(null); }
+  };
+
   // Cards for the active tab.
   const activeMarket = marketplaces.find(m => m.id === activeTab);
   const cards: DisplayCard[] = activeTab === BUILTIN_TAB
@@ -169,7 +198,7 @@ export function SkillsPanel({ showToast }: Props) {
         </div>
         <div className="skills-header-actions">
           <button className="skills-link-btn" onClick={() => setAddOpen(true)}>[{L.add}]</button>
-          <button className="skills-link-btn" onClick={() => commands.openMarketplaceDir().catch(() => {})}>[{L.manage}]</button>
+          <button className="skills-link-btn" onClick={() => setManageOpen(true)}>[{L.manage}]</button>
         </div>
       </div>
 
@@ -228,6 +257,44 @@ export function SkillsPanel({ showToast }: Props) {
               <button className="skills-modal-btn primary" onClick={handleAdd} disabled={adding || !addUrl.trim()}>
                 {adding ? L.adding : L.confirm}
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {manageOpen && createPortal(
+        <div className="skills-modal-backdrop" onMouseDown={() => setManageOpen(false)}>
+          <div className="skills-modal skills-manage" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="skills-modal-title">{L.manageTitle}</div>
+            {marketplaces.length === 0 ? (
+              <div className="skills-modal-hint">{L.noMarkets}</div>
+            ) : (
+              <div className="skills-manage-list">
+                {marketplaces.map(m => (
+                  <div key={m.id} className="skills-manage-row">
+                    <div className="skills-manage-info">
+                      <div className="skills-manage-name">{m.displayName}</div>
+                      <div className="skills-manage-meta">{m.plugins.length} {L.pluginsN}</div>
+                      <div className="skills-manage-path">{m.manifestPath}</div>
+                    </div>
+                    <div className="skills-manage-actions">
+                      <button className="skills-modal-btn" disabled={busyMarket === m.id} onClick={() => upgradeMarket(m.id)}>
+                        {busyMarket === m.id ? L.upgrading : L.upgrade}
+                      </button>
+                      <button className="skills-manage-del" disabled={busyMarket === m.id} onClick={() => deleteMarket(m.id)} aria-label="Delete">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="skills-modal-actions">
+              <button className="skills-link-btn" onClick={() => commands.openMarketplaceDir().catch(() => {})}>{L.openDir}</button>
+              <button className="skills-modal-btn" onClick={() => setManageOpen(false)}>{L.close}</button>
             </div>
           </div>
         </div>,

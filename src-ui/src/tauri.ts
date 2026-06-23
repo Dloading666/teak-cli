@@ -211,6 +211,8 @@ export const commands = {
   listMarketplaces: () => invoke<Marketplace[]>('list_marketplaces'),
   setMarketplacePluginEnabled: (key: string, enabled: boolean) =>
     invoke<void>('set_marketplace_plugin_enabled', { key, enabled }),
+  updateMarketplace: (id: string) => invoke<void>('update_marketplace', { id }),
+  deleteMarketplace: (id: string) => invoke<void>('delete_marketplace', { id }),
   openMarketplaceDir: () => invoke<void>('open_marketplace_dir'),
 
   // Task Board persistence (~/.coffee-cli/tasks.json)
@@ -264,6 +266,7 @@ export interface MarketplacePlugin {
 export interface Marketplace {
   id: string;
   displayName: string;
+  manifestPath: string;
   plugins: MarketplacePlugin[];
 }
 

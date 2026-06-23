@@ -3359,6 +3359,8 @@ pub fn start_ui() -> anyhow::Result<()> {
             crate::marketplace::add_marketplace,
             crate::marketplace::list_marketplaces,
             crate::marketplace::set_marketplace_plugin_enabled,
+            crate::marketplace::update_marketplace,
+            crate::marketplace::delete_marketplace,
             crate::marketplace::open_marketplace_dir,
         ])
         .setup(|app| {

@@ -116,6 +116,8 @@ pub struct Marketplace {
     /// Repo dir name under ~/.coffee-cli/marketplace (also the remove unit).
     pub id: String,
     pub display_name: String,
+    /// Absolute path to the repo's marketplace.json — shown in the manage UI.
+    pub manifest_path: String,
     pub plugins: Vec<MarketplacePlugin>,
 }
 
@@ -183,6 +185,33 @@ fn icon_data_url(base: &Path, rel: &str) -> Option<String> {
     Some(format!("data:{};base64,{}", mime, b64))
 }
 
+/// Run a git command; map non-zero exit / missing binary to a String error.
+fn git(args: &[&str]) -> Result<(), String> {
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(args);
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    let out = cmd.output().map_err(|e| format!("git not available: {e}"))?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        return Err(if err.is_empty() { format!("git {:?} failed", args) } else { err });
+    }
+    Ok(())
+}
+
+/// Resolve a marketplace id to its repo dir, rejecting traversal so a
+/// crafted id can't touch anything outside ~/.coffee-cli/marketplace.
+fn marketplace_dir_checked(id: &str) -> Result<PathBuf, String> {
+    if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
+        return Err(format!("Invalid marketplace id: {}", id));
+    }
+    let dir = marketplace_root()?.join(id);
+    if !dir.is_dir() {
+        return Err(format!("Marketplace not found: {}", id));
+    }
+    Ok(dir)
+}
+
 // ─── Commands ────────────────────────────────────────────────────────────────
 
 /// Clone (or refresh) a Codex-compatible marketplace repo. Runs git on a
@@ -208,31 +237,12 @@ fn add_marketplace_blocking(git_url: &str) -> Result<(), String> {
     fs::create_dir_all(&root).map_err(|e| format!("mkdir marketplace: {}", e))?;
     let dest = root.join(&name);
 
-    let run_git = |args: &[&str]| -> Result<(), String> {
-        let mut cmd = std::process::Command::new("git");
-        cmd.args(args);
-        #[cfg(windows)]
-        cmd.creation_flags(CREATE_NO_WINDOW);
-        let out = cmd
-            .output()
-            .map_err(|e| format!("git not available: {e}"))?;
-        if !out.status.success() {
-            let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
-            return Err(if err.is_empty() {
-                format!("git {:?} failed", args)
-            } else {
-                err
-            });
-        }
-        Ok(())
-    };
-
     if dest.join(".git").is_dir() {
         // Already added — refresh to latest.
-        run_git(&["-C", &dest.to_string_lossy(), "pull", "--ff-only"])?;
+        git(&["-C", &dest.to_string_lossy(), "pull", "--ff-only"])?;
     } else {
         // Fresh clone (shallow — we only need current files).
-        run_git(&["clone", "--depth", "1", url, &dest.to_string_lossy()])?;
+        git(&["clone", "--depth", "1", url, &dest.to_string_lossy()])?;
     }
 
     // Validate the Codex marketplace rule so a wrong URL surfaces clearly
@@ -242,6 +252,35 @@ fn add_marketplace_blocking(git_url: &str) -> Result<(), String> {
             "Cloned, but {} has no .agents/plugins/marketplace.json — not a Codex-compatible marketplace.",
             name
         ));
+    }
+    Ok(())
+}
+
+/// Upgrade one marketplace (git pull). Runs on a blocking thread.
+#[tauri::command]
+pub async fn update_marketplace(id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = marketplace_dir_checked(&id)?;
+        if !dir.join(".git").is_dir() {
+            return Err(format!("{} is not a git repo — re-add it", id));
+        }
+        git(&["-C", &dir.to_string_lossy(), "pull", "--ff-only"])
+    })
+    .await
+    .map_err(|e| format!("update task join failed: {e}"))?
+}
+
+/// Delete one marketplace: remove its repo dir + drop its enabled keys.
+#[tauri::command]
+pub fn delete_marketplace(id: String) -> Result<(), String> {
+    let dir = marketplace_dir_checked(&id)?;
+    fs::remove_dir_all(&dir).map_err(|e| format!("delete {}: {}", dir.display(), e))?;
+    let prefix = format!("{}::", id);
+    let mut keys = read_enabled();
+    let before = keys.len();
+    keys.retain(|k| !k.starts_with(&prefix));
+    if keys.len() != before {
+        let _ = write_enabled(&keys);
     }
     Ok(())
 }
@@ -314,7 +353,12 @@ pub fn list_marketplaces() -> Result<Vec<Marketplace>, String> {
             });
         }
 
-        out.push(Marketplace { id, display_name, plugins });
+        out.push(Marketplace {
+            manifest_path: manifest_path.to_string_lossy().to_string(),
+            id,
+            display_name,
+            plugins,
+        });
     }
     out.sort_by(|a, b| a.display_name.cmp(&b.display_name));
     Ok(out)

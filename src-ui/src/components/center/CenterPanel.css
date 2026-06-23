@@ -948,6 +948,52 @@
 .skills-modal-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .skills-modal-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* ─── Manage marketplaces list (升级 / 删除 per market) ───────── */
+.skills-manage { width: 560px; }
+.skills-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: 4px 0;
+}
+.skills-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+}
+.skills-manage-info { flex: 1; min-width: 0; }
+.skills-manage-name { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.skills-manage-meta { font-size: 12px; color: var(--text-2); margin-top: 1px; }
+.skills-manage-path {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skills-manage-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.skills-manage-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-2);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.skills-manage-del:hover:not(:disabled) { color: #e85454; border-color: #e85454; }
+.skills-manage-del:disabled { opacity: 0.5; cursor: default; }
+
 .skills-empty {
   padding: 60px 24px;
   text-align: center;
