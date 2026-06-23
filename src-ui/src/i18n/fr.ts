@@ -114,7 +114,7 @@ export const fr = {
   'heatmap.tooltip_none': 'Aucune activité le {date}',
 
   // Toasts du panneau Skills
-  'skills.toast.enabled': "Redémarrez l'outil pour appliquer le changement.",
-  'skills.toast.disabled': "Désactivée — redémarrez l'outil pour appliquer.",
+  'skills.toast.enabled': 'Activée',
+  'skills.toast.disabled': 'Désactivée',
 
 } as const;

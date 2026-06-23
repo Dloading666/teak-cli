@@ -1,42 +1,28 @@
-//! Coffee CLI Skills — cross-CLI shared skill store.
+//! Coffee CLI Skills — local skill store, surfaced into agent prompts.
 //!
-//! Architecture (matches Codex's `$CODEX_HOME/skills` + Claude Code's
-//! `~/.claude/skills` convention; each enabled skill gets a per-skill
-//! symlink/junction so the user's own skills directory contents stay
-//! untouched):
-//!
+//! Two tiers under `~/.coffee-cli/`:
 //! ```text
-//!   ~/.coffee-cli/skills/<name>/         ← enabled (linked into each CLI)
-//!   ~/.coffee-cli/skills-library/<name>/ ← downloaded but disabled
-//!
-//!   ~/.claude/skills/<name>  → junction → ~/.coffee-cli/skills/<name>
-//!   ~/.codex/skills/<name>   → junction → ~/.coffee-cli/skills/<name>
+//!   skills/<name>/         ← enabled (offered in the Gambit skill picker)
+//!   skills-library/<name>/ ← downloaded but disabled
 //! ```
 //!
-//! Per-skill (not parent-dir) linking is the safe choice: the user's own
-//! `~/.claude/skills/foo` stays where it was, only the skills *we manage*
-//! get a symlink alongside it.
-//!
-//! Permission model on Windows: junctions (FSCTL reparse points) need NO
-//! special privilege when source and link are on the same volume. We keep
-//! both under `%USERPROFILE%`, so junctions work for any user — no admin,
-//! no developer mode toggle. (Symbolic links would have required either,
-//! which is a non-starter for a desktop app.)
+//! We do NOT install skills into each CLI's native skills dir. Instead the
+//! Gambit input attaches a skill as a pill; on send it expands to a
+//! one-line instruction pointing the agent at the skill's on-disk
+//! `SKILL.md` (e.g. `…/.coffee-cli/skills/hyperframes/SKILL.md`). Every
+//! agent can read files, so this works uniformly with ZERO per-tool wiring
+//! — no junctions, no per-CLI skill-dir conventions, no restart-to-apply.
+//! `skills_list` returns each skill's absolute `path` for that expansion.
 //!
 //! Download model (deferred for future custom-skill upload flow): the
 //! frontend would do HTTP fetches via `fetch()` and pipe bytes into
 //! `skills_write_file`. No HTTP client in Rust deps.
 
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 
 /// Coffee CLI's bundled skills, baked into the binary at compile time.
 /// Currently 2 entries (`screenshot`, `vibeid`); both live under
@@ -54,69 +40,6 @@ use std::os::windows::process::CommandExt;
 /// under `reference/` (gitignored) — see `reference/README.md`.
 static BUNDLED_SKILLS: include_dir::Dir<'_> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/skills");
-
-// Skill-dir layout families across all registered tools — encoded by
-// each `ToolDescriptor::skill_dir_relative` + resolved through
-// `ToolDescriptor::skill_dir(home)`:
-//
-//   - **Dotdir** (claude / codex / qwen): `~/.<tool>/skills`.
-//   - **Shared-dotdir-nested** (antigravity): `~/.gemini/antigravity/skills`.
-//     Antigravity CLI (`agy`) and the Antigravity IDE share this dir
-//     for skills — Coffee CLI junctions in alongside whatever the IDE
-//     and 3rd-party installers (e.g. `antigravity-awesome-skills`)
-//     drop there. Variant of Dotdir but two levels deep under the
-//     shared `.gemini/` namespace. `agy plugin install` is a separate
-//     richer mechanism not wired through this dir.
-//   - **XDG** (opencode): `~/.config/opencode/skills`. Skills are
-//     config, not data — don't apply the "history dir's parent"
-//     heuristic to XDG-family tools.
-//   - **Workspace-nested** (openclaw): `~/.openclaw/workspace/skills`.
-//     Workspace root is configurable via `agents.defaults.workspace`
-//     in `~/.openclaw/openclaw.json`; users who override that key
-//     won't get the junction at the right place.
-//   - **HERMES_HOME-rooted** (hermes): `<HERMES_HOME>/skills`. On
-//     Windows the installer sets HERMES_HOME to `%LOCALAPPDATA%\hermes`
-//     instead of `%USERPROFILE%\.hermes`, so the join lives in
-//     `ToolDescriptor::skill_dir` and ignores the caller-supplied
-//     `home` for this one descriptor — see tools/hermes.rs.
-//
-// Per-target gating (only link if the binary is on PATH) is applied
-// at call sites by combining `tool.skill_dir(&home)` with
-// `is_tool_installed(tool.binary_name)`.
-
-/// Process-level cache of `is_tool_installed` results. A single toggle
-/// fans out to `link_into_cli_dirs` (6 PATH probes), and on Windows each
-/// `where` spawn is hundreds of milliseconds, which the user feels as a
-/// stall on the toggle. Tool install state almost never changes during
-/// one Coffee CLI session, so we probe once per binary and reuse the
-/// result for the rest of the process lifetime. If the user
-/// installs/uninstalls a target CLI mid-session they need to relaunch
-/// Coffee CLI to pick up the change — that's a rare and explicit user
-/// action, worth the trade-off vs paying the PATH-probe cost on every
-/// toggle.
-static TOOL_INSTALLED_CACHE: OnceLock<Mutex<HashMap<String, bool>>> = OnceLock::new();
-
-/// Wraps the platform-specific PATH check from `server.rs` so
-/// `link_into_cli_dirs` can stay platform-clean. Cached — see
-/// `TOOL_INSTALLED_CACHE`.
-fn is_tool_installed(bin: &str) -> bool {
-    let cache = TOOL_INSTALLED_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    if let Ok(guard) = cache.lock() {
-        if let Some(&v) = guard.get(bin) {
-            return v;
-        }
-    }
-    let probed = {
-        #[cfg(target_os = "windows")]
-        { crate::server::check_tool_windows(bin) }
-        #[cfg(not(target_os = "windows"))]
-        { crate::server::check_tool_unix(bin) }
-    };
-    if let Ok(mut guard) = cache.lock() {
-        guard.insert(bin.to_string(), probed);
-    }
-    probed
-}
 
 /// Phased rollout allowlist. The combined bundle (openai/skills .curated
 /// + Coffee CLI's own skills) always ships every skill, but only the
@@ -161,6 +84,10 @@ pub struct SkillEntry {
     /// the IPC self-contained — frontend can `<img src={iconDataUrl}>`
     /// without a second round-trip.
     pub icon_data_url: Option<String>,
+    /// Absolute on-disk path to the skill's directory. The Gambit skill
+    /// pill expands to an instruction pointing the agent at
+    /// `<path>/SKILL.md`. Native separators (backslash on Windows).
+    pub path: String,
 }
 
 fn home() -> Result<PathBuf, String> {
@@ -412,7 +339,13 @@ pub fn skills_list() -> Result<Vec<SkillEntry>, String> {
 
             let skill_md = fs::read_to_string(path.join("SKILL.md")).ok();
             let icon_data_url = read_skill_icon(&path, &name);
-            out.push(SkillEntry { name, enabled, skill_md, icon_data_url });
+            out.push(SkillEntry {
+                path: path.to_string_lossy().to_string(),
+                name,
+                enabled,
+                skill_md,
+                icon_data_url,
+            });
         }
     }
 
@@ -459,16 +392,13 @@ fn read_skill_icon(skill_dir: &Path, name: &str) -> Option<String> {
     None
 }
 
-/// Toggle a skill between disabled (library) and enabled (skills/ + symlinks).
+/// Toggle a skill between disabled (library/) and enabled (skills/).
 ///
-/// `enable=true`: skill must currently exist in `skills-library/<name>`.
-/// We `mv` it into `skills/<name>` and create per-CLI symlinks.
-///
-/// `enable=false`: reverse — `mv` back into library and remove symlinks.
-///
-/// Per the Skills feature contract: this never touches the user's running
-/// CLI sessions. The frontend is responsible for showing the
-/// "需重启工具才能生效" toast.
+/// `enable=true`: move `skills-library/<name>` → `skills/<name>`.
+/// `enable=false`: reverse. Purely a tier move — no per-CLI mirroring;
+/// the Gambit pill references the skill by absolute path at send time, so
+/// nothing has to be installed into any tool's dir and no restart is
+/// needed. Returns an (always-empty today) warnings vec for API stability.
 #[tauri::command]
 pub fn skills_toggle(name: String, enable: bool) -> Result<Vec<String>, String> {
     validate_skill_name(&name)?;
@@ -496,145 +426,16 @@ pub fn skills_toggle(name: String, enable: bool) -> Result<Vec<String>, String> 
 
     fs::rename(&src, &dst).map_err(|e| format!("rename: {}", e))?;
 
-    if enable {
-        // link_into_cli_dirs is per-tool fault tolerant: a single tool's
-        // real-folder conflict (user has a manual install at
-        // ~/.<tool>/skills/<name>) skips that one tool with a warning
-        // surfaced to the UI, but other tools still get the junction.
-        // Skill stays enabled as long as ≥1 tool linked successfully.
-        // Hard Err only when every installed tool failed (rare — would
-        // mean every tool already has a manual install, or there's a
-        // global filesystem problem).
-        match link_into_cli_dirs(&name, &dst) {
-            Ok(warnings) => Ok(warnings),
-            Err(e) => {
-                // Roll the rename back so the on-disk state matches
-                // what the UI is about to show (skill back in library/
-                // as disabled). Best-effort; rollback failure leaves a
-                // real-but-unlinked skill in skills/ — next toggle will
-                // notice the destination already exists and refuse with
-                // the "Destination already exists" error above, which
-                // points the user at the path to clean up manually.
-                let _ = fs::rename(&dst, &from_root.join(&name));
-                Err(e)
-            }
-        }
-    } else {
-        unlink_from_cli_dirs(&name);
-        Ok(Vec::new())
-    }
+    // Enabling/disabling is just a tier move now — no per-CLI junctions.
+    // The Gambit skill pill points the agent straight at the on-disk
+    // SKILL.md, so nothing has to be mirrored into each tool's dir.
+    Ok(Vec::new())
 }
 
-/// For ONE specific tool that just became available, link every
-/// currently-enabled skill into that tool's CLI skills dir. Driven by
-/// the launchpad's focus rescan (paired with `install_hook_for_tool`).
-///
-/// Idempotent. Real folders the user manually placed at the same path
-/// are skipped with a warning — same policy as `link_into_cli_dirs`.
-/// Per-skill failures are logged but don't fail the call: this is
-/// background fan-out triggered by a tool-installed event, not a user
-/// action awaiting a result.
-#[tauri::command]
-pub fn skills_relink_for_tool(tool: String) -> Result<(), String> {
-    let Some(descriptor) = crate::tools::find(&tool) else { return Ok(()); };
-    if !is_tool_installed(descriptor.binary_name) {
-        return Ok(());
-    }
-
-    let home = home()?;
-    let skills_dir = skills_root()?;
-    if !skills_dir.is_dir() {
-        return Ok(());
-    }
-
-    let Some(parent) = descriptor.skill_dir(&home) else { return Ok(()); };
-    fs::create_dir_all(&parent).map_err(|e| format!("mkdir {}: {}", parent.display(), e))?;
-
-    let entries = fs::read_dir(&skills_dir)
-        .map_err(|e| format!("read {}: {}", skills_dir.display(), e))?;
-    for entry in entries.flatten() {
-        let source = entry.path();
-        if !source.is_dir() {
-            continue;
-        }
-        let link = parent.join(entry.file_name());
-        match try_create_skill_link(&source, &link) {
-            LinkOutcome::Created | LinkOutcome::AlreadyLinked => {}
-            LinkOutcome::RealFolderConflict => {
-                log::info!(
-                    "[skills] {} exists as user's own folder — leaving alone",
-                    link.display()
-                );
-            }
-            LinkOutcome::Failed(e) => log::warn!("[skills] {}", e),
-        }
-    }
-    Ok(())
-}
-
-/// Per-target outcome of a junction attempt. Callers that fan out across
-/// multiple tools use this to keep going on a single conflict instead of
-/// aborting the whole operation. See `link_into_cli_dirs` for the
-/// aggregation logic.
-enum LinkOutcome {
-    /// New junction created.
-    Created,
-    /// Existing junction already points at our source — nothing to do,
-    /// not a problem.
-    AlreadyLinked,
-    /// User has a real folder at this path (not a junction). Per
-    /// `feedback_refuse_silent_override`, we never clobber — we leave
-    /// it alone and let the user resolve manually if they want our
-    /// version. The caller surfaces this as a per-tool warning so the
-    /// user sees which tool is using its own copy.
-    RealFolderConflict,
-    /// Other filesystem failure — out of disk, permission denied,
-    /// mklink/symlink syscall failed, etc. Treated as a hard error.
-    Failed(String),
-}
-
-/// Attempt to junction `source` → `link`. Outcome conveys whether a
-/// link was made, the path already had our junction, the user has
-/// their own real folder there (skip with warning), or some other
-/// filesystem operation failed.
-///
-/// Shared by `link_into_cli_dirs` (fan-out across tools for one skill)
-/// and `skills_relink_for_tool` (fan-out across skills for one tool).
-/// Each caller picks its own policy on the variants.
-fn try_create_skill_link(source: &Path, link: &Path) -> LinkOutcome {
-    if link.exists() {
-        if is_dir_link(link) {
-            return LinkOutcome::AlreadyLinked;
-        }
-        return LinkOutcome::RealFolderConflict;
-    }
-    match create_dir_link(source, link) {
-        Ok(()) => LinkOutcome::Created,
-        Err(e) => LinkOutcome::Failed(format!(
-            "link {} → {} failed: {}",
-            link.display(),
-            source.display(),
-            e
-        )),
-    }
-}
-
-/// Display-safe path string: native separators converted to forward
-/// slashes. Windows backslash paths sometimes get mangled when copy-
-/// pasted from a toast (`\U`, `\e`, etc. land near letters and
-/// downstream rendering pipelines silently drop them). Forward slashes
-/// round-trip cleanly through every UI layer and Windows still resolves
-/// them as paths, so error messages destined for end-users always go
-/// through this helper.
-fn display_path(p: &Path) -> String {
-    p.to_string_lossy().replace('\\', "/")
-}
-
-/// Permanently remove a skill from both tiers + clean up any symlinks.
+/// Permanently remove a skill from both tiers.
 #[tauri::command]
 pub fn skills_delete(name: String) -> Result<(), String> {
     validate_skill_name(&name)?;
-    unlink_from_cli_dirs(&name);
     for root in [skills_root()?, library_root()?] {
         let p = root.join(&name);
         if p.exists() {
@@ -642,194 +443,6 @@ pub fn skills_delete(name: String) -> Result<(), String> {
         }
     }
     Ok(())
-}
-
-/// Create per-CLI symlinks for an enabled skill. Returns Err on the
-/// first failure that prevents the skill from reaching ANY target CLI
-/// dir — but a skill enabled when zero supported CLIs are installed
-/// is still a success (no-op linking, the skill stays in our library
-/// for the user to later install a CLI and have it picked up).
-///
-/// Per-target gating: only mirror to a CLI's skills dir if its
-/// binary is on PATH (same source of truth as the launchpad's
-/// tool-availability check). We **never** create a CLI's home dir
-/// from scratch when the binary isn't installed.
-fn link_into_cli_dirs(name: &str, source: &Path) -> Result<Vec<String>, String> {
-    let home = home()?;
-    let mut installed_any = false;
-    let mut linked_any = false;
-    let mut last_err: Option<String> = None;
-    // Per-tool conflict warnings surfaced to the UI so the user sees
-    // exactly which tool is using its own version vs Coffee CLI's.
-    // Empty vec on the success path means "all installed tools got our
-    // link cleanly".
-    let mut conflict_warnings: Vec<String> = Vec::new();
-    for tool in crate::tools::TOOLS {
-        let Some(parent) = tool.skill_dir(&home) else { continue };
-        // Binary gate: tool not on PATH → skip silently. Don't
-        // mkdir its home; that would mislead the user / file
-        // explorer into thinking the tool is there.
-        if !is_tool_installed(tool.binary_name) {
-            continue;
-        }
-        installed_any = true;
-        // Tool IS installed but may not yet have a `skills/` subdir.
-        // Safe to create on its behalf — the binary IS on PATH, so
-        // the user clearly intends to use it. mkdir failure is
-        // logged-and-skipped rather than fatal so a single broken
-        // CLI dir doesn't block fan-out to the rest.
-        if let Err(e) = fs::create_dir_all(&parent) {
-            log::warn!("[skills] mkdir {}: {} — skipping target", parent.display(), e);
-            continue;
-        }
-        let link = parent.join(name);
-        match try_create_skill_link(source, &link) {
-            LinkOutcome::Created | LinkOutcome::AlreadyLinked => linked_any = true,
-            LinkOutcome::RealFolderConflict => {
-                // User has their own folder here. Skip this tool — other
-                // tools still get the skill — but record a warning so the
-                // UI can surface it. Per feedback_refuse_silent_override:
-                // never silently lie about which copy is in effect.
-                let warning = format!(
-                    "{}: skill not mirrored — {} already exists as a real \
-                     folder (not managed by Coffee CLI). Remove it manually \
-                     if you want Coffee CLI's version here.",
-                    tool.binary_name,
-                    display_path(&link)
-                );
-                log::info!("[skills] {}", warning);
-                conflict_warnings.push(warning);
-            }
-            LinkOutcome::Failed(e) => {
-                log::warn!("[skills] {}", e);
-                last_err = Some(e);
-            }
-        }
-    }
-    if linked_any {
-        Ok(conflict_warnings)
-    } else if !installed_any {
-        // No supported CLI installed at all → user enabled a skill
-        // before installing any of the agent CLIs. That's fine: the
-        // skill is in our library, future install + re-toggle will
-        // wire it. Don't surface an error toast for the expected
-        // first-run state.
-        log::info!(
-            "[skills] enabled '{}' but no supported CLI present yet; skill is staged in library",
-            name
-        );
-        Ok(Vec::new())
-    } else {
-        // Every installed tool failed. Combine real-folder conflicts
-        // and other filesystem errors into a single multi-line message
-        // so the user sees the full picture (e.g. "all 3 installed
-        // tools already have manual installs — remove them first").
-        let mut lines: Vec<String> = Vec::new();
-        if let Some(e) = last_err {
-            lines.push(e);
-        }
-        lines.extend(conflict_warnings);
-        if lines.is_empty() {
-            return Err("No CLI target dir was linkable".to_string());
-        }
-        Err(format!(
-            "Skill could not be linked into any installed CLI:\n  - {}",
-            lines.join("\n  - ")
-        ))
-    }
-}
-
-/// Remove per-CLI symlinks. Only removes links we own (symlink/junction);
-/// real folders the user happens to have at the same path are left alone.
-/// No binary gating here — a link might exist from a previous session
-/// when the tool WAS installed and has since been uninstalled; we still
-/// want to clean it up.
-fn unlink_from_cli_dirs(name: &str) {
-    let Ok(home) = home() else { return };
-    for tool in crate::tools::TOOLS {
-        let Some(parent) = tool.skill_dir(&home) else { continue };
-        let link = parent.join(name);
-        if !link.exists() {
-            continue;
-        }
-        if !is_dir_link(&link) {
-            log::warn!("[skills] {} is not a link, leaving alone", link.display());
-            continue;
-        }
-        if let Err(e) = remove_dir_link(&link) {
-            log::warn!("[skills] unlink {}: {}", link.display(), e);
-        }
-    }
-}
-
-#[cfg(unix)]
-fn create_dir_link(source: &Path, link: &Path) -> std::io::Result<()> {
-    std::os::unix::fs::symlink(source, link)
-}
-
-#[cfg(windows)]
-fn create_dir_link(source: &Path, link: &Path) -> std::io::Result<()> {
-    // Junction (FSCTL_SET_REPARSE_POINT) — no admin/dev-mode required, in
-    // contrast to symbolic links which need SeCreateSymbolicLinkPrivilege.
-    // Shell out to cmd's `mklink /J` rather than implementing the IOCTL
-    // ourselves: simpler, no new windows-crate features, behaves identically.
-    //
-    // Two production gotchas baked in here:
-    //   1. **Force backslash separators.** Rust's `PathBuf::join()` on
-    //      Windows happily preserves any `/` inside the joined string
-    //      ("/skills" remains as-is when joined with a backslashed
-    //      home dir). When that mixed-slash path reaches cmd.exe,
-    //      mklink's tokeniser sees `/skills` and treats it as a flag —
-    //      exits 1 with no useful message. Always normalise both
-    //      paths to backslash before handing off.
-    //   2. **Capture stderr.** mklink prints the actual reason
-    //      ("Cannot create a file when that file already exists",
-    //      "The system cannot find the path specified", etc.) to
-    //      stderr; the exit code alone says nothing useful. Surface
-    //      the message into our Err so users + future-us see the
-    //      real cause instead of "Some(1)".
-    let normalize = |p: &Path| -> std::ffi::OsString {
-        p.to_string_lossy().replace('/', "\\").into()
-    };
-    let output = std::process::Command::new("cmd")
-        .args(["/C", "mklink", "/J"])
-        .arg(normalize(link))
-        .arg(normalize(source))
-        .creation_flags(0x08000000)
-        .output()?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let detail = if !stderr.is_empty() {
-            stderr
-        } else if !stdout.is_empty() {
-            stdout
-        } else {
-            format!("exit {:?}", output.status.code())
-        };
-        return Err(std::io::Error::other(format!("mklink /J: {}", detail)));
-    }
-    Ok(())
-}
-
-/// Both Unix symlinks and Windows junctions/symlinks return true for
-/// `is_symlink()` via `symlink_metadata()`. Plain directories return false.
-fn is_dir_link(path: &Path) -> bool {
-    fs::symlink_metadata(path)
-        .map(|m| m.file_type().is_symlink())
-        .unwrap_or(false)
-}
-
-#[cfg(unix)]
-fn remove_dir_link(link: &Path) -> std::io::Result<()> {
-    fs::remove_file(link)
-}
-
-#[cfg(windows)]
-fn remove_dir_link(link: &Path) -> std::io::Result<()> {
-    // Junctions are reparse-pointed directories — `remove_dir` is the
-    // correct call; `remove_file` would fail with "permission denied".
-    fs::remove_dir(link)
 }
 
 #[cfg(test)]

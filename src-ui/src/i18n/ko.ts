@@ -118,7 +118,7 @@ export const ko = {
   'heatmap.tooltip_none': '{date} · 활동 없음',
 
   // Skills 패널 토글 토스트
-  'skills.toast.enabled': '도구를 재시작해야 적용됩니다',
-  'skills.toast.disabled': '비활성화됨 — 도구를 재시작해야 적용됩니다',
+  'skills.toast.enabled': '활성화됨',
+  'skills.toast.disabled': '비활성화됨',
 
 } as const;

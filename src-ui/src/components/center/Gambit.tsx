@@ -410,7 +410,10 @@ function GambitImpl({
   const { state: appState } = useAppState();
   const lang = appState.currentLang;
   const [skillPopoverOpen, setSkillPopoverOpen] = useState(false);
-  const [enabledSkills, setEnabledSkills] = useState<{ name: string; displayName: string }[]>([]);
+  const [enabledSkills, setEnabledSkills] = useState<{ name: string; displayName: string; path: string }[]>([]);
+  // Skills attached to THIS message as pills. On send each expands to a
+  // one-line instruction pointing the agent at the skill's SKILL.md path.
+  const [attachedSkills, setAttachedSkills] = useState<{ name: string; displayName: string; path: string }[]>([]);
   const skillPopoverRef = useRef<HTMLDivElement | null>(null);
 
   // Refresh on mount AND every popover open. Mount fetch drives the
@@ -426,7 +429,7 @@ function GambitImpl({
         if (cancelled) return;
         const enabled = list.filter(s => s.enabled).map(s => {
           const fm = parseFrontmatter(s.skillMd);
-          return { name: s.name, displayName: localizedField(fm, 'name', lang) || s.name };
+          return { name: s.name, displayName: localizedField(fm, 'name', lang) || s.name, path: s.path };
         });
         setEnabledSkills(enabled);
       })
@@ -450,27 +453,17 @@ function GambitImpl({
     };
   }, [skillPopoverOpen]);
 
-  const insertSkillSlash = useCallback((slug: string) => {
-    // Prepend `/<slug> ` to the existing draft. If the user already
-    // had text typed, it gets pushed after a single space — same
-    // shape as if they'd typed `/screenshot 帮我截屏` themselves.
-    // We don't auto-replace an existing `/x ` prefix; the user can
-    // delete the old slash manually if they want to swap.
-    const trimmedExisting = draft.trimStart();
-    onDraftChange(`/${slug} ${trimmedExisting}`);
+  // Attach a skill as a pill (deduped). On send it expands to a one-line
+  // instruction pointing the agent at the skill's SKILL.md path — no
+  // junction, no slash command, works with any file-reading CLI.
+  const addSkill = useCallback((skill: { name: string; displayName: string; path: string }) => {
+    setAttachedSkills(prev => (prev.some(s => s.name === skill.name) ? prev : [...prev, skill]));
     setSkillPopoverOpen(false);
-    // Focus the textarea so the user can keep typing immediately.
-    // Defer one tick so React applies the new value first; otherwise
-    // the cursor lands at position 0 of the OLD value.
-    setTimeout(() => {
-      const ta = textareaRef.current;
-      if (ta) {
-        ta.focus();
-        const cursorPos = slug.length + 2; // `/` + slug + ` `
-        ta.setSelectionRange(cursorPos, cursorPos);
-      }
-    }, 0);
-  }, [draft, onDraftChange]);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  }, []);
+  const removeSkill = useCallback((name: string) => {
+    setAttachedSkills(prev => prev.filter(s => s.name !== name));
+  }, []);
 
   // ─── Context menu ─────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
@@ -582,28 +575,40 @@ function GambitImpl({
     // would be sent twice, making the AI see the same image reference
     // duplicated in its prompt.
     const text = draft.trim();
-    if (!text) {
+    if (!text && attachedSkills.length === 0) {
       setSendEmpty(true);
       return;
     }
-    // The textarea is the source of truth. If the user picked a skill
-    // earlier, `/<slug> ` is already at the start of `draft` (inserted
-    // by insertSkillSlash) and gets sent verbatim. No hidden state.
-    const ok = onSend(wrapImagePathsForSend(text));
+    // Attached skill pills expand to one instruction line each, pointing
+    // the agent at the skill's on-disk SKILL.md. Prepended before the
+    // user's text so the agent reads the skill first, then the request.
+    const preamble = attachedSkills
+      .map(s => `Use the "${s.displayName}" skill at "${s.path}" — read its SKILL.md and follow the instructions.`)
+      .join('\n');
+    const body = wrapImagePathsForSend(text);
+    const finalText = preamble ? (body ? `${preamble}\n\n${body}` : preamble) : body;
+    const ok = onSend(finalText);
     if (!ok) {
-      // Preserve draft so the user doesn't lose what they typed. They
-      // likely just need to click the target pane first, then hit Send
-      // again.
+      // Preserve draft + pills so the user doesn't lose anything. They
+      // likely just need to click the target pane first, then Send again.
       setSendFailed(true);
       return;
     }
     onDraftChange('');
-  }, [draft, onSend, onDraftChange]);
+    setAttachedSkills([]);
+  }, [draft, attachedSkills, onSend, onDraftChange]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // IME composition in progress — let the IME keep Enter for confirming
     // candidates. nativeEvent.isComposing is the canonical flag.
     if (e.nativeEvent.isComposing) return;
+    // Backspace at the very start of an empty draft pops the last skill
+    // pill — mirrors how chip inputs let you delete attachments with ⌫.
+    if (e.key === 'Backspace' && draft.length === 0 && attachedSkills.length > 0) {
+      e.preventDefault();
+      setAttachedSkills(prev => prev.slice(0, -1));
+      return;
+    }
     // Ctrl+Enter (or Cmd+Enter on macOS) sends. Plain Enter inserts a newline
     // — matches office/editor expectation. Shift+Enter also inserts a newline
     // (native textarea behavior).
@@ -802,6 +807,23 @@ function GambitImpl({
         )}
       </div>
 
+      {attachedSkills.length > 0 && (
+        <div className="gambit-skill-pills">
+          {attachedSkills.map(s => (
+            <span key={s.name} className="gambit-skill-pill">
+              <span className="gambit-skill-pill-name">{s.displayName}</span>
+              <button
+                type="button"
+                className="gambit-skill-pill-x"
+                onClick={() => removeSkill(s.name)}
+                onMouseDown={(e) => e.stopPropagation()}
+                aria-label={`Remove ${s.displayName}`}
+              >×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <textarea
         ref={textareaRef}
         className="gambit-textarea"
@@ -827,7 +849,7 @@ function GambitImpl({
             <button
               className="gambit-skill-add"
               onClick={() => setSkillPopoverOpen(o => !o)}
-              aria-label="Insert skill slash command"
+              aria-label="Attach skill"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <line x1="7" y1="2" x2="7" y2="12" />
@@ -836,16 +858,20 @@ function GambitImpl({
             </button>
             {skillPopoverOpen && (
               <div className="gambit-skill-popover">
-                {enabledSkills.map(s => (
-                  <button
-                    key={s.name}
-                    className="gambit-skill-popover-item"
-                    onClick={() => insertSkillSlash(s.name)}
-                  >
-                    <span>{s.displayName}</span>
-                    <span className="gambit-skill-popover-slash">/{s.name}</span>
-                  </button>
-                ))}
+                {enabledSkills.map(s => {
+                  const attached = attachedSkills.some(a => a.name === s.name);
+                  return (
+                    <button
+                      key={s.name}
+                      className="gambit-skill-popover-item"
+                      onClick={() => addSkill(s)}
+                      disabled={attached}
+                    >
+                      <span>{s.displayName}</span>
+                      {attached && <span className="gambit-skill-popover-slash">✓</span>}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -888,7 +914,7 @@ function GambitImpl({
           </span>
         )}
         <button
-          className={`gambit-send${sendFailed ? ' gambit-send--failed' : ''}${!draft.trim() ? ' gambit-send--empty' : ''}`}
+          className={`gambit-send${sendFailed ? ' gambit-send--failed' : ''}${!draft.trim() && attachedSkills.length === 0 ? ' gambit-send--empty' : ''}`}
           onClick={handleSend}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

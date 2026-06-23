@@ -120,8 +120,8 @@ export const en = {
   'heatmap.tooltip_none': 'No activity on {date}',
 
   // Skills panel toggle toasts
-  'skills.toast.enabled': 'Restart the tool to take effect.',
-  'skills.toast.disabled': 'Disabled — restart the tool to apply.',
+  'skills.toast.enabled': 'Enabled',
+  'skills.toast.disabled': 'Disabled',
 
 } as const;
 

@@ -3356,7 +3356,6 @@ pub fn start_ui() -> anyhow::Result<()> {
             crate::skills::skills_list,
             crate::skills::skills_toggle,
             crate::skills::skills_delete,
-            crate::skills::skills_relink_for_tool,
         ])
         .setup(|app| {
             // Install Claude/Qwen hook scripts + settings patches.

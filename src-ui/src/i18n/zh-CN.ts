@@ -119,7 +119,7 @@ export const zhCN = {
   'heatmap.tooltip_none': '{date} · 没有活动',
 
   // Skills 面板开关提示
-  'skills.toast.enabled': '需重启工具才能生效',
-  'skills.toast.disabled': '已关闭，需重启工具',
+  'skills.toast.enabled': '已启用',
+  'skills.toast.disabled': '已关闭',
 
 } as const;

@@ -500,7 +500,6 @@ export function CenterPanel() {
       for (const tool of Object.keys(result)) {
         if (result[tool] === true && prev[tool] === false) {
           commands.installHookForTool(tool).catch(() => {});
-          commands.skillsRelinkForTool(tool).catch(() => {});
         }
       }
     }

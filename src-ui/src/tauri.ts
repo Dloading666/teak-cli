@@ -193,7 +193,7 @@ export const commands = {
   skillsEnsureDirs: () => invoke<void>('skills_ensure_dirs'),
   skillsWriteFile: (name: string, relPath: string, bytes: number[] | Uint8Array) =>
     invoke<void>('skills_write_file', { name, relPath, bytes: Array.from(bytes) }),
-  skillsList: () => invoke<{ name: string; enabled: boolean; skillMd: string | null; iconDataUrl: string | null }[]>('skills_list'),
+  skillsList: () => invoke<{ name: string; enabled: boolean; skillMd: string | null; iconDataUrl: string | null; path: string }[]>('skills_list'),
   /** Toggle a skill on or off. On success, returns a list of per-tool
    *  warnings — usually empty. Non-empty entries describe tools whose
    *  skills dir already contained a real folder for this skill (manual
@@ -206,8 +206,6 @@ export const commands = {
   /** When a CLI flips from not-installed → installed mid-session, fan
    *  out every currently-enabled skill into that tool's skills dir.
    *  Paired with installHookForTool in the launchpad's focus rescan. */
-  skillsRelinkForTool: (tool: string) =>
-    invoke<void>('skills_relink_for_tool', { tool }),
 
   // Task Board persistence (~/.coffee-cli/tasks.json)
   loadTasks: () => invoke<string>('load_tasks'),

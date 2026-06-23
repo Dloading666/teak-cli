@@ -121,6 +121,6 @@ export const vi = {
   'heatmap.tooltip_none': 'Không có hoạt động vào {date}',
 
   // Toast bật/tắt Skills
-  'skills.toast.enabled': 'Khởi động lại công cụ để áp dụng thay đổi.',
-  'skills.toast.disabled': 'Đã tắt — khởi động lại công cụ để áp dụng.',
+  'skills.toast.enabled': 'Đã bật',
+  'skills.toast.disabled': 'Đã tắt',
 };

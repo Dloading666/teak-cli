@@ -392,6 +392,57 @@
     color: var(--accent, #C4956A);
 }
 
+/* ─── Skill pills (attached skills, row above the textarea) ──── */
+/* Each attached skill shows as a removable pill; on send it expands to a
+   one-line instruction pointing the agent at the skill's SKILL.md path. */
+.gambit-skill-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 2px 0;
+    flex-shrink: 0;
+}
+.gambit-skill-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 2px 4px 2px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--accent, #C4956A);
+    background: color-mix(in srgb, var(--accent, #C4956A) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent, #C4956A) 35%, transparent);
+}
+.gambit-skill-pill-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.gambit-skill-pill-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s, background-color 0.15s;
+}
+.gambit-skill-pill-x:hover {
+    opacity: 1;
+    background: color-mix(in srgb, var(--accent, #C4956A) 30%, transparent);
+}
+
 /* ─── Skill picker (footer left, before thumbnail strip) ──── */
 /* Same 30×30 footprint as .gambit-thumb so the footer's vertical
    rhythm doesn't shift when an image gets pasted. position:relative

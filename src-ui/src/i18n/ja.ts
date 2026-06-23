@@ -118,7 +118,7 @@ export const ja = {
   'heatmap.tooltip_none': '{date} · アクティビティなし',
 
   // Skills パネル切替トースト
-  'skills.toast.enabled': 'ツールを再起動すると反映されます',
-  'skills.toast.disabled': '無効化しました。ツールを再起動すると反映されます',
+  'skills.toast.enabled': '有効化しました',
+  'skills.toast.disabled': '無効化しました',
 
 } as const;
