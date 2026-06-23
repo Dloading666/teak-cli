@@ -891,6 +891,10 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Pack rows to the top at their natural height. Without this, the grid's
+     default align-content: stretch expands rows to fill the flex:1 height,
+     making cards balloon when there are only a few. */
+  align-content: start;
 }
 .library-page--skills .skills-empty { flex: 1; }
 .skills-tabs {
