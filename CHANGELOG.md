@@ -7,6 +7,35 @@ For releases prior to v1.5.5, see the
 [GitHub Releases page](https://github.com/edison7009/Coffee-CLI/releases)
 and `git tag --list "v*"`.
 
+## [2.8.6] — 2026-06-24
+
+### Added
+- **Codex-compatible plugin marketplaces.** Add any git repo that follows
+  the Codex marketplace rule (a `.agents/plugins/marketplace.json` at the
+  repo root) from Skills ▸ [Add marketplace]. Coffee CLI clones the repo,
+  reads each plugin's name / description / icon, and renders it as a
+  toggleable card. Enable a plugin and it appears in the composer's skill
+  picker; attaching it hands the agent the plugin's on-disk path — Coffee
+  CLI doesn't run or interpret what's behind that path (SKILL.md, MCP
+  connector, whatever), it just points the agent at it. Works with the
+  official `github.com/openai/plugins` market (~178 plugins) and any
+  community mirror. Big markets render with a skeleton + lazy scroll, and
+  icons load via the asset protocol so the list stays cheap. [Manage] opens
+  the marketplace folder; delete a repo to remove its market.
+
+### Changed
+- **Skills attach as composer pills.** Skills and marketplace plugins now
+  attach directly in the composer as inline pills instead of being mirrored
+  into each CLI's skills dir via junctions/symlinks. The market tab strip is
+  a single horizontally-scrolling row (the mouse wheel scrolls it sideways)
+  so the header stays one line no matter how many markets you add.
+
+### Security
+- **Marketplace git URLs are validated.** Only https / http / git / ssh
+  URLs are accepted; a pasted `ext::…` (which `git clone` would otherwise
+  execute as a shell command) or a leading-`-` option is rejected, and `--`
+  is passed before the URL as a second line of defense.
+
 ## [2.8.0] — 2026-06-19
 
 ### Fixed
