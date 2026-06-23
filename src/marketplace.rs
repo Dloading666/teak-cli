@@ -156,6 +156,25 @@ fn repo_name_from_url(url: &str) -> String {
         .to_string()
 }
 
+/// Reject anything git wouldn't treat as a plain remote repo URL. Without
+/// this, a pasted "URL" like `ext::sh -c '<cmd>'` makes `git clone` execute
+/// arbitrary commands (RCE), and a leading `-` is parsed as a git option
+/// (argument injection). We only ever consume real remote marketplaces.
+fn validate_git_url(url: &str) -> Result<(), String> {
+    if url.starts_with('-') {
+        return Err("Git URL can't start with '-'".to_string());
+    }
+    const ALLOWED: [&str; 5] = ["https://", "http://", "git://", "ssh://", "git@"];
+    let lower = url.to_ascii_lowercase();
+    if !ALLOWED.iter().any(|p| lower.starts_with(p)) {
+        return Err(format!(
+            "Only https / http / git / ssh URLs are supported: {}",
+            url
+        ));
+    }
+    Ok(())
+}
+
 /// Resolve a plugin's icon to an absolute FILE path (first existing of the
 /// manifest's composerIcon / logo). No read, no base64 — the frontend loads
 /// it via the asset protocol, so listing a 178-plugin market stays cheap.
@@ -220,6 +239,7 @@ fn add_marketplace_blocking(git_url: &str) -> Result<(), String> {
     if url.is_empty() {
         return Err("Empty git URL".to_string());
     }
+    validate_git_url(url)?;
     let name = repo_name_from_url(url);
     if name.is_empty() {
         return Err(format!("Could not derive a folder name from: {}", url));
@@ -233,8 +253,9 @@ fn add_marketplace_blocking(git_url: &str) -> Result<(), String> {
         // Already added — refresh to latest.
         git(&["-C", &dest.to_string_lossy(), "pull", "--ff-only"])?;
     } else {
-        // Fresh clone (shallow — we only need current files).
-        git(&["clone", "--depth", "1", url, &dest.to_string_lossy()])?;
+        // Fresh clone (shallow — we only need current files). `--` stops git
+        // from parsing the URL as an option even if validation ever misses one.
+        git(&["clone", "--depth", "1", "--", url, &dest.to_string_lossy()])?;
     }
 
     // Validate the Codex marketplace rule so a wrong URL surfaces clearly
