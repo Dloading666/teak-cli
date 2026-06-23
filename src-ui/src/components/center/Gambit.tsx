@@ -440,14 +440,23 @@ function GambitImpl({
   // Library page while Gambit is also open.
   useEffect(() => {
     let cancelled = false;
-    commands.skillsList()
-      .then(list => {
+    Promise.all([
+      commands.skillsList(),
+      commands.listMarketplaces().catch(() => []),
+    ])
+      .then(([list, markets]) => {
         if (cancelled) return;
-        const enabled = list.filter(s => s.enabled).map(s => {
+        // Bundled skills + enabled marketplace plugins both feed the picker.
+        // Plugin `key` ("market::plugin") is unique so it can't collide with
+        // a bundled skill name in the dedup check.
+        const bundled = list.filter(s => s.enabled).map(s => {
           const fm = parseFrontmatter(s.skillMd);
           return { name: s.name, displayName: localizedField(fm, 'name', lang) || s.name, path: s.path };
         });
-        setEnabledSkills(enabled);
+        const plugins = markets.flatMap(m =>
+          m.plugins.filter(p => p.enabled).map(p => ({ name: p.key, displayName: p.displayName, path: p.path })),
+        );
+        setEnabledSkills([...bundled, ...plugins]);
       })
       .catch(() => { if (!cancelled) setEnabledSkills([]); });
     return () => { cancelled = true; };

@@ -3356,6 +3356,10 @@ pub fn start_ui() -> anyhow::Result<()> {
             crate::skills::skills_list,
             crate::skills::skills_toggle,
             crate::skills::skills_delete,
+            crate::marketplace::add_marketplace,
+            crate::marketplace::list_marketplaces,
+            crate::marketplace::set_marketplace_plugin_enabled,
+            crate::marketplace::open_marketplace_dir,
         ])
         .setup(|app| {
             // Install Claude/Qwen hook scripts + settings patches.

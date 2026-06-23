@@ -8,6 +8,7 @@ mod fs_watcher;
 mod tool_config;
 mod tools;
 mod skills;
+mod marketplace;
 
 use anyhow::Result;
 

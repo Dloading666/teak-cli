@@ -203,9 +203,15 @@ export const commands = {
   skillsToggle: (name: string, enable: boolean) =>
     invoke<string[]>('skills_toggle', { name, enable }),
   skillsDelete: (name: string) => invoke<void>('skills_delete', { name }),
-  /** When a CLI flips from not-installed → installed mid-session, fan
-   *  out every currently-enabled skill into that tool's skills dir.
-   *  Paired with installHookForTool in the launchpad's focus rescan. */
+
+  // Codex-compatible plugin marketplaces (git-cloned repos under
+  // ~/.coffee-cli/marketplace). We read the marketplace.json rule, render
+  // cards, and inject the plugin path into the agent prompt — nothing more.
+  addMarketplace: (gitUrl: string) => invoke<void>('add_marketplace', { gitUrl }),
+  listMarketplaces: () => invoke<Marketplace[]>('list_marketplaces'),
+  setMarketplacePluginEnabled: (key: string, enabled: boolean) =>
+    invoke<void>('set_marketplace_plugin_enabled', { key, enabled }),
+  openMarketplaceDir: () => invoke<void>('open_marketplace_dir'),
 
   // Task Board persistence (~/.coffee-cli/tasks.json)
   loadTasks: () => invoke<string>('load_tasks'),
@@ -244,6 +250,22 @@ export const commands = {
   setToolConfig: (tool: string, entry: ToolConfigEntry) =>
     invoke<void>('set_tool_config', { tool, entry }),
 };
+
+// Codex-compatible plugin marketplace (a cloned git repo) + its plugins.
+export interface MarketplacePlugin {
+  key: string;
+  name: string;
+  displayName: string;
+  description: string;
+  iconDataUrl: string | null;
+  path: string;
+  enabled: boolean;
+}
+export interface Marketplace {
+  id: string;
+  displayName: string;
+  plugins: MarketplacePlugin[];
+}
 
 // In-app self-update progress, emitted by download_and_install_update.
 export interface SelfUpdateProgress {
