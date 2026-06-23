@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type ToolType = 'claude' | 'qwen' | 'installer' | 'hermes' | 'opencode' | 'mimocode' | 'openclaw' | 'codex' | 'antigravity' | 'terminal' | 'remote' | 'history' | 'multi-agent' | 'two-agent' | 'three-agent' | 'two-split' | 'three-split' | 'four-split' | 'hyper-agent' | null;
+export type ToolType = 'claude' | 'qwen' | 'installer' | 'hermes' | 'opencode' | 'mimocode' | 'openclaw' | 'codex' | 'antigravity' | 'terminal' | 'remote' | 'history' | 'two-split' | 'three-split' | 'four-split' | null;
 
 /**
  * Tab status shown as an animated 9-dot glyph. Three states only —
@@ -133,9 +133,7 @@ export interface AppState {
 // ─── Tab tool predicates ────────────────────────────────────────────────────
 
 const SPLIT_TOOLS: ReadonlySet<ToolType> = new Set<ToolType>(['two-split', 'three-split', 'four-split']);
-const MULTI_AGENT_TOOLS: ReadonlySet<ToolType> = new Set<ToolType>(['multi-agent', 'two-agent', 'three-agent']);
 export const isSplitTool = (t: ToolType): boolean => SPLIT_TOOLS.has(t);
-export const isMultiAgentTool = (t: ToolType): boolean => MULTI_AGENT_TOOLS.has(t);
 
 // `kind` is a backend protocol contract: `::pane-N` triggers hands-free flag
 // injection (yolo / skip-permissions) for coordinated multi-agent; `::split-N`
@@ -313,22 +311,6 @@ function reducer(state: AppState, action: Action): AppState {
           activeTerminalId: newId
         };
       }
-    }
-    case 'OPEN_HYPER_AGENT_TAB': {
-      // Singleton tab — like history. Bypasses the 5-tab cap because
-      // Hyper-Agent is a system panel (MCP admin endpoint), not a
-      // user workspace. Reuse the existing one if already open;
-      // otherwise append a new tab and focus it.
-      const existing = state.terminals.find(t => t.tool === 'hyper-agent');
-      if (existing) {
-        return { ...state, activeTerminalId: existing.id };
-      }
-      const newId = crypto.randomUUID();
-      return {
-        ...state,
-        terminals: [...state.terminals, { id: newId, tool: 'hyper-agent', folderPath: null }],
-        activeTerminalId: newId,
-      };
     }
     case 'SET_AGENT_STATUS':
       return {

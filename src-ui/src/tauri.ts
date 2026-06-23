@@ -74,8 +74,8 @@ export const commands = {
   windowClose: () => invoke<void>('window_close'),
 
   // Tier Terminal API
-  tierTerminalStart: (sessionId: string, tool: string | null, cols: number, rows: number, themeMode: string, locale?: string, toolData?: string, cwd?: string, sentinelEnabled?: boolean) =>
-    invoke<void>('tier_terminal_start', { sessionId, tool, toolData: toolData ?? null, cols, rows, themeMode, locale: locale ?? null, cwd: cwd ?? null, sentinelEnabled: sentinelEnabled ?? false }),
+  tierTerminalStart: (sessionId: string, tool: string | null, cols: number, rows: number, themeMode: string, locale?: string, toolData?: string, cwd?: string) =>
+    invoke<void>('tier_terminal_start', { sessionId, tool, toolData: toolData ?? null, cols, rows, themeMode, locale: locale ?? null, cwd: cwd ?? null }),
   tierTerminalInput: (sessionId: string, data: string) => 
     invoke<void>('tier_terminal_input', { sessionId, data }),
   /** Raw write to PTY — does NOT trigger agent-status detection.
@@ -238,32 +238,6 @@ export const commands = {
   stopFsWatcher: () =>
     invoke<void>('stop_fs_watcher'),
 
-  // Multi-agent mode — post-v1.5 this is a thin handshake. The backend
-  // creates per-pane MCP servers + per-pane CLI artifacts (Claude
-  // mcp.json / Codex instructions.md / OpenCode opencode.json) lazily
-  // when each pane spawns its CLI inside `tier_terminal_start`. No
-  // workspace files are written and no global ~/.codex entries are
-  // injected, so there's nothing to "install" or "uninstall" at this
-  // layer. The call is kept as the structured place for the backend
-  // to surface preflight warnings and for future cross-cutting
-  // validation.
-  enableMultiAgentMode: (workspace: string, tools: string[]) =>
-    invoke<{ ok: boolean; warnings: string[] }>(
-      'enable_multi_agent_mode',
-      { workspace, tools },
-    ),
-  disableMultiAgentMode: (workspace: string) =>
-    invoke<{ ok: boolean; warnings: string[] }>(
-      'disable_multi_agent_mode',
-      { workspace },
-    ),
-
-  // ─── Hyper-Agent (cross-tab admin MCP for OpenClaw / Hermes Agent) ──
-  startHyperAgentServer: () =>
-    invoke<HyperAgentStatus>('start_hyper_agent_server'),
-  getHyperAgentEndpoint: () =>
-    invoke<McpEndpoint | null>('get_hyper_agent_endpoint'),
-
   // ─── Per-tool launch overrides (~/.coffee-cli/tools.json) ───────────
   getToolConfig: (tool: string) =>
     invoke<ToolConfigEntry>('get_tool_config', { tool }),
@@ -287,17 +261,6 @@ export async function onSelfUpdateProgress(
 ): Promise<() => void> {
   const { listen } = await import('@tauri-apps/api/event');
   return listen<SelfUpdateProgress>('self-update-progress', (e) => cb(e.payload));
-}
-
-export interface McpEndpoint {
-  url: string;
-  port: number;
-  pid: number;
-  started_at: number;
-}
-
-interface HyperAgentStatus {
-  endpoint: McpEndpoint;
 }
 
 /**
