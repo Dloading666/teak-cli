@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useLayoutEffect, useRef } from 'react';
+import { useEffect, useState, useCallback, useLayoutEffect, useRef, type WheelEvent as ReactWheelEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { commands } from '../../tauri';
@@ -71,6 +71,15 @@ export function SkillsPanel({ showToast }: Props) {
   const PAGE = 30;
   const [visibleCount, setVisibleCount] = useState(PAGE);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Tab strip: vertical wheel scrolls the row sideways (desktop mice have
+  //    no horizontal wheel, so without this extra market tabs are unreachable). ──
+  const tabsRef = useRef<HTMLDivElement | null>(null);
+  const onTabsWheel = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
+    const el = tabsRef.current;
+    if (!el || el.scrollWidth <= el.clientWidth || e.deltaY === 0) return;
+    el.scrollLeft += e.deltaY;
+  }, []);
 
   // ── Add-marketplace modal ──
   const [addOpen, setAddOpen] = useState(false);
@@ -216,7 +225,7 @@ export function SkillsPanel({ showToast }: Props) {
   return (
     <>
       <div className="skills-header">
-        <div className="skills-tabs">
+        <div className="skills-tabs" ref={tabsRef} onWheel={onTabsWheel}>
           <button
             className={`skills-tab ${activeTab === BUILTIN_TAB ? 'is-active' : ''}`}
             onClick={() => setActiveTab(BUILTIN_TAB)}

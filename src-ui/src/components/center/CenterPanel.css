@@ -862,13 +862,13 @@
 .skills-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 8px 4px;
-  flex-wrap: wrap;
-  /* Stays put because the CARD LIST owns the scroll (see
-     .library-page--skills), not the page — so the header never moves and
-     cards can't bleed up into the floating Agents/Skills pill. */
+  /* One row, never wraps: extra market tabs scroll horizontally inside
+     .skills-tabs instead of stacking into more rows and growing the header
+     taller (which would eat the card area and strand the actions mid-height).
+     Stays put because the CARD LIST owns the scroll (see
+     .library-page--skills), so the header never bleeds into the top pill. */
   flex-shrink: 0;
 }
 
@@ -899,11 +899,23 @@
 .library-page--skills .skills-empty { flex: 1; }
 .skills-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
+  flex: 1;
   min-width: 0;
+  /* Many markets scroll sideways here, keeping the header one row tall. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
+.skills-tabs::-webkit-scrollbar { height: 4px; }
+.skills-tabs::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+.skills-tabs::-webkit-scrollbar-track { background: transparent; }
 .skills-tab {
+  flex-shrink: 0;
   padding: 4px 10px;
   border: none;
   background: transparent;
