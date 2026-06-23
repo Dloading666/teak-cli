@@ -415,6 +415,25 @@ function GambitImpl({
   // one-line instruction pointing the agent at the skill's SKILL.md path.
   const [attachedSkills, setAttachedSkills] = useState<{ name: string; displayName: string; path: string }[]>([]);
   const skillPopoverRef = useRef<HTMLDivElement | null>(null);
+  // "+" button + portaled popover refs. The popover is portaled to <body>
+  // with fixed positioning so the Gambit window's `overflow: hidden`
+  // (rounded corners) can't clip its top items. popoverPos is the button's
+  // screen rect captured on open.
+  const skillBtnRef = useRef<HTMLButtonElement | null>(null);
+  const popoverContentRef = useRef<HTMLDivElement | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ left: number; bottom: number } | null>(null);
+  const toggleSkillPopover = useCallback(() => {
+    setSkillPopoverOpen(o => {
+      const next = !o;
+      const btn = skillBtnRef.current;
+      if (next && btn) {
+        const r = btn.getBoundingClientRect();
+        // Anchor the popover's bottom 6px above the button's top edge.
+        setPopoverPos({ left: r.left, bottom: window.innerHeight - r.top + 6 });
+      }
+      return next;
+    });
+  }, []);
 
   // Refresh on mount AND every popover open. Mount fetch drives the
   // visibility of the "+" button itself: when the user has no skills
@@ -441,7 +460,12 @@ function GambitImpl({
   useEffect(() => {
     if (!skillPopoverOpen) return;
     const onDown = (e: MouseEvent) => {
-      if (skillPopoverRef.current && skillPopoverRef.current.contains(e.target as Node)) return;
+      const target = e.target as Node;
+      // The "+" button lives in skillPopoverRef; the popover itself is
+      // portaled to <body> under popoverContentRef. A click in either is
+      // "inside" — only close on a genuine outside click.
+      if (skillPopoverRef.current?.contains(target)) return;
+      if (popoverContentRef.current?.contains(target)) return;
       setSkillPopoverOpen(false);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSkillPopoverOpen(false); };
@@ -464,6 +488,17 @@ function GambitImpl({
   const removeSkill = useCallback((name: string) => {
     setAttachedSkills(prev => prev.filter(s => s.name !== name));
   }, []);
+
+  // Auto-grow the textarea to fit its content so attached pills can sit
+  // inline on the first line and the box grows downward as the user types.
+  // attachedSkills.length is a dep because adding/removing a pill changes
+  // the first-line width available to the textarea.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [draft, attachedSkills.length]);
 
   // ─── Context menu ─────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
@@ -807,34 +842,38 @@ function GambitImpl({
         )}
       </div>
 
-      {attachedSkills.length > 0 && (
-        <div className="gambit-skill-pills">
-          {attachedSkills.map(s => (
-            <span key={s.name} className="gambit-skill-pill">
-              <span className="gambit-skill-pill-name">{s.displayName}</span>
-              <button
-                type="button"
-                className="gambit-skill-pill-x"
-                onClick={() => removeSkill(s.name)}
-                onMouseDown={(e) => e.stopPropagation()}
-                aria-label={`Remove ${s.displayName}`}
-              >×</button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <textarea
-        ref={textareaRef}
-        className="gambit-textarea"
-        value={draft}
-        placeholder={t('gambit.placeholder')}
-        onChange={(e) => onDraftChange(e.target.value)}
-        onKeyDown={onKeyDown}
-        onPaste={onPaste}
-        onContextMenu={onContextMenu}
-        spellCheck={false}
-      />
+      {/* Input box: attached skill pills flow inline with the textarea so a
+          pill sits on the same line as the text (Codex-style), not on a
+          separate row above. Clicking empty box space focuses the textarea. */}
+      <div
+        className="gambit-input"
+        onMouseDown={(e) => { if (e.target === e.currentTarget) textareaRef.current?.focus(); }}
+      >
+        {attachedSkills.map(s => (
+          <span key={s.name} className="gambit-skill-pill">
+            <span className="gambit-skill-pill-name">{s.displayName}</span>
+            <button
+              type="button"
+              className="gambit-skill-pill-x"
+              onClick={() => removeSkill(s.name)}
+              onMouseDown={(e) => e.stopPropagation()}
+              aria-label={`Remove ${s.displayName}`}
+            >×</button>
+          </span>
+        ))}
+        <textarea
+          ref={textareaRef}
+          className="gambit-textarea"
+          value={draft}
+          placeholder={t('gambit.placeholder')}
+          onChange={(e) => onDraftChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+          onContextMenu={onContextMenu}
+          spellCheck={false}
+          rows={1}
+        />
+      </div>
 
       <div className="gambit-footer">
         {/* Skill picker — only renders when at least one skill is
@@ -847,8 +886,9 @@ function GambitImpl({
         {enabledSkills.length > 0 && (
           <div className="gambit-skill-bar" ref={skillPopoverRef}>
             <button
+              ref={skillBtnRef}
               className="gambit-skill-add"
-              onClick={() => setSkillPopoverOpen(o => !o)}
+              onClick={toggleSkillPopover}
               aria-label="Attach skill"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -856,8 +896,12 @@ function GambitImpl({
                 <line x1="2" y1="7" x2="12" y2="7" />
               </svg>
             </button>
-            {skillPopoverOpen && (
-              <div className="gambit-skill-popover">
+            {skillPopoverOpen && popoverPos && createPortal(
+              <div
+                className="gambit-skill-popover"
+                ref={popoverContentRef}
+                style={{ position: 'fixed', left: popoverPos.left, bottom: popoverPos.bottom, top: 'auto', right: 'auto', zIndex: 10000 }}
+              >
                 {enabledSkills.map(s => {
                   const attached = attachedSkills.some(a => a.name === s.name);
                   return (
@@ -872,7 +916,8 @@ function GambitImpl({
                     </button>
                   );
                 })}
-              </div>
+              </div>,
+              document.body,
             )}
           </div>
         )}

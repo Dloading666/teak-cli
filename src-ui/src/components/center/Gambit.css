@@ -236,14 +236,12 @@
     display: none;
 }
 
-.gambit.gambit--docked .gambit-textarea {
-    /* In dock mode the dock-resize flex row already eats 6px of top
-       space; if we let the base padding-top: 10 inherit, the visible
-       text top would land at 6+10+~4(font leading) = 20px — far larger
-       than the 14px side padding. Override to 4 so the total stays
-       SHORTER than the side breathing (~13.5 < 14), matching typical
-       chat/input UX. Right side gets 40 so typed text never runs under
-       the floating dock-toggle button at the top-right corner. */
+.gambit.gambit--docked .gambit-input {
+    /* In dock mode the dock-resize flex row already eats 6px of top space;
+       trim the box's top padding so text doesn't sit too low, and pad the
+       right so it never runs under the floating dock-toggle button at the
+       top-right corner. (Padding now lives on the input box, not the
+       textarea.) */
     padding-top: 4px;
     padding-right: 40px;
 }
@@ -392,16 +390,10 @@
     color: var(--accent, #C4956A);
 }
 
-/* ─── Skill pills (attached skills, row above the textarea) ──── */
-/* Each attached skill shows as a removable pill; on send it expands to a
-   one-line instruction pointing the agent at the skill's SKILL.md path. */
-.gambit-skill-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 6px 2px 0;
-    flex-shrink: 0;
-}
+/* ─── Skill pills (attached skills, inline in the input box) ──── */
+/* Each attached skill shows as a removable pill that flows inline with the
+   textarea; on send it expands to a one-line instruction pointing the
+   agent at the skill's SKILL.md path. */
 .gambit-skill-pill {
     display: inline-flex;
     align-items: center;
@@ -550,22 +542,44 @@
     flex-shrink: 0;
 }
 
-/* ─── Textarea ─────────────────────────────────────────────── */
-.gambit-textarea {
+/* ─── Input box (skill pills + textarea, inline tag-input) ──── */
+/* Pills and the textarea share one flex-wrap box so a pill sits on the
+   same line as the text start (Codex-style), not on a separate row above.
+   Fills the middle of the Gambit window; scrolls when the auto-grown
+   textarea + pills overflow. */
+.gambit-input {
     flex: 1;
     min-height: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    align-items: flex-start;
+    gap: 6px;
     padding: 10px 14px;
+    overflow-y: auto;
+    cursor: text;
+}
+
+/* ─── Textarea ─────────────────────────────────────────────── */
+.gambit-textarea {
+    /* flex-basis 120px: shares the first row with any leading pills, then
+       takes the remaining width. Height is JS-driven (auto-grow), so
+       overflow is hidden here and .gambit-input owns the scrolling. */
+    flex: 1 1 120px;
+    min-width: 120px;
+    min-height: 1.5em;
+    padding: 0;
     background: transparent;
     border: none;
     outline: none;
     resize: none;
+    overflow: hidden;
     color: var(--text-1, #e8e4de);
     font-family: var(--font, inherit);
     font-size: 14px;
     line-height: 1.5;
     user-select: text;
     cursor: text;
-    /* Scrollbar hidden via global rule. */
 }
 
 .gambit-textarea::placeholder {
