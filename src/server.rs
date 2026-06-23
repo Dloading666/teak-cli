@@ -258,12 +258,14 @@ struct FileSnapshot {
 
 /// Global per-file baseline — keyed by absolute (forward-slash) path,
 /// shared across every tab and every project the user opens during this
-/// Coffee CLI process. First-seen wins: if a file is already in the
-/// map, a later `start_folder_snapshot` walk does NOT overwrite it.
-/// This is the foundation of the app-lifecycle audit semantics — once
-/// Coffee CLI has seen a file, it remembers the original content for
-/// the rest of the process so reopening the project later doesn't
-/// erase the audit trail. Process exit = full reset.
+/// Coffee CLI process. Last-seen wins: a `start_folder_snapshot` walk
+/// OVERWRITES any existing entry, so re-snapshotting a folder resets its
+/// baseline to the current on-disk state. The frontend gates when that
+/// happens — once per (session, folder) combo, plus an "away reset" when
+/// the window returns from being hidden a while (see file-stats.tsx) —
+/// giving an IDE-like "this session's changes" view rather than a
+/// permanent audit trail. Process exit = full reset (the OnceLock map is
+/// dropped with the process).
 fn snapshots() -> &'static std::sync::Mutex<std::collections::HashMap<String, FileSnapshot>> {
     static FILE_SNAPSHOTS: std::sync::OnceLock<
         std::sync::Mutex<std::collections::HashMap<String, FileSnapshot>>,
@@ -503,14 +505,16 @@ fn stats_walk(
     }
 }
 
-/// Walk every text file under `path` and add files we've never seen
-/// before to the global baseline. Files already in the baseline are
-/// kept as-is — first-seen wins. This is the foundation of Coffee
-/// CLI's app-lifecycle audit log: once a file's original content is
-/// recorded, reopening the same project later (with a new tab, a
-/// different tool, or after the original tab closed) preserves the
-/// baseline so the audit trail isn't erased. Process exit clears
-/// everything (the OnceLock map is dropped with the process).
+/// Walk every text file under `path` and (re)record it in the global
+/// baseline. Last-seen wins: existing entries are OVERWRITTEN, so calling
+/// this re-snapshots the folder to its current on-disk state and resets
+/// the diff to zero. The frontend decides when to call it — once per
+/// (session, folder) combo when a tab first uses a folder, and again on
+/// an "away reset" when the window returns from being hidden a while
+/// (see file-stats.tsx) — which together give the IDE-like "changes since
+/// this session began" behavior. Pair with `clear_folder_snapshot` first
+/// when you also want to drop keys for files deleted while away. Process
+/// exit clears everything (the OnceLock map is dropped with the process).
 #[tauri::command]
 fn start_folder_snapshot(path: String) -> Result<(), String> {
     let dir = std::path::Path::new(&path);

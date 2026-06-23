@@ -63,6 +63,24 @@ const folderRefCount = new Map<string, number>();
 // agent-status + fs-refresh + tab-activation lands as one walk).
 const REFRESH_DEBOUNCE_MS = 300;
 
+// IDE-like "presence session" reset. The baseline lives for the whole app
+// process (see server.rs), which is great while you're continuously working
+// — changes accumulate as "what I've done this session". But the user is a
+// dogfooder who leaves Coffee CLI running for days; without a reset, opening
+// a folder you last touched a week ago piles every external edit since then
+// onto a baseline frozen at app launch.
+//
+// Fix: when the window has been HIDDEN (minimized / closed-to-tray, i.e.
+// document.hidden) for longer than this and then becomes visible again, we
+// re-baseline the open folders to their current on-disk state — "step away,
+// come back, fresh record", matching how an IDE feels. We key off document
+// VISIBILITY, not focus: a plain alt-tab to a browser keeps the window
+// visible (just unfocused), so glancing at docs mid-task will NOT wipe your
+// in-progress change list. Only a real "I closed/minimized it and walked
+// off" counts. Tunable; a few minutes cleanly separates a quick
+// minimize/restore from genuinely leaving.
+const AWAY_RESET_MS = 3 * 60_000;
+
 export function FileStatsProvider({ children }: { children: ReactNode }) {
   const { state } = useAppState();
   const activeSession = state.terminals.find(t => t.id === state.activeTerminalId);
@@ -223,6 +241,62 @@ export function FileStatsProvider({ children }: { children: ReactNode }) {
       }
     };
   }, [activeFolderPath, activeSessionId, activeTool]);
+
+  // 3. IDE-like presence reset. See AWAY_RESET_MS. Re-baseline the open
+  //    folders when the user returns after the window was hidden for a
+  //    while, so the changes list starts fresh instead of replaying every
+  //    external edit made while they were gone. `hiddenSinceRef` is a ref
+  //    (not effect-local) so it survives the re-subscribe that a
+  //    `state.terminals` change triggers while the window is hidden.
+  const hiddenSinceRef = useRef<number | null>(null);
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden) {
+        // Entering hidden — stamp the first moment; ignore repeats.
+        if (hiddenSinceRef.current == null) hiddenSinceRef.current = Date.now();
+        return;
+      }
+      // Becoming visible again.
+      const since = hiddenSinceRef.current;
+      hiddenSinceRef.current = null;
+      if (since == null) return;
+      if (Date.now() - since < AWAY_RESET_MS) return;
+
+      // Distinct, diff-eligible folders currently open across all tabs.
+      const folders = new Set<string>();
+      for (const term of state.terminals) {
+        const ctx = resolveDiffContext(term);
+        if (!ctx?.folderPath || !ctx?.sessionId) continue;
+        if (ctx.tool && CWD_AGNOSTIC_TOOLS.has(ctx.tool)) continue;
+        folders.add(ctx.folderPath);
+      }
+      if (folders.size === 0) return;
+
+      // Re-baseline each: clear the stale snapshot (also drops keys for
+      // files deleted while away, so no ghost rows), then re-walk to
+      // capture current state as the new zero point. Fire one fs-refresh
+      // per folder once all settle so the active folder's stats refetch to
+      // empty. Must be a CustomEvent carrying `detail.dirPath` — Explorer's
+      // window 'fs-refresh' handlers deref `ev.detail.dirPath` unguarded,
+      // so a bare Event would throw there (file-stats' own listener ignores
+      // detail). Matches Explorer.dispatchFsRefresh's shape.
+      Promise.all(
+        Array.from(folders).map(async folder => {
+          try {
+            await commands.clearFolderSnapshot(folder);
+            await commands.startFolderSnapshot(folder);
+          } catch {}
+        }),
+      ).finally(() => {
+        for (const folder of folders) {
+          window.dispatchEvent(new CustomEvent('fs-refresh', { detail: { dirPath: folder } }));
+        }
+      });
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [state.terminals]);
 
   const activeStats: FileStatsMap | null = activeSessionId
     ? tabStats.get(activeSessionId) ?? null
