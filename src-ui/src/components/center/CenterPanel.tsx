@@ -342,9 +342,18 @@ export function CenterPanel() {
       if (stored !== null) {
         let arr = JSON.parse(stored);
         if (!Array.isArray(arr)) return [];
+        // Migrate the retired multi-agent pin to four-split so upgrading
+        // users keep a card in that home-screen slot instead of an empty
+        // hole — the coordinated multi-agent tool was removed and the
+        // independent four-split is its closest replacement. Dedup after,
+        // in case four-split was already pinned.
+        arr = arr.map((id: unknown) => (id === 'agent:multi-agent' ? 'agent:four-split' : id));
+        arr = arr.filter((id: unknown, i: number) => arr.indexOf(id) === i);
         // Drop stale pin IDs from retired AGENT_CATALOG entries (e.g.
-        // `agent:vibeid` after /vibeid moved from launcher tool to skill).
-        // These ghosts render nothing but inflate the "Agents N/6" counter.
+        // `agent:vibeid` after /vibeid became a skill, or the other retired
+        // coordinated tools `agent:two-agent` / `agent:three-agent` /
+        // `agent:hyper-agent`). These ghosts render nothing but inflate the
+        // "Agents N/6" counter.
         arr = arr.filter((id: unknown) =>
           typeof id === 'string' && id.startsWith('agent:') && VALID_PIN_KEYS.has(id.slice('agent:'.length))
         );
@@ -421,13 +430,8 @@ export function CenterPanel() {
       requiresCwd: !CWD_AGNOSTIC_AI_CLI.has(item.key),
     }));
 
-    // Utility order is deliberate for 4-column alignment in the
-    // "Agent Tools" grid on the Library page:
-    //   Row 1: multi-agent | three-agent | two-agent | Coffee 101
-    //   Row 2: four-split  | three-split | two-split | hyper-agent
-    // Coordinated row on top, independent row below, each descending
-    // 4→3→2 so the pane counts align column-by-column (4↔4, 3↔3, 2↔2)
-    // and the two rightmost slots hold standalone utilities.
+    // "Agent Tools" grid on the Library page: Terminal + Coffee 101, then
+    // the independent split tools descending 4→3→2.
     const utilities = [
       // Terminal is an AI-CLI-like tool (needs cwd) rather than a 'utility'.
       { key: 'terminal' as ToolType, label: t('tool.terminal'), icon: <TerminalIcon />, type: 'ai-cli' as const, requiresCwd: true },
