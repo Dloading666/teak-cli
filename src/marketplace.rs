@@ -228,7 +228,8 @@ fn add_marketplace_blocking(git_url: &str) -> Result<(), String> {
     fs::create_dir_all(&root).map_err(|e| format!("mkdir marketplace: {}", e))?;
     let dest = root.join(&name);
 
-    if dest.join(".git").is_dir() {
+    let already = dest.join(".git").is_dir();
+    if already {
         // Already added — refresh to latest.
         git(&["-C", &dest.to_string_lossy(), "pull", "--ff-only"])?;
     } else {
@@ -239,8 +240,16 @@ fn add_marketplace_blocking(git_url: &str) -> Result<(), String> {
     // Validate the Codex marketplace rule so a wrong URL surfaces clearly
     // instead of silently adding an empty card.
     if !dest.join(".agents/plugins/marketplace.json").is_file() {
+        // A fresh clone of a non-marketplace repo would otherwise leave an
+        // orphan dir that's invisible in the manage list (list_marketplaces
+        // skips repos with no marketplace.json) — so the user couldn't
+        // remove it. Clean up our own fresh clone; leave a pre-existing
+        // repo alone.
+        if !already {
+            let _ = fs::remove_dir_all(&dest);
+        }
         return Err(format!(
-            "Cloned, but {} has no .agents/plugins/marketplace.json — not a Codex-compatible marketplace.",
+            "{} has no .agents/plugins/marketplace.json — not a Codex-compatible marketplace.",
             name
         ));
     }
