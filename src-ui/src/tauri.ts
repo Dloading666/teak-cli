@@ -223,6 +223,13 @@ export const commands = {
   openUrl: (url: string) =>
     invoke<void>('open_url', { url }),
 
+  // In-app self-update (Windows): download the latest installer from
+  // coffeecli.com/download/<os> with streamed progress, launch it, exit.
+  // Emits `self-update-progress` while it runs (see onSelfUpdateProgress).
+  // Rejects on non-Windows / download failure — caller falls back to openUrl.
+  downloadAndInstallUpdate: () =>
+    invoke<void>('download_and_install_update'),
+
   // Live fs watcher — subscribes to OS-native events under `path` and
   // emits `fs-refresh` Tauri events that Explorer already listens for.
   // Calling start with a new path implicitly replaces the previous watcher.
@@ -265,6 +272,22 @@ export const commands = {
   setToolConfig: (tool: string, entry: ToolConfigEntry) =>
     invoke<void>('set_tool_config', { tool, entry }),
 };
+
+// In-app self-update progress, emitted by download_and_install_update.
+export interface SelfUpdateProgress {
+  status: 'speed_test' | 'downloading' | 'launching' | 'error';
+  percent: number;
+}
+
+// Subscribe to self-update progress while downloadAndInstallUpdate runs.
+// Returns an unlisten fn. Dynamic-imports the event API (matches how the
+// rest of the app subscribes to Tauri events).
+export async function onSelfUpdateProgress(
+  cb: (p: SelfUpdateProgress) => void,
+): Promise<() => void> {
+  const { listen } = await import('@tauri-apps/api/event');
+  return listen<SelfUpdateProgress>('self-update-progress', (e) => cb(e.payload));
+}
 
 export interface McpEndpoint {
   url: string;

@@ -49,6 +49,9 @@ anyhow = "1"
 log = "0.4"
 dirs = "5"
 base64 = "0.22.1"
+# In-app self-update downloader (Windows). Blocking + rustls, runs on a
+# spawn_blocking thread; streams the installer so we can emit download %.
+ureq = "2"
 # Compile-time embed of openai/skills .curated tree (~6 MB / 38 skills / 742
 # files) into the binary's rodata. Seeded into ~/.coffee-cli/skills-library/
 # on first launch — avoids GitHub API at runtime (rate limit, GFW, errors)

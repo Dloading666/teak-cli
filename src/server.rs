@@ -3309,6 +3309,125 @@ fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+// ─── In-app self-update ────────────────────────────────────────────────────
+//
+// Downloads the latest installer from `coffeecli.com/download/<os>` — a CF
+// Worker that proxies the matching GitHub Release asset (China-accessible,
+// stable name, no per-version URL to construct). Streams the body so the
+// frontend can paint a circular download-progress ring via the
+// `self-update-progress` event, then launches the installer and exits so it
+// can replace our running files. ureq is blocking + rustls, so the whole
+// thing runs on a spawn_blocking thread; `app.emit` works from any thread.
+
+#[derive(serde::Serialize, Clone)]
+struct SelfUpdateProgress {
+    status: String, // "speed_test" | "downloading" | "launching" | "error"
+    percent: u32,
+}
+
+fn emit_self_update(app: &tauri::AppHandle, status: &str, percent: u32) {
+    let _ = app.emit(
+        "self-update-progress",
+        SelfUpdateProgress { status: status.to_string(), percent },
+    );
+}
+
+#[tauri::command]
+async fn download_and_install_update(app: tauri::AppHandle) -> Result<(), String> {
+    let os = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    };
+    let url = format!("https://coffeecli.com/download/{os}");
+    let app2 = app.clone();
+    tauri::async_runtime::spawn_blocking(move || run_self_update(&app2, &url))
+        .await
+        .map_err(|e| format!("self-update task join failed: {e}"))?
+}
+
+fn run_self_update(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
+    use std::io::{Read, Write};
+
+    emit_self_update(app, "speed_test", 0);
+
+    let resp = match ureq::get(url).call() {
+        Ok(r) => r,
+        Err(e) => {
+            emit_self_update(app, "error", 0);
+            return Err(format!("download request failed: {e}"));
+        }
+    };
+    let total: u64 = resp
+        .header("Content-Length")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+
+    let ext = if cfg!(target_os = "windows") {
+        "exe"
+    } else if cfg!(target_os = "macos") {
+        "dmg"
+    } else {
+        "bin"
+    };
+    let out_path = std::env::temp_dir().join(format!("coffee-cli-update-setup.{ext}"));
+
+    let mut reader = resp.into_reader();
+    let mut file = std::fs::File::create(&out_path).map_err(|e| {
+        emit_self_update(app, "error", 0);
+        format!("create temp file: {e}")
+    })?;
+
+    let mut buf = [0u8; 65536];
+    let mut downloaded: u64 = 0;
+    let mut last_pct: u32 = 0;
+    emit_self_update(app, "downloading", 0);
+    loop {
+        let n = reader.read(&mut buf).map_err(|e| {
+            emit_self_update(app, "error", last_pct);
+            format!("download read failed: {e}")
+        })?;
+        if n == 0 {
+            break;
+        }
+        file.write_all(&buf[..n]).map_err(|e| {
+            emit_self_update(app, "error", last_pct);
+            format!("write temp file failed: {e}")
+        })?;
+        downloaded += n as u64;
+        if total > 0 {
+            // Cap at 99 during streaming; 100 is reserved for "fully written".
+            let pct = (downloaded.saturating_mul(100) / total).min(99) as u32;
+            if pct != last_pct {
+                last_pct = pct;
+                emit_self_update(app, "downloading", pct);
+            }
+        }
+    }
+    drop(file);
+    emit_self_update(app, "downloading", 100);
+
+    // Launch the installer, then exit so it can overwrite our running files.
+    emit_self_update(app, "launching", 100);
+    #[cfg(target_os = "windows")]
+    let launch = std::process::Command::new(&out_path).spawn();
+    #[cfg(target_os = "macos")]
+    let launch = std::process::Command::new("open").arg(&out_path).spawn();
+    #[cfg(target_os = "linux")]
+    let launch = std::process::Command::new("xdg-open").arg(&out_path).spawn();
+    if let Err(e) = launch {
+        emit_self_update(app, "error", 100);
+        return Err(format!("launch installer failed: {e}"));
+    }
+
+    // Let the wizard come up before we tear the app down.
+    std::thread::sleep(std::time::Duration::from_millis(800));
+    app.exit(0);
+    Ok(())
+}
+
 // ─── Hyper-Agent: global anonymous MCP server for external orchestrators ──
 //
 // Started lazily when the user opens the Hyper-Agent tab. `self_pane_id=None`,
@@ -3649,6 +3768,7 @@ pub fn start_ui() -> anyhow::Result<()> {
             load_password,
             delete_password,
             open_url,
+            download_and_install_update,
             enable_multi_agent_mode,
             disable_multi_agent_mode,
             start_hyper_agent_server,
