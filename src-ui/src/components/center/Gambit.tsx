@@ -638,7 +638,7 @@ function GambitImpl({
     // the agent at the skill's on-disk SKILL.md. Prepended before the
     // user's text so the agent reads the skill first, then the request.
     const preamble = attachedSkills
-      .map(s => `Use the "${s.displayName}" skill at "${s.path}" — read its SKILL.md and follow the instructions.`)
+      .map(s => `Use the "${s.displayName}" skill — study the directory "${s.path}", read whatever instructions it contains (e.g. SKILL.md, README, or other docs), and follow them to do the task.`)
       .join('\n');
     const body = wrapImagePathsForSend(text);
     const finalText = preamble ? (body ? `${preamble}\n\n${body}` : preamble) : body;
@@ -868,7 +868,18 @@ function GambitImpl({
           next to it on line 1 and wraps to the LEFT margin on line 2. */}
       <div
         className="gambit-input"
-        onMouseDown={(e) => { if (e.target === e.currentTarget) textareaRef.current?.focus(); }}
+        onMouseDown={(e) => {
+          // Click anywhere in the box (padding, the pill overlay, a pill
+          // chip body) → focus the textarea. preventDefault stops focus
+          // from landing on a non-input element, which would let the global
+          // focus enforcer (CenterPanel) yank it back to the active
+          // terminal. The pill ×-button stops propagation, so it's exempt.
+          const tgt = e.target as HTMLElement;
+          if (tgt !== textareaRef.current && !tgt.closest('.gambit-skill-pill-x')) {
+            e.preventDefault();
+            textareaRef.current?.focus();
+          }
+        }}
       >
         {attachedSkills.length > 0 && (
           <div className="gambit-pills" ref={pillsRef}>
