@@ -13,7 +13,7 @@
 // editable path string. AI CLI agents that support local image paths (e.g.
 // Claude Code) will read the file; agents that don't just see the raw path.
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { clipboardRead, clipboardWrite } from '../../lib/clipboard';
 import { commands } from '../../tauri';
@@ -414,6 +414,12 @@ function GambitImpl({
   // Skills attached to THIS message as pills. On send each expands to a
   // one-line instruction pointing the agent at the skill's SKILL.md path.
   const [attachedSkills, setAttachedSkills] = useState<{ name: string; displayName: string; path: string }[]>([]);
+  // The pills are an absolute overlay on the textarea's first line; the
+  // textarea reserves exactly their width via a first-line text-indent, so a
+  // pill reads as inline "skinned text" — typed text sits next to it on line
+  // 1 and wraps back to the LEFT margin on line 2 (no hanging indent).
+  const pillsRef = useRef<HTMLDivElement | null>(null);
+  const [pillsWidth, setPillsWidth] = useState(0);
   const skillPopoverRef = useRef<HTMLDivElement | null>(null);
   // "+" button + portaled popover refs. The popover is portaled to <body>
   // with fixed positioning so the Gambit window's `overflow: hidden`
@@ -507,6 +513,12 @@ function GambitImpl({
     ta.style.height = 'auto';
     ta.style.height = `${ta.scrollHeight}px`;
   }, [draft, attachedSkills.length, size.w]);
+
+  // Measure the pill overlay → first-line indent for the textarea. +8px so
+  // text doesn't butt right against the last pill. 0 when there are no pills.
+  useLayoutEffect(() => {
+    setPillsWidth(pillsRef.current ? pillsRef.current.offsetWidth + 8 : 0);
+  }, [attachedSkills, size.w]);
 
   // ─── Context menu ─────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
@@ -850,30 +862,36 @@ function GambitImpl({
         )}
       </div>
 
-      {/* Input box: attached skill pills flow inline with the textarea so a
-          pill sits on the same line as the text (Codex-style), not on a
-          separate row above. Clicking empty box space focuses the textarea. */}
+      {/* Input box: skill pills are an absolute overlay on the textarea's
+          first line; the textarea's first-line text-indent reserves their
+          width, so a pill reads as inline "skinned text" — typed text sits
+          next to it on line 1 and wraps to the LEFT margin on line 2. */}
       <div
         className="gambit-input"
         onMouseDown={(e) => { if (e.target === e.currentTarget) textareaRef.current?.focus(); }}
       >
-        {attachedSkills.map(s => (
-          <span key={s.name} className="gambit-skill-pill">
-            <span className="gambit-skill-pill-name">{s.displayName}</span>
-            <button
-              type="button"
-              className="gambit-skill-pill-x"
-              onClick={() => removeSkill(s.name)}
-              onMouseDown={(e) => e.stopPropagation()}
-              aria-label={`Remove ${s.displayName}`}
-            >×</button>
-          </span>
-        ))}
+        {attachedSkills.length > 0 && (
+          <div className="gambit-pills" ref={pillsRef}>
+            {attachedSkills.map(s => (
+              <span key={s.name} className="gambit-skill-pill">
+                <span className="gambit-skill-pill-name">{s.displayName}</span>
+                <button
+                  type="button"
+                  className="gambit-skill-pill-x"
+                  onClick={() => removeSkill(s.name)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  aria-label={`Remove ${s.displayName}`}
+                >×</button>
+              </span>
+            ))}
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           className="gambit-textarea"
+          style={{ textIndent: pillsWidth }}
           value={draft}
-          placeholder={t('gambit.placeholder')}
+          placeholder={attachedSkills.length > 0 ? '' : t('gambit.placeholder')}
           onChange={(e) => onDraftChange(e.target.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}

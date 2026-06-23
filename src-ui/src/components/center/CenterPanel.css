@@ -864,8 +864,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 4px 4px 8px;
+  padding: 8px 4px;
   flex-wrap: wrap;
+  /* Pin the marketplace tabs just below the floating Agents/Skills pill so
+     only the card list scrolls. top:60 clears the pill (top:24 + h~36). */
+  position: sticky;
+  top: 60px;
+  z-index: 5;
+  background: var(--bg-app);
 }
 .skills-tabs {
   display: flex;
@@ -967,8 +973,9 @@
   border-radius: var(--radius-sm, 6px);
 }
 .skills-manage-info { flex: 1; min-width: 0; }
-.skills-manage-name { font-size: 13px; font-weight: 600; color: var(--text-1); }
-.skills-manage-meta { font-size: 12px; color: var(--text-2); margin-top: 1px; }
+.skills-manage-titlerow { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.skills-manage-name { font-size: 13px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skills-manage-meta { font-size: 12px; color: var(--text-2); flex-shrink: 0; }
 .skills-manage-path {
   font-size: 11px;
   color: var(--text-3);

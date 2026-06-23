@@ -236,14 +236,16 @@
     display: none;
 }
 
-.gambit.gambit--docked .gambit-input {
+.gambit.gambit--docked .gambit-textarea {
     /* In dock mode the dock-resize flex row already eats 6px of top space;
-       trim the box's top padding so text doesn't sit too low, and pad the
-       right so it never runs under the floating dock-toggle button at the
-       top-right corner. (Padding now lives on the input box, not the
-       textarea.) */
+       trim the textarea's top padding so text doesn't sit too low, and pad
+       the right so it never runs under the floating dock-toggle button. */
     padding-top: 4px;
     padding-right: 40px;
+}
+/* Keep the pill overlay aligned with the textarea's first line in dock mode. */
+.gambit.gambit--docked .gambit-pills {
+    top: 4px;
 }
 
 /* Top-edge resize handle — implemented as a real flex row, NOT an
@@ -542,38 +544,43 @@
     flex-shrink: 0;
 }
 
-/* ─── Input box (skill pills + textarea, inline tag-input) ──── */
-/* Pills and the textarea share one flex-wrap box so a pill sits on the
-   same line as the text start (Codex-style), not on a separate row above.
-   Fills the middle of the Gambit window; scrolls when the auto-grown
-   textarea + pills overflow. */
+/* ─── Input box (textarea + absolute pill overlay) ──────────── */
+/* The textarea is a normal full-width field; skill pills float over its
+   first line as an absolute overlay, and the textarea's first-line
+   text-indent (set inline from the measured pill width) reserves their
+   width. So a pill behaves like inline skinned text — no hanging indent. */
 .gambit-input {
+    position: relative;
     flex: 1;
     min-height: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 10px 14px;
     overflow-y: auto;
     cursor: text;
 }
 
+.gambit-pills {
+    position: absolute;
+    top: 10px;
+    left: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 28px);
+    z-index: 1;
+}
+
 /* ─── Textarea ─────────────────────────────────────────────── */
 .gambit-textarea {
-    /* flex-basis 120px: shares the first row with any leading pills, then
-       takes the remaining width. Height is JS-driven (auto-grow), so
-       overflow is hidden here and .gambit-input owns the scrolling. */
-    flex: 1 1 120px;
-    min-width: 120px;
+    width: 100%;
+    box-sizing: border-box;
     min-height: 1.5em;
-    padding: 0;
+    padding: 10px 14px;
+    /* Height is JS-driven (auto-grow); .gambit-input owns the scroll. */
+    overflow: hidden;
     background: transparent;
     border: none;
     outline: none;
     resize: none;
-    overflow: hidden;
     color: var(--text-1, #e8e4de);
     font-family: var(--font, inherit);
     font-size: 14px;

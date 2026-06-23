@@ -318,8 +318,10 @@ export function SkillsPanel({ showToast }: Props) {
                 {marketplaces.map(m => (
                   <div key={m.id} className="skills-manage-row">
                     <div className="skills-manage-info">
-                      <div className="skills-manage-name">{m.displayName}</div>
-                      <div className="skills-manage-meta">{m.plugins.length} {L.pluginsN}</div>
+                      <div className="skills-manage-titlerow">
+                        <span className="skills-manage-name">{m.displayName}</span>
+                        <span className="skills-manage-meta">{m.plugins.length} {L.pluginsN}</span>
+                      </div>
                       <div className="skills-manage-path">{m.manifestPath}</div>
                     </div>
                     <div className="skills-manage-actions">
