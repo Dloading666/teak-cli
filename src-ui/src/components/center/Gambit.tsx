@@ -499,6 +499,10 @@ function GambitImpl({
   }, []);
   const removeSkill = useCallback((name: string) => {
     setAttachedSkills(prev => prev.filter(s => s.name !== name));
+    // Keep focus in the composer — the ×-button's mousedown stops
+    // propagation, so without this the global focus enforcer (CenterPanel)
+    // would yank focus to the active terminal after a pill is removed.
+    textareaRef.current?.focus();
   }, []);
 
   // Auto-grow the textarea to fit its content so attached pills can sit
