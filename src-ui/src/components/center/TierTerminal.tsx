@@ -265,7 +265,7 @@ interface TierTerminalProps {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 function TierTerminalImpl({
-  sessionId, tool, toolName, theme, lang, isActive, toolData, folderPath, hasBg, bgUrl, bgType, termColorScheme, sentinelEnabled,
+  sessionId, tool, toolName, theme, lang, isActive, toolData, folderPath, hasBg, bgUrl, bgType, termColorScheme,
 }: TierTerminalProps) {
   // Dispatch-only subscription. Never re-renders this component.
   const dispatch = useAppDispatch();
@@ -786,7 +786,7 @@ function TierTerminalImpl({
       const initialCols = term.cols || 80;
       const initialRows = term.rows || 24;
 
-        await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined, sentinelEnabled);
+        await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined);
 
         // After PTY is running, wait two frames for layout to settle then
         // send the true terminal size. This fixes TUI adaptive-width tools

@@ -5,9 +5,7 @@ import { onWindowForeground } from '../../lib/window-focus-filter';
 import { TierTerminal } from './TierTerminal';
 import { ChatReader } from './ChatReader';
 import { SkillsPanel } from './SkillsPanel';
-import { MultiAgentGrid } from './MultiAgentGrid';
 import { FourSplitGrid } from './FourSplitGrid';
-import { HyperAgentPanel } from './HyperAgentPanel';
 import { ToolConfigModal } from './ToolConfigModal';
 import { ContributionHeatmap } from './ContributionHeatmap';
 import { ErrorBoundary } from '../common/ErrorBoundary';
@@ -223,38 +221,6 @@ const SvgInstaller = () => (
   </svg>
 );
 
-// Multi-Agent glyph — same lucide layout-grid path used by the titlebar's
-// "2×2 grid" layout toggle. Inline so it tints with the theme (currentColor)
-// and stays in lockstep with the titlebar. Rendered at 1em so it picks up
-// the card/tab font-size (Launchpad card ≈ 22px, Tab ≈ 13px) without
-// per-callsite tweaks.
-// Multi-Agent glyph — one whole frame divided into 4 quadrants by a cross.
-// Reads as "a single coordinated system split into 4 roles", matching the
-// MCP peer-coordination model (the 4 panes share one workspace and one MCP
-// endpoint, so conceptually they're one entity with 4 heads).
-// Multi-Agent (4-pane coordination) — hollow outer frame with internal cross.
-// One workspace shared by all panes → shared outer border, no gaps.
-// Internal dividers use butt caps + inset endpoints so they stop at the
-// inner edge of the outer frame instead of poking through it as small
-// "ticks" at the corners.
-const SvgMultiAgent = () => (
-  <svg
-    width="1em"
-    height="1em"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="square"
-    strokeLinejoin="miter"
-    style={{ flexShrink: 0, color: 'var(--accent)', verticalAlign: '-0.125em' }}
-  >
-    <rect x="4" y="4" width="16" height="16" />
-    <line x1="12" y1="5" x2="12" y2="19" strokeLinecap="butt" />
-    <line x1="5" y1="12" x2="19" y2="12" strokeLinecap="butt" />
-  </svg>
-);
-
 // Two-Split (independent) — 2 filled solid rectangles with a visible gap between.
 // Reads as "two standalone windows" → solid = individual, gap = separation.
 const SvgTwoSplit = () => (
@@ -306,75 +272,6 @@ const SvgFourSplit = () => (
   </svg>
 );
 
-// Hyper-Agent — central admin node with radiating connections to four
-// satellite agent nodes. Evokes "one orchestrator commanding a team
-// across all panes". Single accent color, mix of filled center + smaller
-// satellite dots so the hub-and-spokes structure reads at icon size.
-const SvgHyperAgent = () => (
-  <svg
-    width="1em"
-    height="1em"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.6"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    style={{ flexShrink: 0, color: 'var(--accent)', verticalAlign: '-0.125em' }}
-  >
-    {/* Connection lines from center to each satellite */}
-    <line x1="12" y1="12" x2="5"  y2="5"  />
-    <line x1="12" y1="12" x2="19" y2="5"  />
-    <line x1="12" y1="12" x2="5"  y2="19" />
-    <line x1="12" y1="12" x2="19" y2="19" />
-    {/* Central admin node — filled */}
-    <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
-    {/* Four satellite agent nodes — outlined */}
-    <circle cx="5"  cy="5"  r="2" />
-    <circle cx="19" cy="5"  r="2" />
-    <circle cx="5"  cy="19" r="2" />
-    <circle cx="19" cy="19" r="2" />
-  </svg>
-);
-
-// Two-Agent (coordination) — hollow outer frame with one internal divider.
-// Shared outer border = same workspace; internal line = two cooperating panes.
-const SvgTwoAgent = () => (
-  <svg
-    width="1em"
-    height="1em"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="square"
-    strokeLinejoin="miter"
-    style={{ flexShrink: 0, color: 'var(--accent)', verticalAlign: '-0.125em' }}
-  >
-    <rect x="4" y="4" width="16" height="16" />
-    <line x1="12" y1="5" x2="12" y2="19" strokeLinecap="butt" />
-  </svg>
-);
-
-// Three-Agent (coordination) — hollow outer frame with two internal dividers.
-const SvgThreeAgent = () => (
-  <svg
-    width="1em"
-    height="1em"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="square"
-    strokeLinejoin="miter"
-    style={{ flexShrink: 0, color: 'var(--accent)', verticalAlign: '-0.125em' }}
-  >
-    <rect x="4" y="4" width="16" height="16" />
-    <line x1="9.33"  y1="5" x2="9.33"  y2="19" strokeLinecap="butt" />
-    <line x1="14.67" y1="5" x2="14.67" y2="19" strokeLinecap="butt" />
-  </svg>
-);
-
 // ── Platform-aware Terminal Icon & Label ─────────────────────────────────────
 
 const detectOS = (): 'win' | 'mac' | 'linux' => {
@@ -414,8 +311,7 @@ const SvgPlus = ({ active }: { active: boolean }) => (
 // entries below.
 const VALID_PIN_KEYS = new Set<string>([
   'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes', 'terminal',
-  'multi-agent', 'three-agent', 'two-agent', 'installer',
-  'four-split', 'three-split', 'two-split', 'hyper-agent',
+  'installer', 'four-split', 'three-split', 'two-split',
 ]);
 
 export function CenterPanel() {
@@ -452,24 +348,6 @@ export function CenterPanel() {
         arr = arr.filter((id: unknown) =>
           typeof id === 'string' && id.startsWith('agent:') && VALID_PIN_KEYS.has(id.slice('agent:'.length))
         );
-        // One-shot migration: existing users who launched before the
-        // multi-agent quadrant shipped won't have it pinned. Inject it
-        // once so they discover the feature. If they're already at cap,
-        // evict the oldest pin to make room. Gated by a localStorage
-        // flag so it runs ONCE per user — without the flag, an explicit
-        // unpin of multi-agent gets silently undone on every restart,
-        // and at-cap users see a different agent evicted on each
-        // launch ("有的消失,有的出现"). The flag is set unconditionally
-        // after this branch so existing users on this version stop
-        // re-migrating regardless of whether the inject actually fired.
-        const MIGRATION_FLAG = 'coffee_pinned_multi_agent_migrated';
-        if (!localStorage.getItem(MIGRATION_FLAG)) {
-          if (!arr.includes('agent:multi-agent')) {
-            if (arr.length >= CAP) arr.shift();
-            arr.push('agent:multi-agent');
-          }
-          try { localStorage.setItem(MIGRATION_FLAG, '1'); } catch {}
-        }
         // Defensive cap: historical bugs (e.g. earlier migrations that
         // pushed past the limit) may have left > CAP items in storage.
         // Trim and persist back so the state stays consistent.
@@ -485,7 +363,7 @@ export function CenterPanel() {
         'agent:codex',
         'agent:opencode',
         'agent:antigravity',
-        'agent:multi-agent',
+        'agent:four-split',
         'agent:terminal',
       ];
       localStorage.setItem('coffee_pinned_items', JSON.stringify(defaults));
@@ -553,30 +431,8 @@ export function CenterPanel() {
     const utilities = [
       // Terminal is an AI-CLI-like tool (needs cwd) rather than a 'utility'.
       { key: 'terminal' as ToolType, label: t('tool.terminal'), icon: <TerminalIcon />, type: 'ai-cli' as const, requiresCwd: true },
-      // ─── Row 1: coordinated (descending 4→3→2) + Coffee 101 link ────
-      {
-        key: 'multi-agent' as ToolType,
-        label: t('tool.multi_agent' as any),
-        icon: <SvgMultiAgent />,
-        type: 'utility' as const,
-        requiresCwd: true,
-      },
-      {
-        key: 'three-agent' as ToolType,
-        label: t('tool.three_agent' as any),
-        icon: <SvgThreeAgent />,
-        type: 'utility' as const,
-        requiresCwd: true,
-      },
-      {
-        key: 'two-agent' as ToolType,
-        label: t('tool.two_agent' as any),
-        icon: <SvgTwoAgent />,
-        type: 'utility' as const,
-        requiresCwd: true,
-      },
       { key: 'installer' as ToolType, label: 'Coffee 101', icon: <SvgInstaller />, type: 'utility' as const, requiresCwd: false },
-      // ─── Row 2: independent (descending 4→3→2) + hyper-agent ──────
+      // ─── Independent split (descending 4→3→2): N side-by-side PTYs ──
       {
         key: 'four-split' as ToolType,
         label: t('tool.four_split' as any),
@@ -598,9 +454,6 @@ export function CenterPanel() {
         type: 'utility' as const,
         requiresCwd: false,
       },
-      // Hyper-Agent — cross-tab admin MCP for OpenClaw / Hermes Agent
-      // to remote-control the running agent team. No cwd needed.
-      { key: 'hyper-agent' as ToolType, label: t('tool.hyper_agent' as any), icon: <SvgHyperAgent />, type: 'utility' as const, requiresCwd: false },
     ];
 
     return [...aiCliEntries, ...utilities];
@@ -1103,13 +956,9 @@ export function CenterPanel() {
         return { icon: <TerminalIcon />, title, tooltip: undefined };
       }
       case 'terminal': return { icon: <TerminalIcon />, title: cwd ?? t('tool.terminal'), tooltip: pathTip };
-      case 'multi-agent': return { icon: <SvgMultiAgent />, title: cwd ?? t('tool.multi_agent' as any), tooltip: pathTip };
-      case 'two-agent': return { icon: <SvgTwoAgent />, title: cwd ?? t('tool.two_agent' as any), tooltip: pathTip };
-      case 'three-agent': return { icon: <SvgThreeAgent />, title: cwd ?? t('tool.three_agent' as any), tooltip: pathTip };
       case 'two-split': return { icon: <SvgTwoSplit />, title: cwd ?? t('tool.two_split' as any), tooltip: pathTip };
       case 'three-split': return { icon: <SvgThreeSplit />, title: cwd ?? t('tool.three_split' as any), tooltip: pathTip };
       case 'four-split': return { icon: <SvgFourSplit />, title: cwd ?? t('tool.four_split' as any), tooltip: pathTip };
-      case 'hyper-agent': return { icon: <SvgHyperAgent />, title: t('tool.hyper_agent' as any), tooltip: undefined };
       case 'history': {
         let titleParam = 'History';
         if (session.toolData) {
@@ -1255,11 +1104,9 @@ export function CenterPanel() {
                     *is* the alive signal: always green idle, no agent
                     state to read. Anything else (terminal, history,
                     multi-agent, etc.) gets no indicator. */}
-                {(session.tool === 'claude' || session.tool === 'codex' || session.tool === 'opencode' || session.tool === 'mimocode' || session.tool === 'hermes' || session.tool === 'hyper-agent') && (
+                {(session.tool === 'claude' || session.tool === 'codex' || session.tool === 'opencode' || session.tool === 'mimocode' || session.tool === 'hermes') && (
                   <div className={`tab-status-grid status-${
-                    session.tool === 'hyper-agent'
-                      ? 'idle'
-                      : session.agentStatus === 'wait_input' ? 'waiting' : session.agentStatus ?? 'idle'
+                    session.agentStatus === 'wait_input' ? 'waiting' : session.agentStatus ?? 'idle'
                   }${__IS_LINUX__ ? ' tab-status-grid--static' : ''}`}>
                     {/* Linux gate — the 9 dot wave/snake/ripple animations are
                         opacity-loop infinites with box-shadow halos. WebKit2GTK
@@ -1308,33 +1155,6 @@ export function CenterPanel() {
           >
             {t.tool === 'history' ? (
               <ChatReader sessionId={t.id} />
-            ) : t.tool === 'multi-agent' ? (
-              // Independent four-pane peer mode. Standalone Tab type —
-              // does not share layout with the single-terminal path
-              // below. Every pane is a peer; any CLI can drive the
-              // others via coffee-cli MCP tools.
-              <MultiAgentGrid
-                tab={t}
-                hasBg={hasBg}
-                bgUrl={bgUrl}
-                bgType={bgType}
-              />
-            ) : t.tool === 'two-agent' ? (
-              <MultiAgentGrid
-                tab={t}
-                hasBg={hasBg}
-                bgUrl={bgUrl}
-                bgType={bgType}
-                paneCount={2}
-              />
-            ) : t.tool === 'three-agent' ? (
-              <MultiAgentGrid
-                tab={t}
-                hasBg={hasBg}
-                bgUrl={bgUrl}
-                bgType={bgType}
-                paneCount={3}
-              />
             ) : t.tool === 'two-split' ? (
               <FourSplitGrid
                 tab={t}
@@ -1352,21 +1172,14 @@ export function CenterPanel() {
                 paneCount={3}
               />
             ) : t.tool === 'four-split' ? (
-              // Independent Quad: same 2×2 pane grid as multi-agent but
-              // with zero MCP coordination — panes cannot observe or
-              // drive each other.
+              // Independent Quad: 4 side-by-side PTYs, each its own CLI +
+              // folder, zero coordination.
               <FourSplitGrid
                 tab={t}
                 hasBg={hasBg}
                 bgUrl={bgUrl}
                 bgType={bgType}
                 paneCount={4}
-              />
-            ) : t.tool === 'hyper-agent' ? (
-              <HyperAgentPanel
-                hasBg={hasBg}
-                bgUrl={bgUrl}
-                bgType={bgType}
               />
             ) : (
               <ErrorBoundary key={`err-${t.id}-${t.restartKey || 0}`} fallbackLabel="Tier Terminal Error">
@@ -1447,14 +1260,6 @@ export function CenterPanel() {
                                     // install/usage knowledge.
                                     if (tool.key === 'installer') {
                                       commands.openUrl('https://coffeecli.com/courses/claude-code').catch(() => {});
-                                      return;
-                                    }
-                                    // Hyper-Agent opens as a singleton system tab (like
-                                    // history). It does not consume one of the 5 user
-                                    // workspace tabs — it's an MCP admin endpoint, not a
-                                    // workspace.
-                                    if (tool.key === 'hyper-agent') {
-                                      dispatch({ type: 'OPEN_HYPER_AGENT_TAB' });
                                       return;
                                     }
                                     selectTool(tool.key, undefined, lastCwdByTool[tool.key!]);

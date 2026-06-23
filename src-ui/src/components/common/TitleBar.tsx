@@ -35,11 +35,9 @@ export function TitleBar() {
   const setGrid    = () => dispatch({ type: 'SET_MULTI_AGENT_LAYOUT', layout: 'grid' });
   const setColumns = () => dispatch({ type: 'SET_MULTI_AGENT_LAYOUT', layout: 'columns' });
 
-  // Show the 2×2 / 1×4 layout picker when the active tab is either the
-  // multi-agent quadrant or the independent four-split view — both use
-  // the same multiAgentLayout state and CSS modifier classes.
+  // Show the 2×2 / 1×4 layout picker only for the independent four-split view.
   const activeTab = state.terminals.find(t => t.id === state.activeTerminalId);
-  const showMaLayout = activeTab?.tool === 'multi-agent' || activeTab?.tool === 'four-split';
+  const showMaLayout = activeTab?.tool === 'four-split';
 
   // Drag is wired as a single JS path: mousedown anywhere on the bar (except
   // on a child <button>) calls `startDragging()`, double-click toggles
