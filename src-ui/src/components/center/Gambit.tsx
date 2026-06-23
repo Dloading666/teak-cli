@@ -423,17 +423,14 @@ function GambitImpl({
   const popoverContentRef = useRef<HTMLDivElement | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ left: number; bottom: number } | null>(null);
   const toggleSkillPopover = useCallback(() => {
-    setSkillPopoverOpen(o => {
-      const next = !o;
-      const btn = skillBtnRef.current;
-      if (next && btn) {
-        const r = btn.getBoundingClientRect();
-        // Anchor the popover's bottom 6px above the button's top edge.
-        setPopoverPos({ left: r.left, bottom: window.innerHeight - r.top + 6 });
-      }
-      return next;
-    });
-  }, []);
+    // Capture the button's screen rect before opening so the portaled
+    // (position:fixed) popover can anchor 6px above its top edge.
+    if (!skillPopoverOpen) {
+      const r = skillBtnRef.current?.getBoundingClientRect();
+      if (r) setPopoverPos({ left: r.left, bottom: window.innerHeight - r.top + 6 });
+    }
+    setSkillPopoverOpen(o => !o);
+  }, [skillPopoverOpen]);
 
   // Refresh on mount AND every popover open. Mount fetch drives the
   // visibility of the "+" button itself: when the user has no skills
@@ -491,14 +488,16 @@ function GambitImpl({
 
   // Auto-grow the textarea to fit its content so attached pills can sit
   // inline on the first line and the box grows downward as the user types.
-  // attachedSkills.length is a dep because adding/removing a pill changes
-  // the first-line width available to the textarea.
+  // Deps: draft (content), attachedSkills.length (a pill changes the
+  // first-line width left for the textarea), and size.w (resizing the
+  // window narrower re-wraps text → needs a taller box; without this the
+  // overflow:hidden textarea would clip the extra lines).
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = `${ta.scrollHeight}px`;
-  }, [draft, attachedSkills.length]);
+  }, [draft, attachedSkills.length, size.w]);
 
   // ─── Context menu ─────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
