@@ -656,6 +656,15 @@ code::-webkit-scrollbar-thumb {
   opacity: 0.95;
 }
 
+/* Inline command inside the macOS/Linux hint. The global `code` rule is sized
+   for the flex install box (0.95rem); scope it down here so it reads as a
+   compact inline snippet within the small, dimmed download note. */
+.downloads-note code {
+  font-size: 0.74rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
 .downloads-other {
   font-size: 0.8rem;
   color: var(--text-secondary);

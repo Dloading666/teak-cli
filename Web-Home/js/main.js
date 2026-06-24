@@ -52,7 +52,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "Feedback",
     "downloads-title": "Or download the desktop app",
-    "downloads-note": "<strong>macOS / Linux</strong> may need extra terminal steps after download (please look up open-source software install conventions for your platform).",
+    "downloads-note": "<strong>macOS:</strong> if it won't open on first launch, run <code>xattr -cr '/Applications/Coffee CLI.app'</code> in Terminal, then reopen. <strong>Linux:</strong> may need extra terminal steps after download.",
     "downloads-other": "Other variants (Intel Mac · ARM Linux · AppImage) →"
   },
   zh: {
@@ -62,7 +62,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "问题反馈",
     "downloads-title": "或者直接下载桌面应用",
-    "downloads-note": "<strong>macOS / Linux</strong> 下载后可能需要额外终端步骤（请自行查询开源软件安装方法）。",
+    "downloads-note": "<strong>macOS：</strong>首次打开若无反应或提示「已损坏」，在「终端」运行 <code>xattr -cr '/Applications/Coffee CLI.app'</code> 后重新打开即可。<strong>Linux：</strong>下载后可能需要额外终端步骤。",
     "downloads-other": "其他版本（Intel Mac · ARM Linux · AppImage）→",
     "cn-mirrors-title": "其他下载渠道：",
     "cn-mirrors-baidu": "百度网盘",
@@ -77,7 +77,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "問題回饋",
     "downloads-title": "或者直接下載桌面應用",
-    "downloads-note": "<strong>macOS / Linux</strong> 下載後可能需要額外終端步驟（請自行查詢開源軟體安裝方法）。",
+    "downloads-note": "<strong>macOS：</strong>首次開啟若無反應或提示「已損壞」，在「終端機」執行 <code>xattr -cr '/Applications/Coffee CLI.app'</code> 後重新開啟即可。<strong>Linux：</strong>下載後可能需要額外終端步驟。",
     "downloads-other": "其他版本（Intel Mac · ARM Linux · AppImage）→",
     "cn-mirrors-title": "其他下載渠道：",
     "cn-mirrors-baidu": "百度網盤",
@@ -92,7 +92,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "フィードバック",
     "downloads-title": "デスクトップアプリを直接ダウンロード",
-    "downloads-note": "<strong>macOS / Linux</strong> はダウンロード後にターミナル操作が必要な場合があります（オープンソースソフトウェアのインストール方法をご自身でご確認ください）。",
+    "downloads-note": "<strong>macOS：</strong>初回起動で開かない場合は、ターミナルで <code>xattr -cr '/Applications/Coffee CLI.app'</code> を実行してから開き直してください。<strong>Linux：</strong>ダウンロード後にターミナル操作が必要な場合があります。",
     "downloads-other": "その他のバリアント（Intel Mac · ARM Linux · AppImage）→"
   },
   ko: {
@@ -102,7 +102,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "피드백",
     "downloads-title": "데스크톱 앱 직접 다운로드",
-    "downloads-note": "<strong>macOS / Linux</strong> 는 다운로드 후 추가 터미널 작업이 필요할 수 있습니다 (오픈소스 소프트웨어 설치 방법을 직접 확인해 주세요).",
+    "downloads-note": "<strong>macOS:</strong> 처음 실행 시 열리지 않으면 터미널에서 <code>xattr -cr '/Applications/Coffee CLI.app'</code> 를 실행한 뒤 다시 여세요. <strong>Linux:</strong> 다운로드 후 추가 터미널 작업이 필요할 수 있습니다.",
     "downloads-other": "기타 버전 (Intel Mac · ARM Linux · AppImage) →"
   },
   es: {
@@ -112,7 +112,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "Comentarios",
     "downloads-title": "O descarga la app de escritorio",
-    "downloads-note": "<strong>macOS / Linux</strong> pueden requerir pasos extra en terminal tras descargar (consulta los métodos habituales de instalación de software de código abierto).",
+    "downloads-note": "<strong>macOS:</strong> si no abre en el primer intento, ejecuta <code>xattr -cr '/Applications/Coffee CLI.app'</code> en la Terminal y vuelve a abrirla. <strong>Linux:</strong> puede requerir pasos extra en terminal tras descargar.",
     "downloads-other": "Otras variantes (Intel Mac · ARM Linux · AppImage) →"
   },
   fr: {
@@ -122,7 +122,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "Retour",
     "downloads-title": "Ou téléchargez l'application bureau",
-    "downloads-note": "<strong>macOS / Linux</strong> peuvent nécessiter des étapes supplémentaires en terminal après téléchargement (consultez les méthodes d'installation habituelles des logiciels open source).",
+    "downloads-note": "<strong>macOS :</strong> si l'app ne s'ouvre pas au premier lancement, exécutez <code>xattr -cr '/Applications/Coffee CLI.app'</code> dans le Terminal, puis rouvrez-la. <strong>Linux :</strong> peut nécessiter des étapes supplémentaires en terminal après téléchargement.",
     "downloads-other": "Autres variantes (Intel Mac · ARM Linux · AppImage) →"
   },
   de: {
@@ -132,7 +132,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "Feedback",
     "downloads-title": "Oder lade die Desktop-App herunter",
-    "downloads-note": "<strong>macOS / Linux</strong> brauchen nach dem Download eventuell zusätzliche Terminal-Schritte (bitte die üblichen Installationsmethoden für Open-Source-Software nachschlagen).",
+    "downloads-note": "<strong>macOS:</strong> Öffnet sie sich beim ersten Start nicht, führe <code>xattr -cr '/Applications/Coffee CLI.app'</code> im Terminal aus und öffne sie erneut. <strong>Linux:</strong> braucht nach dem Download eventuell zusätzliche Terminal-Schritte.",
     "downloads-other": "Andere Varianten (Intel Mac · ARM Linux · AppImage) →"
   },
   pt: {
@@ -142,7 +142,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "Feedback",
     "downloads-title": "Ou baixe o app desktop",
-    "downloads-note": "<strong>macOS / Linux</strong> podem exigir etapas extras no terminal após o download (consulte os métodos habituais de instalação de software open-source).",
+    "downloads-note": "<strong>macOS:</strong> se não abrir na primeira vez, execute <code>xattr -cr '/Applications/Coffee CLI.app'</code> no Terminal e abra novamente. <strong>Linux:</strong> pode exigir etapas extras no terminal após o download.",
     "downloads-other": "Outras variantes (Intel Mac · ARM Linux · AppImage) →"
   },
   ru: {
@@ -152,7 +152,7 @@ const I18N_DICT = {
     "opc-link": "Coffee 101",
     "feedback": "Обратная связь",
     "downloads-title": "Или скачайте десктоп-приложение",
-    "downloads-note": "<strong>macOS / Linux</strong> после скачивания могут потребовать дополнительных шагов в терминале (см. стандартные способы установки open-source ПО).",
+    "downloads-note": "<strong>macOS:</strong> если не открывается при первом запуске, выполните <code>xattr -cr '/Applications/Coffee CLI.app'</code> в Терминале и откройте снова. <strong>Linux:</strong> после скачивания могут потребоваться дополнительные шаги в терминале.",
     "downloads-other": "Другие варианты (Intel Mac · ARM Linux · AppImage) →"
   }
 };
