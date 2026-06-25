@@ -8,7 +8,7 @@ import { useT } from '../../i18n/useT';
 import { ScrollPanel } from '../common/ScrollPanel';
 import { clipboardWrite } from '../../lib/clipboard';
 import { beginExplorerDrag } from '../../lib/explorer-drag';
-import { useFileStats } from '../../lib/git-status';
+import { useFileStats, useDirtyDirs } from '../../lib/git-status';
 import { commands, onSelfUpdateProgress } from '../../tauri';
 import type { DirEntryInfo } from '../../tauri';
 import { HistoryBoard } from '../right/HistoryBoard';
@@ -592,15 +592,13 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
   // signal that something inside is modified, so users don't have to expand
   // the whole tree to find the +/- badge. Icon stays untouched (icon themes
   // own their own coloring; tinting the icon would fight Material/Seti).
-  const fileStats = useFileStats();
-  const hasDirtyDescendant = useMemo(() => {
-    if (!fileStats || fileStats.size === 0) return false;
-    const prefix = normPath(dirPath) + '/';
-    for (const k of fileStats.keys()) {
-      if (k.startsWith(prefix)) return true;
-    }
-    return false;
-  }, [fileStats, dirPath]);
+  // O(1) check against the precomputed dirty-dirs set (was an O(open-folders ×
+  // changes) scan of the whole change list on every poll — a main-thread cost).
+  const dirtyDirs = useDirtyDirs();
+  const hasDirtyDescendant = useMemo(
+    () => dirtyDirs.has(normPath(dirPath).replace(/\/+$/, '')),
+    [dirtyDirs, dirPath],
+  );
 
   const toggle = async () => {
     if (!open && children === null) {
