@@ -437,13 +437,17 @@
   border: none;
   padding: 4px;
   cursor: pointer;
-  color: var(--text-3);
-  opacity: 0.18;
+  /* Theme-accent colored — follows each theme like the heatmap's bright
+     cells, so it's clearly visible and on-palette. Was --text-3 @ opacity
+     0.18, so dim that users didn't notice the open-folder affordance and
+     kept asking how to set the directory. */
+  color: var(--accent);
+  opacity: 0.9;
   transition: opacity 0.15s;
 }
 
 .launchpad-folder-btn:hover {
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .launchpad-folder-btn svg {
