@@ -9,6 +9,7 @@ mod tool_config;
 mod tools;
 mod skills;
 mod marketplace;
+mod git;
 
 use anyhow::Result;
 

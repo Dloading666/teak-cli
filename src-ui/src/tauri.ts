@@ -38,6 +38,29 @@ export function retryInvoke() {
   return _invoke;
 }
 
+// ── Git changes-panel types (mirror of src/git.rs serde output) ──
+export interface GitFileEntry {
+  /** Absolute, forward-slashed path (repo_root + "/" + rel). */
+  path: string;
+  /** Repo-relative path exactly as git reports it; diff/show specs use this. */
+  rel: string;
+  /** Single-letter status: M A D R C U or ? (untracked). */
+  status: string;
+  added: number;
+  deleted: number;
+}
+export type GitChanges =
+  | { state: 'no_git' }
+  | { state: 'not_repo' }
+  | {
+      state: 'ok';
+      repo_root: string;
+      branch: string;
+      staged: GitFileEntry[];
+      unstaged: GitFileEntry[];
+      untracked: GitFileEntry[];
+    };
+
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!_invoke) throw new Error('Tauri IPC not available');
   return _invoke(cmd, args) as Promise<T>;
@@ -142,44 +165,24 @@ export const commands = {
 
   listDirectory: (path: string) => invoke<DirEntryInfo[]>('list_directory', { path }),
 
-  // Workspace file diff — global per-file baseline keyed by absolute
-  // path, shared across every tab and project the user opens during
-  // this Coffee CLI process. Last-seen wins (方案 A): re-running
-  // startFolderSnapshot for an already-baselined file overwrites the
-  // baseline, so closing and reopening a tab resets the diff. Use
-  // clearFolderSnapshot when a tab closes to free memory.
-  startFolderSnapshot: (path: string) =>
-    invoke<void>('start_folder_snapshot', { path }),
-  // Clear the baseline snapshot for a folder. Called when the last tab
-  // using a folder closes. Removes all file snapshots under the given
-  // path to prevent memory leaks from accumulating snapshots across
-  // multiple projects.
-  clearFolderSnapshot: (path: string) =>
-    invoke<void>('clear_folder_snapshot', { path }),
-  // Walk `folder` and return one entry per file that drifts from the
-  // global baseline. Tool-agnostic — diff is purely fs-state vs.
-  // snapshot, so Claude / Codex / OpenCode / external-editor /
-  // git-pull all show up uniformly. Cheap enough to call on
-  // fs-refresh + agent-status idle without polling.
-  computeFolderStats: (folder: string) =>
-    invoke<{ path: string; added: number; deleted: number; mtime_ms: number }[]>(
-      'compute_folder_stats',
-      { folder },
-    ),
-  // Diff panel inputs: baseline = the file's bytes when Coffee CLI
-  // first observed it during this process lifetime; current = the
-  // file's bytes now. Both lossy-UTF8 decoded so GBK / latin-1 source
-  // files still render. `null` = file missing / binary / never seen.
-  getBaselineContent: (path: string) =>
-    invoke<string | null>('get_baseline_content', { path }),
+  // ── Git-backed changes panel ──────────────────────────────────────
+  // The right-side "修改记录" tab reads the active folder's git working
+  // tree. `gitChanges` returns no_git / not_repo / ok (with staged·
+  // unstaged·untracked groups); the DiffPanel pulls each side's blob via
+  // `gitShowFile` and feeds the existing jsdiff + Shiki pipeline.
+  gitChanges: (folder: string) => invoke<GitChanges>('git_changes', { folder }),
+  // Content of `<spec>` — e.g. "HEAD:src/a.ts" (committed) or ":src/a.ts"
+  // (staged/index blob). null when the path doesn't exist at that revision;
+  // the panel treats null as an empty side (file renders as all-additions).
+  gitShowFile: (repoRoot: string, spec: string) =>
+    invoke<string | null>('git_show_file', { repoRoot, spec }),
+  // `git init` a folder — backs the not-a-repo state's "initialize" button.
+  gitInit: (folder: string) => invoke<void>('git_init', { folder }),
+  // Current on-disk text of a file (lossy-UTF8 so GBK / latin-1 still
+  // render; null = missing / binary). Used for the working-tree "new" side
+  // and for untracked files, which have no git blob to `show`.
   readTextFile: (path: string) =>
     invoke<string | null>('read_text_file', { path }),
-  // Cheap pre-read probe for the Diff panel: the file's on-disk byte size
-  // (real UTF-8 bytes) so the panel can reject oversized files for an inline
-  // diff BEFORE marshalling their contents over IPC. `current_exists` is
-  // false when the path is missing or not a regular file.
-  getDiffMeta: (path: string) =>
-    invoke<{ current_bytes: number; current_exists: boolean }>('get_diff_meta', { path }),
 
   // File system operations
   fsDelete: (path: string) => invoke<void>('fs_delete', { path }),

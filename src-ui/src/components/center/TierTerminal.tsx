@@ -1079,6 +1079,17 @@ function TierTerminalImpl({
         clearInterval(poll);
         return;
       }
+      // Continuously-emitting inline CLIs never trip the silence gate above:
+      // Claude Code's idle input box repaints a cursor-blink frame roughly
+      // every 500 ms, so `sinceLastOutput` keeps resetting and the splash would
+      // otherwise hang until the 15 s maxWait even though the REPL is already
+      // up. Once a real frame is painted (≥512 B) and the branding window has
+      // passed, the tool IS interactive — dismiss without requiring silence.
+      if (outputBytesRef.current >= 512 && elapsed > 2000) {
+        dismiss();
+        clearInterval(poll);
+        return;
+      }
       // Fallback timeout: shell tabs are fast (3s), AI CLI tools may
       // take longer (15s) before the first meaningful frame.
       const maxWait = tool === 'terminal' ? 3000 : 15000;

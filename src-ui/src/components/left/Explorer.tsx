@@ -8,7 +8,7 @@ import { useT } from '../../i18n/useT';
 import { ScrollPanel } from '../common/ScrollPanel';
 import { clipboardWrite } from '../../lib/clipboard';
 import { beginExplorerDrag } from '../../lib/explorer-drag';
-import { useFileStats } from '../../lib/file-stats';
+import { useFileStats } from '../../lib/git-status';
 import { commands, onSelfUpdateProgress } from '../../tauri';
 import type { DirEntryInfo } from '../../tauri';
 import { HistoryBoard } from '../right/HistoryBoard';

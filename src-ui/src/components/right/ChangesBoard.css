@@ -155,3 +155,106 @@
 
 .changes-stats .diff-add { color: #4ec76b; }
 .changes-stats .diff-del { color: #e07070; }
+
+/* ── Branch header (top of the changes panel) ───────────────────────── */
+.changes-branch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  /* Faint lift so this reads as the repo "bar" anchored at the top, with the
+   * Unstaged/Staged/Untracked group labels below it as lighter sub-headers —
+   * a clear two-level hierarchy instead of two competing header rows. */
+  background: rgba(255, 255, 255, 0.025);
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.06));
+  flex-shrink: 0;
+}
+.changes-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+}
+.changes-branch svg { flex-shrink: 0; opacity: 0.8; }
+.changes-branch-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.changes-branch-stats {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.changes-branch-stats .diff-add { color: #4ec76b; }
+.changes-branch-stats .diff-del { color: #e07070; }
+
+/* ── Git group sections (Unstaged / Staged / Untracked) ─────────────── */
+.changes-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 4px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3, var(--text-2));
+  user-select: none;
+}
+.changes-group-count {
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--bg-hover);
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Single-letter git status badge (M/A/D/R/C/U/?). Fixed width so file
+ * names align in a column regardless of status letter. */
+.changes-status {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.changes-status-m { color: #e0a458; } /* modified */
+.changes-status-a { color: #4ec76b; } /* added (staged) */
+.changes-status-d { color: #e07070; } /* deleted */
+.changes-status-r,
+.changes-status-c { color: #6c9fd8; } /* renamed / copied */
+.changes-status-u { color: #d98b6c; } /* unmerged */
+.changes-status-untracked { color: #8aa872; } /* ? untracked */
+
+/* "Initialize Git here" button shown in the not-a-repo empty state. */
+.changes-init-btn {
+  margin-top: 14px;
+  padding: 6px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.changes-init-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--bg-app, #fff);
+}
+.changes-init-btn:disabled {
+  opacity: 0.6;
+  cursor: default !important;
+}

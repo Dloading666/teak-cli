@@ -75,7 +75,20 @@ const DIFF_CONTEXT_LINES = 3;
 const DIFF_COLLAPSE_MIN_HIDDEN = 4;
 
 interface DiffPanelProps {
+  /** Absolute on-disk path — used for the header basename, Shiki language
+   *  detection, and reading the working-tree "new" side. */
   path: string;
+  /** Repository root (from git_changes) — the dir all `git show` specs
+   *  resolve against. */
+  repoRoot: string;
+  /** Repo-relative path — the rel used in `HEAD:rel` / `:rel` specs. */
+  rel: string;
+  /** True for a Staged-group row: diff index-vs-HEAD instead of
+   *  worktree-vs-index. */
+  staged: boolean;
+  /** True for an Untracked-group row: no git blob, render the whole working
+   *  file as additions. */
+  untracked: boolean;
   onClose: () => void;
   expanded: boolean;
   onToggleExpanded: () => void;
@@ -83,15 +96,14 @@ interface DiffPanelProps {
    *  Ignored in expanded mode (which uses fixed-inset modal sizing).
    *  When omitted, the CSS default (55%) applies. */
   heightPercent?: number;
-  /** Baseline→current change magnitude from the Rust folder-stats badge
-   *  (multiset line diff). Used to short-circuit the render for very large
-   *  diffs before the expensive jsdiff + Shiki pass (see the size guard in
-   *  the load effect) and to label the summary card when we do. */
+  /** Change magnitude from the git numstat badge. Short-circuits the render
+   *  for very large diffs before the expensive jsdiff + Shiki pass, and
+   *  labels the summary card when we do. */
   added?: number;
   deleted?: number;
 }
 
-export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
+export function DiffPanel({ path, repoRoot, rel, staged, untracked, onClose, expanded, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
   const t = useT();
   const dataTheme = useDataAttr('data-theme');
   const [result, setResult] = useState<DiffResult>({ state: 'loading' });
@@ -157,33 +169,41 @@ export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPer
 
     (async () => {
       try {
-        // Pre-read size guard: ask Rust for the file's on-disk byte size and
-        // bail to the summary for oversized files BEFORE marshalling their
-        // (possibly multi-MB) contents across IPC. current_bytes is real UTF-8
-        // bytes, so this catches large multibyte CJK files that a decoded
-        // String.length check (UTF-16 units) under-measured.
-        const meta = await commands.getDiffMeta(path);
-        if (cancelled) return;
-        if (!meta.current_exists) {
-          setResult({ state: 'error', reason: 'unreadable' });
-          return;
+        // Fetch the two sides from git per group:
+        //   untracked → old "" / new = working file on disk (no git blob)
+        //   staged    → old = HEAD blob / new = index blob (`:rel`)
+        //   unstaged  → old = index blob (`:rel`) / new = working file
+        // `gitShowFile` returns null when the path is absent at that revision
+        // (a newly-added file has no HEAD blob) → empty side → all-additions.
+        let oldText: string;
+        let newText: string;
+        if (untracked) {
+          oldText = '';
+          newText = (await commands.readTextFile(path)) ?? '';
+        } else if (staged) {
+          const [o, n] = await Promise.all([
+            commands.gitShowFile(repoRoot, `HEAD:${rel}`),
+            commands.gitShowFile(repoRoot, `:${rel}`),
+          ]);
+          oldText = o ?? '';
+          newText = n ?? '';
+        } else {
+          const [o, n] = await Promise.all([
+            commands.gitShowFile(repoRoot, `:${rel}`),
+            commands.readTextFile(path),
+          ]);
+          oldText = o ?? '';
+          newText = n ?? '';
         }
-        if (meta.current_bytes > DIFF_MAX_BYTES) {
+        if (cancelled) return;
+
+        // Post-fetch size guard (replaces the old getDiffMeta pre-probe): bail
+        // to the summary card before the jsdiff + double-Shiki pass, which
+        // would freeze the main thread on a multi-MB blob.
+        if (oldText.length + newText.length > DIFF_MAX_BYTES) {
           setResult({ state: 'too_large', added: badgeAdded, deleted: badgeDeleted });
           return;
         }
-
-        const [baseline, current] = await Promise.all([
-          commands.getBaselineContent(path),
-          commands.readTextFile(path),
-        ]);
-        if (cancelled) return;
-        if (current === null) {
-          setResult({ state: 'error', reason: 'unreadable' });
-          return;
-        }
-        const oldText = baseline ?? '';
-        const newText = current;
 
         const lines = computeUnifiedDiff(oldText, newText);
         // Renderer-side counts (order-sensitive jsdiff), distinct from the
@@ -220,7 +240,7 @@ export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPer
     })();
 
     return () => { cancelled = true; };
-  }, [path, dataTheme]);
+  }, [path, repoRoot, rel, staged, untracked, dataTheme]);
 
   const basename = useMemo(() => path.replace(/\\/g, '/').split('/').pop() || path, [path]);
 
@@ -284,7 +304,7 @@ export function DiffPanel({ path, onClose, expanded, onToggleExpanded, heightPer
           </div>
         )}
         {result.state === 'ok' && result.added === 0 && result.deleted === 0 && (
-          <div className="diff-empty">{t('diff.no_changes' as any) || 'Identical to baseline'}</div>
+          <div className="diff-empty">{t('diff.no_changes' as any) || 'No changes'}</div>
         )}
         {result.state === 'ok' && (result.added > 0 || result.deleted > 0) && (
           <pre className="diff-pre">

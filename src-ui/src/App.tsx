@@ -11,7 +11,7 @@ import { Explorer } from './components/left/Explorer';
 import { CenterPanel } from './components/center/CenterPanel';
 import { ActiveGambit } from './components/center/ActiveGambit';
 import { RightPanel } from './components/right/Compiler';
-import { FileStatsProvider } from './lib/file-stats';
+import { GitStatusProvider } from './lib/git-status';
 import './styles/global.css';
 
 // CSS transition duration on .panel-left / .panel-right in global.css.
@@ -225,7 +225,7 @@ export function App() {
           UNMOUNTS so Explorer / RightPanel stop firing IPC + event
           subs while hidden; on show, we mount in the collapsed state
           and let CSS animate it back open. */}
-      <FileStatsProvider>
+      <GitStatusProvider>
         <div className="app-layout">
           {leftPanel.mounted && (
             <aside
@@ -248,7 +248,7 @@ export function App() {
             </aside>
           )}
         </div>
-      </FileStatsProvider>
+      </GitStatusProvider>
 
       {/* App-level overlay — the floating compose window. Rendered here so
           it's isolated from TierTerminal re-renders (xterm output, agent

@@ -72,10 +72,46 @@ jobs:
           cache: npm
           cache-dependency-path: src-ui/package-lock.json
 
-      - name: Install & build frontend
+      - name: Install frontend deps
         run: |
           cd src-ui
           npm ci
+
+      # ── Linux-only stopgap: ship xterm 6.1.0-beta on Linux ──────────────
+      # The committed deps stay on stable 6.0.0 (Windows/macOS ship that).
+      # Only the Linux release artifact pulls the 6.1.0-beta line, which
+      # carries upstream's reworked IME composition handling and clears the
+      # WebKit2GTK CJK-punctuation duplication on the raw terminal
+      # (issue #37 / xtermjs#5374 — open, no stable fix yet). Windows is
+      # Chromium and never had the bug; macOS stays on stable too.
+      # `--no-save` keeps package.json / package-lock.json untouched.
+      # REMOVE this whole block once xterm 6.1.0 ships stable and the
+      # committed deps are bumped for every platform.
+      - name: "[Linux] Override xterm with 6.1.0-beta (IME stopgap)"
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: |
+          cd src-ui
+          npm install --no-save \
+            @xterm/xterm@6.1.0-beta.287 \
+            @xterm/addon-fit@0.12.0-beta.287 \
+            @xterm/addon-web-links@0.13.0-beta.287 \
+            @xterm/addon-webgl@0.20.0-beta.286
+
+      # Linux builds skip `tsc` because 6.1.0-beta dropped the `customGlyphs`
+      # init option from its types (it is now always-on); the option is still
+      # valid on the committed 6.0.0 and is harmlessly ignored at runtime on
+      # beta. `vite build` transpiles without type-checking, and Windows/macOS
+      # still run the full `tsc` gate, so no type coverage is lost overall.
+      - name: Build frontend (Linux — vite only)
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: |
+          cd src-ui
+          npx vite build
+
+      - name: Build frontend (Windows / macOS — tsc + vite)
+        if: ${{ !startsWith(matrix.platform, 'ubuntu-') }}
+        run: |
+          cd src-ui
           npm run build
 
       - name: Setup Rust
