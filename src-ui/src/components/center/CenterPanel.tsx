@@ -569,7 +569,17 @@ export function CenterPanel() {
       }
     }
     prevToolsInstalledRef.current = result;
-    setToolsInstalled(result);
+    // Unchanged result (the common case on a foreground rescan — tools don't
+    // get installed/removed between alt-tabs) keeps the same ref so React skips
+    // the re-render. setToolsInstalled always receives a fresh IPC object, so
+    // without this an unchanged rescan reconciles the whole CenterPanel and a
+    // tab switch right after returning to the foreground stutters (#43 #5).
+    setToolsInstalled(curr => {
+      const keys = Object.keys(result);
+      const same = keys.length === Object.keys(curr).length
+        && keys.every(k => curr[k] === result[k]);
+      return same ? curr : result;
+    });
     lastToolsScanAt.current = Date.now();
   };
 
@@ -673,6 +683,10 @@ export function CenterPanel() {
   // Derived state — must be before hooks that depend on it
   const activeSession = terminals.find(t => t.id === activeTerminalId);
   const isLaunchpadMode = activeSession && activeSession.tool === null;
+  // Mirrored into a ref so the window-foreground rescan (which has [] deps and
+  // can't see the latest value otherwise) can skip work while in a terminal tab.
+  const isLaunchpadModeRef = useRef(isLaunchpadMode);
+  useEffect(() => { isLaunchpadModeRef.current = isLaunchpadMode; }, [isLaunchpadMode]);
 
 
 
@@ -733,6 +747,11 @@ export function CenterPanel() {
     const unsubscribe = onWindowForeground(() => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
+        // Only the launchpad shows per-tool install state. Rescanning while the
+        // user is inside a terminal tab is wasted work whose setState reflows
+        // the whole CenterPanel, making the next tab switch stutter (#43 #5).
+        // Re-entering the launchpad runs its own (TTL-gated) rescan anyway.
+        if (!isLaunchpadModeRef.current) return;
         commands.checkToolsInstalled()
           .then(applyToolsInstalled)
           .catch(() => {});
