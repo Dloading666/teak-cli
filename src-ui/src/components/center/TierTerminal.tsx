@@ -550,6 +550,55 @@ function TierTerminalImpl({
       return true; // Let xterm handle all other keys natively
     });
 
+    // ── Alternate-scroll mode (mouse wheel in full-screen TUIs) ───────────
+    // Real terminals (Windows Terminal, iTerm2, xterm) translate the mouse
+    // wheel into arrow-key presses when an app is in the ALTERNATE screen
+    // buffer but has NOT enabled mouse tracking. xterm.js does not implement
+    // this, so the wheel does *nothing* in pagers / menu-driven CLIs (less,
+    // git log, man, fzf, ratatui apps): the alt-screen has no host scrollback
+    // for xterm to scroll, and the app never receives the wheel. That is the
+    // "win10 下控制台界面没法鼠标中间滑动 — 微软商店的终端却可以" report
+    // (works in Windows Terminal, not here).
+    //
+    // Strictly scoped so we never fight xterm's own handling:
+    //   • normal buffer            → return true → xterm scrolls its scrollback.
+    //   • alt-screen + mouse mode  → return true → xterm forwards wheel→mouse
+    //                                to the app (Claude/Codex capture the mouse
+    //                                and do their own scrolling / Ctrl+T).
+    //   • alt-screen + NO mouse    → emit Up/Down arrows so the TUI navigates,
+    //                                then return false to swallow the no-op.
+    term.attachCustomWheelEventHandler((e) => {
+      try {
+        const inAltScreen = term.buffer.active.type === 'alternate';
+        const mouseOff = term.modes.mouseTrackingMode === 'none';
+        if (!inAltScreen || !mouseOff || e.deltaY === 0) return true;
+
+        // Normalize the platform's wheel delta into a line count. WebView2 on
+        // Windows reports pixel deltas (deltaMode 0, ~100px/notch); some mice
+        // / Linux report line deltas (deltaMode 1, ~3 lines/notch). Convert to
+        // notches, then 3 arrow presses per notch (the xterm convention),
+        // capped so a fast flick can't flood the PTY.
+        const notches =
+          e.deltaMode === 1 ? Math.abs(e.deltaY) / 3 :              // lines
+          e.deltaMode === 2 ? Math.abs(e.deltaY) :                  // pages
+          Math.abs(e.deltaY) / 100;                                // pixels
+        const lines = Math.max(1, Math.min(Math.round(notches * 3), 9));
+
+        // App-cursor-keys mode (DECCKM) decides SS3 (ESC O) vs CSI (ESC [);
+        // most TUIs accept either, but honor it when xterm exposes it.
+        const down = e.deltaY > 0;
+        const appCursor = term.modes.applicationCursorKeysMode;
+        const seq = appCursor
+          ? (down ? '\x1bOB' : '\x1bOA')
+          : (down ? '\x1b[B' : '\x1b[A');
+        commands.tierTerminalInput(sessionId, seq.repeat(lines)).catch(() => {});
+        e.preventDefault(); // we own this wheel event — no default browser scroll
+        return false; // handled — suppress xterm's no-op scrollback attempt
+      } catch {
+        return true; // any introspection failure → fall back to xterm default
+      }
+    });
+
     // Clickable links: URLs (http/https/file) + absolute file paths.
     // Underlines matched tokens on hover; click opens via Tauri's open_url
     // command (delegates to the OS shell — system browser for URLs, default
