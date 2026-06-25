@@ -59,6 +59,7 @@ export const ko = {
   'task.tab.tasks': '작업 목록',
   'task.tab.changes': '변경 기록',
   'changes.empty': '아직 변경 사항이 없습니다.',
+  'launchpad.open_folder': '폴더 열기',
   'changes.clean': '변경 없음 — 작업 트리가 깨끗합니다.',
   'changes.no_git': 'Git이 설치되지 않았습니다 — 코드 비교, 브랜치 등 Git 기능을 사용할 수 없습니다.',
   'changes.not_repo': '이 폴더는 Git 저장소가 아닙니다.',

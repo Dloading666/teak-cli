@@ -60,6 +60,7 @@ export const de = {
   'task.tab.tasks': 'Aufgabenliste',
   'task.tab.changes': 'Änderungsverlauf',
   'changes.empty': 'Noch keine Änderungen.',
+  'launchpad.open_folder': 'Ordner öffnen',
   'changes.clean': 'Keine Änderungen — Arbeitsverzeichnis ist sauber.',
   'changes.no_git': 'Git ist nicht installiert — Code-Diff, Branches und andere Git-Funktionen sind nicht verfügbar.',
   'changes.not_repo': 'Dieser Ordner ist kein Git-Repository.',

@@ -61,6 +61,7 @@ export const en = {
   'task.tab.tasks': 'Tasks',
   'task.tab.changes': 'Changes',
   'changes.empty': 'No changes yet.',
+  'launchpad.open_folder': 'Open Folder',
   'changes.clean': 'No changes — working tree clean.',
   'changes.no_git': 'Git is not installed — code diff, branches and other git features are unavailable.',
   'changes.not_repo': 'This folder is not a Git repository.',

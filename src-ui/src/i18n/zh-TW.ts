@@ -59,6 +59,7 @@ export const zhTW = {
   'task.tab.tasks': '任務列表',
   'task.tab.changes': '修改記錄',
   'changes.empty': '暫無修改。',
+  'launchpad.open_folder': '開啟資料夾',
   'changes.clean': '沒有改動 — 工作區乾淨。',
   'changes.no_git': '未安裝 Git — 程式碼比對、分支等功能不可用。',
   'changes.not_repo': '目前資料夾不是 Git 儲存庫。',

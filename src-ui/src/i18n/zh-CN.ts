@@ -59,6 +59,7 @@ export const zhCN = {
   'task.tab.tasks': '任务列表',
   'task.tab.changes': '修改记录',
   'changes.empty': '暂无修改。',
+  'launchpad.open_folder': '打开文件夹',
   'changes.clean': '没有改动 — 工作区干净。',
   'changes.no_git': '未安装 Git — 代码对比、分支等功能不可用。',
   'changes.not_repo': '当前文件夹不是 Git 仓库。',

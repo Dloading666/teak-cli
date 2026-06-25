@@ -62,6 +62,7 @@ export const vi = {
   'task.tab.tasks': 'Danh sách',
   'task.tab.changes': 'Lịch sử',
   'changes.empty': 'Chưa có thay đổi.',
+  'launchpad.open_folder': 'Mở thư mục',
   'changes.clean': 'Không có thay đổi — cây làm việc sạch.',
   'changes.no_git': 'Git chưa được cài đặt — so sánh mã, nhánh và các tính năng Git khác không khả dụng.',
   'changes.not_repo': 'Thư mục này không phải là kho Git.',

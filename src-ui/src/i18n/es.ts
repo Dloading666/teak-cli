@@ -59,6 +59,7 @@ export const es = {
   'task.tab.tasks': 'Lista de tareas',
   'task.tab.changes': 'Historial',
   'changes.empty': 'Aún no hay cambios.',
+  'launchpad.open_folder': 'Abrir carpeta',
   'changes.clean': 'Sin cambios — el árbol de trabajo está limpio.',
   'changes.no_git': 'Git no está instalado — la comparación de código, las ramas y otras funciones de Git no están disponibles.',
   'changes.not_repo': 'Esta carpeta no es un repositorio Git.',

@@ -59,6 +59,7 @@ export const fr = {
   'task.tab.tasks': 'Liste des tâches',
   'task.tab.changes': 'Historique',
   'changes.empty': 'Aucune modification pour le moment.',
+  'launchpad.open_folder': 'Ouvrir un dossier',
   'changes.clean': 'Aucune modification — l\'arbre de travail est propre.',
   'changes.no_git': 'Git n\'est pas installé — le diff, les branches et les autres fonctions Git sont indisponibles.',
   'changes.not_repo': 'Ce dossier n\'est pas un dépôt Git.',

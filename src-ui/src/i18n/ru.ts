@@ -60,6 +60,7 @@ export const ru = {
   'task.tab.tasks': 'Список задач',
   'task.tab.changes': 'История изменений',
   'changes.empty': 'Изменений пока нет.',
+  'launchpad.open_folder': 'Открыть папку',
   'changes.clean': 'Нет изменений — рабочее дерево чисто.',
   'changes.no_git': 'Git не установлен — сравнение кода, ветки и другие функции Git недоступны.',
   'changes.not_repo': 'Эта папка не является репозиторием Git.',

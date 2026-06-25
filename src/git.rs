@@ -91,10 +91,13 @@ pub enum GitChanges {
 /// rename rows (path field empty under -z) simply don't match and degrade to a
 /// 0/0 badge. Counts are best-effort by design.
 fn numstat_map(repo_root: &str, cached: bool) -> HashMap<String, (u32, u32)> {
+    // --no-optional-locks: a read-only query must never take index.lock to
+    // refresh the stat cache — it just writes disk and contends with the
+    // user's own git/agent processes on a big repo (issue #40).
     let args: &[&str] = if cached {
-        &["diff", "--numstat", "-z", "--cached"]
+        &["--no-optional-locks", "diff", "--numstat", "-z", "--cached"]
     } else {
-        &["diff", "--numstat", "-z"]
+        &["--no-optional-locks", "diff", "--numstat", "-z"]
     };
     let mut map = HashMap::new();
     let Ok(out) = git_output(repo_root, args) else { return map; };
@@ -190,7 +193,7 @@ pub fn git_changes(folder: String) -> GitChanges {
     // isn't mis-parsed as its own entry.
     let porcelain = git_output(
         &repo_root,
-        &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        &["--no-optional-locks", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
     )
     .unwrap_or_default();
     let fields: Vec<&str> = porcelain.split('\0').collect();

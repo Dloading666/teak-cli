@@ -59,6 +59,7 @@ export const ja = {
   'task.tab.tasks': 'タスク一覧',
   'task.tab.changes': '変更履歴',
   'changes.empty': 'まだ変更はありません。',
+  'launchpad.open_folder': 'フォルダを開く',
   'changes.clean': '変更なし — 作業ツリーはクリーンです。',
   'changes.no_git': 'Git がインストールされていません — 差分・ブランチなどの Git 機能は利用できません。',
   'changes.not_repo': 'このフォルダは Git リポジトリではありません。',

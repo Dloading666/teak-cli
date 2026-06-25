@@ -133,6 +133,51 @@ struct FsRefreshPayload {
     dir_path: String,
 }
 
+/// How a changed path relates to a `.git` metadata directory.
+enum GitEvt {
+    /// Not inside any `.git` dir — a normal workspace change, handle as usual.
+    NotGit,
+    /// Inside `.git` but high-frequency churn we must ignore: `index.lock`,
+    /// `logs/`, `refs/remotes/` (fetch), `packed-refs`, `ORIG_HEAD`,
+    /// `COMMIT_EDITMSG`, `objects/`, `config`. These fire on essentially every
+    /// git command, so refreshing on them storms the Explorer + git-status
+    /// poll during agent activity. Warp's watcher filters the same class
+    /// (`is_index_lock_file` / `is_common_git_config` / `is_remote_tracking_ref`).
+    Skip,
+    /// Inside `.git` and meaningful to what the Changes panel shows: a branch
+    /// switch (`HEAD`), staging (`index`), or a commit landing on the current
+    /// branch (`refs/heads/*`). Carries the repo root (parent of `.git`) so we
+    /// refresh that — never `.git` itself, which is never listed.
+    Meaningful(PathBuf),
+}
+
+/// Classify a watcher path against the nearest enclosing `.git` directory.
+/// Worktree gitlinks (`.git` as a file) and paths with no `.git` ancestor
+/// fall through to `NotGit`/`Skip` safely — no manual prefix reconstruction.
+fn classify_git_event(path: &Path) -> GitEvt {
+    let git_dir = path
+        .ancestors()
+        .find(|a| a.file_name().map(|n| n == ".git").unwrap_or(false));
+    let Some(git_dir) = git_dir else {
+        return GitEvt::NotGit;
+    };
+    let parts: Vec<String> = path
+        .strip_prefix(git_dir)
+        .unwrap_or(Path::new(""))
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    let meaningful = match parts.as_slice() {
+        [one] => one == "HEAD" || one == "index",
+        [a, b, ..] => a == "refs" && b == "heads",
+        _ => false,
+    };
+    match (meaningful, git_dir.parent()) {
+        (true, Some(root)) => GitEvt::Meaningful(root.to_path_buf()),
+        _ => GitEvt::Skip,
+    }
+}
+
 /// Owns the debouncer (and transitively the OS watcher handle).
 /// Dropping this struct stops the watch.
 pub struct FsWatcher {
@@ -170,21 +215,35 @@ impl FsWatcher {
                     let mut dirs: HashSet<String> = HashSet::new();
                     for event in events {
                         for path in &event.event.paths {
-                            // Always refresh the parent — that's where the
-                            // entry is listed. Critical for directory create
-                            // events (e.g. `cargo new`, `mkdir`): without this
-                            // the new dir node never appears in its parent's
-                            // listing because nothing was mounted to receive
-                            // a self-targeted event yet.
-                            if let Some(parent) = path.parent() {
-                                dirs.insert(parent.to_string_lossy().replace('\\', "/"));
-                            }
-                            // If the path itself is a directory (still exists
-                            // post-debounce), also emit for self so any
-                            // already-expanded BrowserDirNode owning it
-                            // re-lists its children.
-                            if path.is_dir() {
-                                dirs.insert(path.to_string_lossy().replace('\\', "/"));
+                            match classify_git_event(path) {
+                                // git's own internal churn (index.lock, logs,
+                                // remote refs, objects…) — ignore so an agent's
+                                // git activity doesn't storm the UI (issue #40).
+                                GitEvt::Skip => continue,
+                                // Branch/stage/commit changed — refresh the repo
+                                // root so the Changes panel re-polls; `.git`
+                                // itself is never listed in the tree.
+                                GitEvt::Meaningful(root) => {
+                                    dirs.insert(root.to_string_lossy().replace('\\', "/"));
+                                }
+                                GitEvt::NotGit => {
+                                    // Always refresh the parent — that's where the
+                                    // entry is listed. Critical for directory create
+                                    // events (e.g. `cargo new`, `mkdir`): without this
+                                    // the new dir node never appears in its parent's
+                                    // listing because nothing was mounted to receive
+                                    // a self-targeted event yet.
+                                    if let Some(parent) = path.parent() {
+                                        dirs.insert(parent.to_string_lossy().replace('\\', "/"));
+                                    }
+                                    // If the path itself is a directory (still exists
+                                    // post-debounce), also emit for self so any
+                                    // already-expanded BrowserDirNode owning it
+                                    // re-lists its children.
+                                    if path.is_dir() {
+                                        dirs.insert(path.to_string_lossy().replace('\\', "/"));
+                                    }
+                                }
                             }
                         }
                     }

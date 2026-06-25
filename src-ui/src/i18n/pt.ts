@@ -60,6 +60,7 @@ export const pt = {
   'task.tab.tasks': 'Lista de tarefas',
   'task.tab.changes': 'Histórico',
   'changes.empty': 'Ainda sem alterações.',
+  'launchpad.open_folder': 'Abrir pasta',
   'changes.clean': 'Sem alterações — árvore de trabalho limpa.',
   'changes.no_git': 'O Git não está instalado — diff de código, branches e outros recursos do Git ficam indisponíveis.',
   'changes.not_repo': 'Esta pasta não é um repositório Git.',

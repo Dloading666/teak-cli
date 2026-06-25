@@ -11,6 +11,71 @@ import { ContributionHeatmap } from './ContributionHeatmap';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { useAppState, type ToolType } from '../../store/app-state';
 
+// Dropdown shown when a tool card's folder icon is clicked: the globally
+// recent project folders (any tool that used one) + "Open folder…" last.
+// Clicking a recent launches THIS card's tool in that folder; the card body
+// click is unchanged (old flow). Portal-rendered with outside-click / Esc to
+// close — same pattern as the terminal context menu.
+function RecentFolderMenu({ x, y, recent, openLabel, onPick, onOpenNew, onClose }: {
+  x: number;
+  y: number;
+  recent: string[];
+  openLabel: string;
+  onPick: (folder: string) => void;
+  onOpenNew: () => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // Defer so the opening click doesn't immediately close the menu.
+    const id = setTimeout(() => {
+      document.addEventListener('mousedown', onDown);
+      document.addEventListener('keydown', onKey);
+    }, 0);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const left = Math.min(x, window.innerWidth - 290);
+  const top = Math.min(y, window.innerHeight - (recent.length * 40 + 56));
+  const split = (p: string) => {
+    const norm = p.replace(/\\/g, '/').replace(/\/+$/, '');
+    const i = norm.lastIndexOf('/');
+    return { name: i >= 0 ? norm.slice(i + 1) : norm, parent: i >= 0 ? norm.slice(0, i) : '' };
+  };
+  const FolderGlyph = (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+
+  return createPortal(
+    <div ref={ref} className="folder-menu" style={{ left, top }}>
+      {recent.map(f => {
+        const { name, parent } = split(f);
+        return (
+          <button key={f} className="folder-menu-item" onMouseDown={(e) => { e.preventDefault(); onPick(f); }}>
+            {FolderGlyph}
+            <span className="folder-menu-name">{name}</span>
+            {parent && <span className="folder-menu-path">{parent}</span>}
+          </button>
+        );
+      })}
+      {recent.length > 0 && <div className="folder-menu-sep" />}
+      <button className="folder-menu-item folder-menu-open" onMouseDown={(e) => { e.preventDefault(); onOpenNew(); }}>
+        {FolderGlyph}
+        <span className="folder-menu-name">{openLabel}</span>
+      </button>
+    </div>,
+    document.body,
+  );
+}
+
 interface RemoteHistoryItem {
   id: string;
   protocol: 'ssh' | 'ws';
@@ -539,6 +604,19 @@ export function CenterPanel() {
   };
   const [connStatus, setConnStatus] = useState<'idle' | 'connecting' | 'failed'>('idle');
   const [lastCwdByTool, setLastCwdByTool] = useState<Record<string, string>>({});
+  // Global recent project folders (across all folder-using tools) — backs the
+  // folder-icon dropdown. Separate from the per-tool last-cwd above.
+  const [recentFolders, setRecentFolders] = useState<string[]>(() => {
+    try { const r = localStorage.getItem('coffee:recent-folders'); return r ? JSON.parse(r) : []; } catch { return []; }
+  });
+  const [folderMenu, setFolderMenu] = useState<{ x: number; y: number; tool: ToolType } | null>(null);
+  const pushRecentFolder = (folder: string) => {
+    setRecentFolders(prev => {
+      const next = [folder, ...prev.filter(f => f !== folder)].slice(0, 8);
+      try { localStorage.setItem('coffee:recent-folders', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   // ── Global focus enforcer ────────────────────────────────────────────────
   // One pair of window listeners for the whole app (previously each
@@ -851,6 +929,7 @@ export function CenterPanel() {
           try { localStorage.setItem('coffee:last-cwd-by-tool', JSON.stringify(next)); } catch {}
           return next;
         });
+        pushRecentFolder(cwd);
       }
       dispatch({ type: 'SET_TERMINAL_TOOL', id: activeTerminalId, tool, toolData });
     }
@@ -1292,7 +1371,14 @@ export function CenterPanel() {
                                     )}
                                   </div>
                                   {tool.requiresCwd && (
-                                    <div className="launchpad-folder-btn" onClick={(e) => { e.stopPropagation(); if (!disabled) handlePickFolder(tool.key!); }}>
+                                    <div className="launchpad-folder-btn" onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (disabled) return;
+                                      // No recents yet → behave like before (straight to the picker).
+                                      if (recentFolders.length === 0) { handlePickFolder(tool.key!); return; }
+                                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                      setFolderMenu({ x: r.left, y: r.bottom + 4, tool: tool.key! });
+                                    }}>
                                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                                       </svg>
@@ -1639,6 +1725,17 @@ export function CenterPanel() {
           toolKey={configModalTool.key}
           toolLabel={configModalTool.label}
           onClose={() => setConfigModalTool(null)}
+        />
+      )}
+      {folderMenu && (
+        <RecentFolderMenu
+          x={folderMenu.x}
+          y={folderMenu.y}
+          recent={recentFolders}
+          openLabel={t('launchpad.open_folder' as any) || 'Open folder…'}
+          onPick={(f) => { selectTool(folderMenu.tool, undefined, f); setFolderMenu(null); }}
+          onOpenNew={() => { const tk = folderMenu.tool; setFolderMenu(null); handlePickFolder(tk); }}
+          onClose={() => setFolderMenu(null)}
         />
       )}
     </>
