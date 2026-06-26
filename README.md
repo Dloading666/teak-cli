@@ -46,6 +46,21 @@ This is not a web app. Not an Electron wrapper. A **true native desktop app** bu
   <img src="screenshot/wallpaper.jpg" alt="Coffee CLI workspace with custom wallpaper" width="860" />
 </p>
 
+### Supported AI CLIs
+
+Coffee CLI can launch **any** command-line agent — but the ones below get deeper, purpose-built integration. The tier tells you how much of the workspace lights up for each one: **Dynamic Island** (live status), **History** (saved conversations), **Heatmap** (activity), **Changes** (diff panel), **Brand icon**, and **One-click launch**.
+
+| Tier | What you get | CLIs |
+|---|---|---|
+| **T1** | Dynamic Island · History · Heatmap · Changes · Brand icon · One-click launch | **Claude Code** |
+| **T2** | History · Heatmap · Changes · Brand icon · One-click launch | OpenCode · OpenClaw · Hermes Agent · Codex CLI · Antigravity · Qwen Code · mimocode |
+| **T3** | Brand icon · One-click launch | Pi · Crush · Aider · Kimi Code · Goose · Copilot CLI |
+| **T4** | Open a terminal tab and type the command to launch | any other CLI |
+
+*T1 and T2 CLIs ship today; T3 integrations are rolling in.*
+
+---
+
 ### Who is it for?
 
 AI coding agents are transforming how work gets done — but they speak English, output dense terminal text, and assume you're comfortable with a command line. That leaves out a massive group of capable, intelligent professionals:
@@ -113,21 +128,6 @@ The Coffee CLI app ships with a fully localized UI in 11 languages — menus, di
 | **Remote Terminal** | SSH into remote machines and run agents on servers without leaving the app |
 
 **11 languages supported out of the box:** English · 简体中文 · 繁體中文 · Deutsch · Español · Français · 日本語 · 한국어 · Português · Русский · Tiếng Việt
-
----
-
-### Supported AI CLIs
-
-Coffee CLI can launch **any** command-line agent — but the ones below get deeper, purpose-built integration. The tier tells you how much of the workspace lights up for each one: **Dynamic Island** (live status), **History** (saved conversations), **Heatmap** (activity), **Changes** (diff panel), **Brand icon**, and **One-click launch**.
-
-| Tier | What you get | CLIs |
-|---|---|---|
-| **T1** | Dynamic Island · History · Heatmap · Changes · Brand icon · One-click launch | **Claude Code** |
-| **T2** | History · Heatmap · Changes · Brand icon · One-click launch | OpenCode · OpenClaw · Hermes Agent · Codex CLI · Antigravity · Qwen Code · mimocode |
-| **T3** | Brand icon · One-click launch | Pi · Crush · Aider · Kimi Code · Goose · Copilot CLI |
-| **T4** | Open a terminal tab and type the command to launch | any other CLI |
-
-*T1 and T2 CLIs ship today; T3 integrations are rolling in.*
 
 ---
 
