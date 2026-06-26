@@ -312,10 +312,14 @@ function initDotField() {
   // alpha and as 1-alpha for the circle (crossfade).
   const MORPH_THRESHOLD = 0.55;
 
-  // Outfit 800 (the site's heaviest loaded brand weight) gives the $ a bold,
-  // geometric look that reads as "value" — not the thin monospace "calculator"
-  // glyph the earlier 600-weight mono font produced.
-  const GLYPH_FONT = '800 14px "Outfit", -apple-system, "Helvetica Neue", Arial, sans-serif';
+  // Cifrão (the double-barred "$") drawn as vector paths, so the value motif
+  // reads as a bold, standard money glyph — not the thin single-bar "$" a text
+  // font produces. Source: Wikimedia Commons "Double-barred dollar sign.svg"
+  // (the S stroke + the two vertical bars), 500×500 viewBox centered ~(250,249).
+  const CIFRAO_S    = new Path2D("m119,312c4,70 58,111 130,110 78,1 129-34 125-101-11-61-78-69-122-79-48-16-118-16-117-89-1-53 59-84 117-78 60,1 111,32 112,96");
+  const CIFRAO_BARS = new Path2D("m205,17v464m90,0V17");
+  const CIFRAO_VB = 500, CIFRAO_CX = 250, CIFRAO_CY = 249;
+  const GLYPH_PX  = 18;  // on-screen box (px) the 500-unit viewBox maps to
 
   let cells = [];
   let trackLength = 0;   // cyclic Y range — set in resize() to an exact
@@ -355,7 +359,6 @@ function initDotField() {
           y: y,
           dispX: 0,
           dispY: 0,
-          glyph: "$",  // value motif — dots morph into a dollar sign on hover
           bp: Math.random() * Math.PI * 2,
         });
       }
@@ -394,9 +397,8 @@ function initDotField() {
     const colHotRGB  = parseRGBA(token("--dot-color-hot") || "rgba(196,149,106,0.9)");
 
     ctx.clearRect(0, 0, viewW, viewH);
-    ctx.font         = GLYPH_FONT;
-    ctx.textAlign    = "center";
-    ctx.textBaseline = "middle";
+    ctx.lineCap  = "round";
+    ctx.lineJoin = "round";
 
     for (const c of cells) {
       // Uniform downward drift; wrap by exactly trackLength so the seam
@@ -446,10 +448,20 @@ function initDotField() {
         ctx.fill();
       }
 
-      // Draw digit, faded in as morph rises.
+      // Draw the cifrão ($), faded in as morph rises. Stroke the S and the two
+      // vertical bars, scaled from the 500-unit viewBox and centered at (fx,fy).
       if (morph > 0.05) {
-        ctx.fillStyle = withAlpha(useColor, morph);
-        ctx.fillText(c.glyph, fx, fy);
+        const gs = GLYPH_PX / CIFRAO_VB;
+        ctx.save();
+        ctx.translate(fx, fy);
+        ctx.scale(gs, gs);
+        ctx.translate(-CIFRAO_CX, -CIFRAO_CY);
+        ctx.strokeStyle = withAlpha(useColor, morph);
+        ctx.lineWidth = 45;
+        ctx.stroke(CIFRAO_S);
+        ctx.lineWidth = 35;
+        ctx.stroke(CIFRAO_BARS);
+        ctx.restore();
       }
     }
 
