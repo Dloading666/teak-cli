@@ -397,6 +397,17 @@ const VALID_PIN_KEYS = new Set<string>([
   'installer', 'four-split', 'three-split', 'two-split',
 ]);
 
+// Tabs that show the status-grid ("Dynamic Island") indicator: every AI CLI.
+// Hook-wired tools (claude/codex/opencode/mimocode/hermes) drive it live off
+// session.agentStatus; the rest have no status bus and sit at static 'idle'
+// green — the "fake island" baseline so every AI-CLI tab reads consistently.
+// Non-CLI tabs (terminal/remote/history/splits/installer) get no indicator.
+const TAB_STATUS_TOOLS = new Set<string>([
+  'claude', 'codex', 'opencode', 'mimocode', 'hermes',
+  'antigravity', 'qwen', 'openclaw',
+  'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
+]);
+
 export function CenterPanel() {
   const { state, dispatch } = useAppState();
   const t = useT();
@@ -1068,6 +1079,15 @@ export function CenterPanel() {
       case 'openclaw': return { icon: <SvgOpenClaw />, title: getToolDisplayName('openclaw'), tooltip: undefined };
       case 'codex': return { icon: <SvgCodex />, title: cwd ?? getToolDisplayName('codex'), tooltip: pathTip };
       case 'antigravity': return { icon: <SvgAntigravity />, title: cwd ?? getToolDisplayName('antigravity'), tooltip: pathTip };
+      // T3 launch-only tools — directory-aware tab like the AI CLIs above
+      // (icon + cwd basename). No real status bus, so they get the static
+      // "fake" island via TAB_STATUS_TOOLS below.
+      case 'pi': return { icon: <SvgPi />, title: cwd ?? getToolDisplayName('pi'), tooltip: pathTip };
+      case 'crush': return { icon: <SvgCrush />, title: cwd ?? getToolDisplayName('crush'), tooltip: pathTip };
+      case 'aider': return { icon: <SvgAider />, title: cwd ?? getToolDisplayName('aider'), tooltip: pathTip };
+      case 'kimicode': return { icon: <SvgKimi />, title: cwd ?? getToolDisplayName('kimicode'), tooltip: pathTip };
+      case 'goose': return { icon: <SvgGoose />, title: cwd ?? getToolDisplayName('goose'), tooltip: pathTip };
+      case 'copilot': return { icon: <SvgCopilot />, title: cwd ?? getToolDisplayName('copilot'), tooltip: pathTip };
       case 'remote': {
         let title = t('tool.remote') as string;
         if (session.toolData) {
@@ -1218,20 +1238,15 @@ export function CenterPanel() {
               {icon}
               <span className="tab-title" style={{ flex: '0 1 auto', minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{title}</span>
               <div className="tab-actions">
-                {/* Indicator gate. AI CLIs with hook integration —
-                    claude/codex/opencode each have a forwarder (Python
-                    script for claude+codex, Bun plugin for opencode)
-                    wired to the same agent-status bus; color follows
-                    session.agentStatus. MiMo Code (OpenCode fork) has no
-                    forwarder, but the status ticker is preset-driven, so its
-                    `┃` prompt-marker + silence detection feeds the same bus —
-                    same mechanism, just no plugin. Hyper-Agent is the MCP admin
-                    tab — its job is "stay open so OpenClaw / Hermes
-                    Agent can drive the team", so the tab being open
-                    *is* the alive signal: always green idle, no agent
-                    state to read. Anything else (terminal, history,
-                    multi-agent, etc.) gets no indicator. */}
-                {(session.tool === 'claude' || session.tool === 'codex' || session.tool === 'opencode' || session.tool === 'mimocode' || session.tool === 'hermes') && (
+                {/* Indicator gate — every AI CLI gets the island (see
+                    TAB_STATUS_TOOLS). Hook-wired tools (claude/codex/opencode
+                    via forwarders, mimocode via its preset-driven status
+                    ticker, hermes) drive color off session.agentStatus.
+                    Tools with no status bus (antigravity/qwen/openclaw and the
+                    T3 launch-only set) have no agentStatus, so the grid sits at
+                    static 'idle' green — the "fake island" baseline. Non-CLI
+                    tabs (terminal/remote/history/splits) get no indicator. */}
+                {TAB_STATUS_TOOLS.has(session.tool as string) && (
                   <div className={`tab-status-grid status-${
                     session.agentStatus === 'wait_input' ? 'waiting' : session.agentStatus ?? 'idle'
                   }${__IS_LINUX__ ? ' tab-status-grid--static' : ''}`}>
