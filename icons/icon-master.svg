@@ -1,18 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!--
-    v2 — minimal change vs icon-master.svg:
-    background only goes from flat #181818 to a warm radial gradient.
-    Cup geometry, scale, color (#B68B63), and square corners all unchanged.
-  -->
   <defs>
     <radialGradient id="bgGrad" cx="0.5" cy="0.42" r="0.75">
-      <stop offset="0%"   stop-color="#2a201a"/>
-      <stop offset="100%" stop-color="#0e0a08"/>
+      <stop offset="0%" stop-color="#2a201a"/><stop offset="100%" stop-color="#0e0a08"/>
     </radialGradient>
+    <clipPath id="sq"><rect width="512" height="512" rx="115" ry="115"/></clipPath>
   </defs>
-  <rect width="512" height="512" fill="url(#bgGrad)"/>
-  <g transform="translate(54, 54) scale(17)">
-    <path fill="#B68B63" d="M5 2h2v3H5zM9 2h2v3H9zM13 2h2v3h-2z"/>
-    <path fill="#B68B63" d="M19 9h-2V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3h2c1.103 0 2-.897 2-2v-5c0-1.103-.897-2-2-2zm-2 7v-5h2l.002 5z"/>
+  <g clip-path="url(#sq)">
+    <rect width="512" height="512" fill="url(#bgGrad)"/>
+    <g transform="translate(54, 54) scale(17)">
+      <path fill="#B68B63" d="M5 2h2v3H5zM9 2h2v3H9zM13 2h2v3h-2z"/>
+      <path fill="#B68B63" d="M19 9h-2V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3h2c1.103 0 2-.897 2-2v-5c0-1.103-.897-2-2-2zm-2 7v-5h2l.002 5z"/>
+    </g>
+    <rect x="1.5" y="1.5" width="509" height="509" rx="113.5" ry="113.5" fill="none" stroke="#B68B63" stroke-opacity="0.20" stroke-width="3"/>
   </g>
 </svg>
