@@ -457,9 +457,9 @@ function initDotField() {
         ctx.scale(gs, gs);
         ctx.translate(-CIFRAO_CX, -CIFRAO_CY);
         ctx.strokeStyle = withAlpha(useColor, morph);
-        ctx.lineWidth = 45;
+        ctx.lineWidth = 60;
         ctx.stroke(CIFRAO_S);
-        ctx.lineWidth = 35;
+        ctx.lineWidth = 48;
         ctx.stroke(CIFRAO_BARS);
         ctx.restore();
       }
