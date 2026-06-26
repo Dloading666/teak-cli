@@ -49,6 +49,7 @@ const I18N_DICT = {
     "logo-text": "Coffee CLI",
     "hero-title-1": "Enjoy life while you work.",
     "hero-title-2": "Coffee CLI for",
+    "hero-subtitle": "Off the games and dating. <span class=\"accent\">Something more interesting…</span>",
     "opc-link": "Coffee 101",
     "feedback": "Feedback",
     "downloads-title": "Or download the desktop app",
@@ -59,6 +60,7 @@ const I18N_DICT = {
     "logo-text": "Coffee CLI",
     "hero-title-1": "一边享受生活 一边工作",
     "hero-title-2": "Coffee CLI 适合",
+    "hero-subtitle": "游戏和恋爱之外，<span class=\"accent\">更有趣的事……</span>",
     "opc-link": "Coffee 101",
     "feedback": "问题反馈",
     "downloads-title": "或者直接下载桌面应用",
@@ -74,6 +76,7 @@ const I18N_DICT = {
     "logo-text": "Coffee CLI",
     "hero-title-1": "一邊享受生活 一邊工作",
     "hero-title-2": "Coffee CLI 適用於",
+    "hero-subtitle": "遊戲和戀愛之外，<span class=\"accent\">更有趣的事……</span>",
     "opc-link": "Coffee 101",
     "feedback": "問題回饋",
     "downloads-title": "或者直接下載桌面應用",
@@ -309,7 +312,10 @@ function initDotField() {
   // alpha and as 1-alpha for the circle (crossfade).
   const MORPH_THRESHOLD = 0.55;
 
-  const GLYPH_FONT = '600 13px "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace';
+  // Outfit 800 (the site's heaviest loaded brand weight) gives the $ a bold,
+  // geometric look that reads as "value" — not the thin monospace "calculator"
+  // glyph the earlier 600-weight mono font produced.
+  const GLYPH_FONT = '800 14px "Outfit", -apple-system, "Helvetica Neue", Arial, sans-serif';
 
   let cells = [];
   let trackLength = 0;   // cyclic Y range — set in resize() to an exact
@@ -349,7 +355,7 @@ function initDotField() {
           y: y,
           dispX: 0,
           dispY: 0,
-          glyph: Math.random() < 0.5 ? "+" : "−",  // typographic minus (U+2212), not hyphen
+          glyph: "$",  // value motif — dots morph into a dollar sign on hover
           bp: Math.random() * Math.PI * 2,
         });
       }
