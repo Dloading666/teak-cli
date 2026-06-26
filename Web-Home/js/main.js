@@ -319,7 +319,7 @@ function initDotField() {
   const CIFRAO_S    = new Path2D("m119,312c4,70 58,111 130,110 78,1 129-34 125-101-11-61-78-69-122-79-48-16-118-16-117-89-1-53 59-84 117-78 60,1 111,32 112,96");
   const CIFRAO_BARS = new Path2D("m205,17v464m90,0V17");
   const CIFRAO_VB = 500, CIFRAO_CX = 250, CIFRAO_CY = 249;
-  const GLYPH_PX  = 8;  // on-screen box (px) the 500-unit viewBox maps to
+  const GLYPH_PX  = 6;  // on-screen box (px) the 500-unit viewBox maps to
 
   let cells = [];
   let trackLength = 0;   // cyclic Y range — set in resize() to an exact
