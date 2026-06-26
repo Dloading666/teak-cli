@@ -221,6 +221,14 @@ mod mimocode;
 mod openclaw;
 mod opencode;
 mod qwen;
+// Third-class (T3) launch-only tools — brand icon + one-click launch, no
+// history/hook surface. See each module's doc comment.
+mod aider;
+mod copilot;
+mod crush;
+mod goose;
+mod kimicode;
+mod pi;
 
 /// All supported AI CLIs. Order matches launchpad layout (claude
 /// first, then codex, …). Iterate this when you need to do
@@ -238,6 +246,15 @@ pub static TOOLS: &[&ToolDescriptor] = &[
     // Order here doesn't affect the launchpad (that list is hardcoded in the
     // frontend); it only needs to be in the registry for list_tools + scanning.
     &mimocode::DESCRIPTOR,
+    // T3 launch-only tools: display name + PATH probe + launch binary only.
+    // history_shape: None (skipped by the history scanner) and
+    // has_hook_surface: false (skipped by hook install) keep them at T3.
+    &pi::DESCRIPTOR,
+    &crush::DESCRIPTOR,
+    &aider::DESCRIPTOR,
+    &kimicode::DESCRIPTOR,
+    &goose::DESCRIPTOR,
+    &copilot::DESCRIPTOR,
 ];
 
 /// Lookup by id. `None` if the id isn't registered. Used by hook

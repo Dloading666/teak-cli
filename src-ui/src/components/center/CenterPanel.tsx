@@ -98,6 +98,14 @@ import HERMES_DATA_URL from '../../icons-inline/hermes.png?inline';
 import TERMINAL_MAC_DATA_URL from '../../icons-inline/terminal-macos.png?inline';
 import TERMINAL_LINUX_DATA_URL from '../../icons-inline/terminal-linux.png?inline';
 import TERMINAL_PWSH_SVG from '../../icons-inline/terminal-powershell.svg?raw';
+// T3 launch-only tool icons (brand icon + one-click launch). SVG → ?raw,
+// PNG → ?inline, same pipeline as the tools above.
+import PI_SVG from '../../icons-inline/pi.svg?raw';
+import COPILOT_SVG from '../../icons-inline/copilot.svg?raw';
+import AIDER_DATA_URL from '../../icons-inline/aider.png?inline';
+import KIMICODE_DATA_URL from '../../icons-inline/kimicode.png?inline';
+import CRUSH_DATA_URL from '../../icons-inline/crush.png?inline';
+import GOOSE_DATA_URL from '../../icons-inline/goose.png?inline';
 
 // Tool icons — adding a new tool = drop the asset under src/icons-inline/
 // and import it the same way (?inline for PNG, ?raw for SVG).
@@ -206,6 +214,15 @@ const SvgAntigravity = () => inlineSvgIcon(ANTIGRAVITY_SVG);
 // PNG-backed icons render via CSS background-image with data-URI sources
 // (see bgIcon). Hermes uses `cover` to fill the rounded square.
 const SvgHermes      = () => bgIcon(HERMES_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)', backgroundSize: 'cover' });
+// T3 launch-only tool icons. Monochrome marks (Pi, Copilot) are inline SVG
+// using currentColor so they follow the theme; raster brand marks render via
+// bgIcon with a rounded square to match the other PNG-backed icons.
+const SvgPi        = () => inlineSvgIcon(PI_SVG);
+const SvgCopilot   = () => inlineSvgIcon(COPILOT_SVG);
+const SvgAider     = () => bgIcon(AIDER_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
+const SvgKimi      = () => bgIcon(KIMICODE_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
+const SvgCrush     = () => bgIcon(CRUSH_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
+const SvgGoose     = () => bgIcon(GOOSE_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
 
 // Coffee 101 card icon — animated coffee mark (same as the left-panel
 // brand header in Explorer.tsx panel-header): steam wave loops 3s, cup
@@ -376,6 +393,7 @@ const SvgPlus = ({ active }: { active: boolean }) => (
 // entries below.
 const VALID_PIN_KEYS = new Set<string>([
   'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes', 'terminal',
+  'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
   'installer', 'four-split', 'three-split', 'two-split',
 ]);
 
@@ -463,6 +481,12 @@ export function CenterPanel() {
     antigravity: <SvgAntigravity />,
     qwen: <SvgQwen />,
     hermes: <SvgHermes />,
+    pi: <SvgPi />,
+    crush: <SvgCrush />,
+    aider: <SvgAider />,
+    kimicode: <SvgKimi />,
+    goose: <SvgGoose />,
+    copilot: <SvgCopilot />,
   };
 
   // Built-in AI CLI catalog. Fully local — no remote fetch. Display
@@ -470,6 +494,8 @@ export function CenterPanel() {
   // the order here is the launchpad's preferred presentation order.
   const BUILTIN_AI_CLI_FALLBACK: { key: ToolType; label: string }[] = [
     'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes',
+    // T3 launch-only tools (brand icon + one-click launch).
+    'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
   ].map((key) => ({ key: key as ToolType, label: getToolDisplayName(key) }));
 
   // Unified agent catalog — fully local. The remote catalog fetch
