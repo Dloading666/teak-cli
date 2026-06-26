@@ -48,12 +48,12 @@ This is not a web app. Not an Electron wrapper. A **true native desktop app** bu
 
 ### Supported AI CLIs
 
-Coffee CLI can launch **any** command-line agent — but the ones below get deeper, purpose-built integration. The tier tells you how much of the workspace lights up for each one: **Dynamic Island** (live status), **History** (saved conversations), **Heatmap** (activity), **Changes** (diff panel), **Brand icon**, and **One-click launch**.
+Coffee CLI can launch **any** command-line agent — but the ones below get deeper, purpose-built integration. The tier tells you how much of the workspace lights up for each one: **Dynamic Island** (live status), **History** (saved conversations), **Heatmap** (activity), **Changes** (diff panel), **Brand icon**, **One-click launch**, and **Custom launch args** (per-tool flags).
 
 | Tier | What you get | CLIs |
 |---|---|---|
-| **T1** | Dynamic Island · History · Heatmap · Changes · Brand icon · One-click launch | **Claude Code** |
-| **T2** | History · Heatmap · Changes · Brand icon · One-click launch | OpenCode · OpenClaw · Hermes Agent · Codex CLI · Antigravity · Qwen Code · mimocode |
+| **T1** | Dynamic Island · History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | **Claude Code** |
+| **T2** | History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | OpenCode · OpenClaw · Hermes Agent · Codex CLI · Antigravity · Qwen Code · mimocode |
 | **T3** | Brand icon · One-click launch | Pi · Crush · Aider · Kimi Code · Goose · Copilot CLI |
 | **T4** | Open a terminal tab and type the command to launch | any other CLI |
 
