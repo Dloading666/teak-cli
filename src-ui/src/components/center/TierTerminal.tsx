@@ -363,11 +363,18 @@ function TierTerminalImpl({
     // installed one — which oh-my-posh's setup explicitly tells them to do —
     // automatically get the missing glyphs without us bundling a 5 MB font.
     const NERD_FONTS = "'CaskaydiaCove Nerd Font', 'JetBrainsMono Nerd Font', 'MesloLGS NF', 'FiraCode Nerd Font', 'Hack Nerd Font'";
+    // CJK fallback — the Latin mono faces above carry NO Chinese/Japanese/
+    // Korean glyphs, so without this the WebView picks a per-machine default
+    // CJK face (nice 微软雅黑 on one box, ugly 宋体 / a JP serif on another).
+    // One cross-platform cascade (Mac → Windows → Linux faces); the browser
+    // skips names absent on the host, so the right OS face wins everywhere.
+    // Mirrors the UI's --font CJK stack (global.css) for visual consistency.
+    const CJK = "'PingFang SC', 'PingFang TC', 'Hiragino Sans', 'Apple SD Gothic Neo', 'Microsoft YaHei', 'Microsoft JhengHei', 'Yu Gothic UI', 'Malgun Gothic', 'Noto Sans CJK SC', 'Noto Sans CJK TC', 'Noto Sans CJK JP', 'Noto Sans CJK KR', 'WenQuanYi Micro Hei'";
     const fontFamily = isLinux
-      ? `CascadiaMono, ${NERD_FONTS}, 'Ubuntu Mono', 'Noto Sans Mono', 'DejaVu Sans Mono', 'Liberation Mono', monospace`
+      ? `CascadiaMono, ${NERD_FONTS}, 'Ubuntu Mono', 'Noto Sans Mono', 'DejaVu Sans Mono', 'Liberation Mono', ${CJK}, monospace`
       : isMac
-        ? `CascadiaMono, ${NERD_FONTS}, ui-monospace, Menlo, Monaco, 'Courier New', monospace`
-        : `CascadiaMono, ${NERD_FONTS}, 'Cascadia Mono', Consolas, 'Courier New', monospace`;
+        ? `CascadiaMono, ${NERD_FONTS}, ui-monospace, Menlo, Monaco, 'Courier New', ${CJK}, monospace`
+        : `CascadiaMono, ${NERD_FONTS}, 'Cascadia Mono', Consolas, 'Courier New', ${CJK}, monospace`;
     const term = new Terminal({
       fontFamily,
       fontSize: 14,
