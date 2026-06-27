@@ -373,7 +373,7 @@ white-label**, or **embed it in a proprietary product you distribute**.
 That's welcome too — just reach out and we'll agree on terms (priced
 per use case; tell us what you're building and we'll quote). **Custom
 development, priority support, and SLAs** are available separately.
-Contact: **ebenxp707@gmail.com**.
+Contact: **hi@coffeecli.com**.
 
 **Contributing** — See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions
 are accepted under the project's CLA so that future relicensing remains possible.
@@ -406,7 +406,7 @@ README / About 页面 / 产品页诚实标注 Coffee CLI 为上游,可以保留�
 Coffee CLI 并保持改动闭源**、**以自有品牌 / 白标对外分发**,或
 **嵌入你要分发的闭源商业产品**。这类使用我们同样欢迎 —— 直接联系
 我们商定条款即可(按具体场景报价,说明你的用途我们给方案)。
-**定制开发、优先支持、SLA** 可另行提供。联系方式:**ebenxp707@gmail.com**。
+**定制开发、优先支持、SLA** 可另行提供。联系方式:**hi@coffeecli.com**。
 
 **贡献** — 见 [CONTRIBUTING.md](CONTRIBUTING.md)。所有贡献按项目 CLA 接收,
 以保持未来重新授权的灵活性。
