@@ -364,6 +364,17 @@ tutorials, and honest references — including critical ones — are
 welcome without permission. See [TRADEMARKS.md](TRADEMARKS.md) for the
 full policy.
 
+**Commercial & enterprise licensing** — The open-source edition is
+**free, forever**, under AGPL-3.0; companies are welcome to use it as-is.
+You only need a paid commercial license if you want to step outside
+AGPL's copyleft — specifically to **customize Coffee CLI and keep your
+changes closed-source**, **redistribute it under your own brand /
+white-label**, or **embed it in a proprietary product you distribute**.
+That's welcome too — just reach out and we'll agree on terms (priced
+per use case; tell us what you're building and we'll quote). **Custom
+development, priority support, and SLAs** are available separately.
+Contact: **ebenxp707@gmail.com**.
+
 **Contributing** — See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions
 are accepted under the project's CLA so that future relicensing remains possible.
 
@@ -389,6 +400,13 @@ README / About 页面 / 产品页诚实标注 Coffee CLI 为上游,可以保留�
 (Apache-2.0,作者 Vjacheslav Trushkin),**不**主张为本项目商标。
 评测、教程、事实性引用 —— **包括批评** —— 都欢迎,无需授权。完整政策见
 [TRADEMARKS.md](TRADEMARKS.md)。
+
+**商业与企业授权** — 开源版**永久免费**(AGPL-3.0),企业可原样使用。
+只有当你想跳出 AGPL 的开源义务时才需要付费商业授权,具体指:**定制
+Coffee CLI 并保持改动闭源**、**以自有品牌 / 白标对外分发**,或
+**嵌入你要分发的闭源商业产品**。这类使用我们同样欢迎 —— 直接联系
+我们商定条款即可(按具体场景报价,说明你的用途我们给方案)。
+**定制开发、优先支持、SLA** 可另行提供。联系方式:**ebenxp707@gmail.com**。
 
 **贡献** — 见 [CONTRIBUTING.md](CONTRIBUTING.md)。所有贡献按项目 CLA 接收,
 以保持未来重新授权的灵活性。
