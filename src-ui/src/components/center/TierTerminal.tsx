@@ -134,6 +134,26 @@ function deriveSelectionBg(hex: string, isDark: boolean): string {
 // stranded artifact. Always paint the cursor in the background color so the
 // WebGL renderer effectively erases it; the DOM renderer is also covered by
 // `.xterm-cursor { display: none }` in TierTerminal.css.
+// Build the xterm fontFamily stack. `userFont` (from Settings) is prepended
+// so it wins for the glyphs it has; the bundled CascadiaMono + Nerd Fonts +
+// platform monospace faces follow, and the CJK cascade backstops Chinese/
+// Japanese/Korean (so picking a Latin-only font never re-breaks CJK).
+// Embedded CascadiaMono guarantees consistent box-drawing; the per-glyph
+// cascade skips names absent on the host so the right OS face always wins.
+export function buildFontFamily(userFont?: string): string {
+  const ua = navigator.userAgent.toLowerCase();
+  const isLinux = ua.includes('linux');
+  const isMac = ua.includes('mac');
+  const NERD = "'CaskaydiaCove Nerd Font', 'JetBrainsMono Nerd Font', 'MesloLGS NF', 'FiraCode Nerd Font', 'Hack Nerd Font'";
+  const CJK = "'PingFang SC', 'PingFang TC', 'Hiragino Sans', 'Apple SD Gothic Neo', 'Microsoft YaHei', 'Microsoft JhengHei', 'Yu Gothic UI', 'Malgun Gothic', 'Noto Sans CJK SC', 'Noto Sans CJK TC', 'Noto Sans CJK JP', 'Noto Sans CJK KR', 'WenQuanYi Micro Hei'";
+  const base = isLinux
+    ? `CascadiaMono, ${NERD}, 'Ubuntu Mono', 'Noto Sans Mono', 'DejaVu Sans Mono', 'Liberation Mono', ${CJK}, monospace`
+    : isMac
+      ? `CascadiaMono, ${NERD}, ui-monospace, Menlo, Monaco, 'Courier New', ${CJK}, monospace`
+      : `CascadiaMono, ${NERD}, 'Cascadia Mono', Consolas, 'Courier New', ${CJK}, monospace`;
+  return userFont ? `"${userFont}", ${base}` : base;
+}
+
 function buildXtermTheme(themeName: string, hasBg: boolean | undefined, schemeId?: string) {
   const isDark = themeName !== 'light';
   const scheme = schemeId ? TERM_COLOR_SCHEMES.find(s => s.id === schemeId) : undefined;
@@ -253,6 +273,7 @@ interface TierTerminalProps {
   bgUrl?: string;
   bgType?: 'image' | 'video' | 'none';
   termColorScheme?: string;
+  termFont?: string;
   /** Multi-agent only. When true, the backend wires this pane's
    *  `coffee-cli` MCP server + injects the cross-pane protocol prompt
    *  into the CLI's system instructions. When false (default), the
@@ -265,7 +286,7 @@ interface TierTerminalProps {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 function TierTerminalImpl({
-  sessionId, tool, toolName, theme, lang, isActive, toolData, folderPath, hasBg, bgUrl, bgType, termColorScheme,
+  sessionId, tool, toolName, theme, lang, isActive, toolData, folderPath, hasBg, bgUrl, bgType, termColorScheme, termFont,
 }: TierTerminalProps) {
   // Dispatch-only subscription. Never re-renders this component.
   const dispatch = useAppDispatch();
@@ -349,32 +370,7 @@ function TierTerminalImpl({
     let mounted = true;
     const unlisteners: (() => void)[] = [];
 
-    const isLinux = navigator.userAgent.toLowerCase().includes('linux');
-    const isMac = navigator.userAgent.toLowerCase().includes('mac');
-    // Embedded CascadiaMono (woff2) guarantees consistent box-drawing glyphs on
-    // every platform — no more border misalignment from font-fallback jitter.
-    // Platform-native fonts remain as fallbacks if the embedded font fails to load.
-    //
-    // Nerd Font names are inserted right after CascadiaMono so per-character
-    // font fallback covers the Unicode private-use-area glyphs (powerline
-    // separators, git/branch icons, etc.) that oh-my-posh / starship / p10k
-    // emit and that CascadiaMono lacks. Users who haven't installed a Nerd
-    // Font see no change (these names just don't resolve); users who have
-    // installed one — which oh-my-posh's setup explicitly tells them to do —
-    // automatically get the missing glyphs without us bundling a 5 MB font.
-    const NERD_FONTS = "'CaskaydiaCove Nerd Font', 'JetBrainsMono Nerd Font', 'MesloLGS NF', 'FiraCode Nerd Font', 'Hack Nerd Font'";
-    // CJK fallback — the Latin mono faces above carry NO Chinese/Japanese/
-    // Korean glyphs, so without this the WebView picks a per-machine default
-    // CJK face (nice 微软雅黑 on one box, ugly 宋体 / a JP serif on another).
-    // One cross-platform cascade (Mac → Windows → Linux faces); the browser
-    // skips names absent on the host, so the right OS face wins everywhere.
-    // Mirrors the UI's --font CJK stack (global.css) for visual consistency.
-    const CJK = "'PingFang SC', 'PingFang TC', 'Hiragino Sans', 'Apple SD Gothic Neo', 'Microsoft YaHei', 'Microsoft JhengHei', 'Yu Gothic UI', 'Malgun Gothic', 'Noto Sans CJK SC', 'Noto Sans CJK TC', 'Noto Sans CJK JP', 'Noto Sans CJK KR', 'WenQuanYi Micro Hei'";
-    const fontFamily = isLinux
-      ? `CascadiaMono, ${NERD_FONTS}, 'Ubuntu Mono', 'Noto Sans Mono', 'DejaVu Sans Mono', 'Liberation Mono', ${CJK}, monospace`
-      : isMac
-        ? `CascadiaMono, ${NERD_FONTS}, ui-monospace, Menlo, Monaco, 'Courier New', ${CJK}, monospace`
-        : `CascadiaMono, ${NERD_FONTS}, 'Cascadia Mono', Consolas, 'Courier New', ${CJK}, monospace`;
+    const fontFamily = buildFontFamily(termFont);
     const term = new Terminal({
       fontFamily,
       fontSize: 14,
@@ -926,6 +922,21 @@ function TierTerminalImpl({
     if (!term) return;
     term.options.theme = buildXtermTheme(theme, hasBg, termColorScheme);
   }, [theme, termColorScheme, hasBg]);
+
+  // ── Terminal font sync (live, no PTY restart) ────────────────────────────
+  useEffect(() => {
+    const term = xtermRef.current;
+    if (!term) return;
+    term.options.fontFamily = buildFontFamily(termFont);
+    // Glyph metrics changed → refit, but ONLY when visible. termFont is global,
+    // so this effect fires in every tab incl. hidden (display:none) ones, where
+    // fit() would read ~0 size and collapse the grid to ~1 col. The activation
+    // path re-fits with the new font when a hidden tab is shown again.
+    const el = termRef.current;
+    if (el && el.clientWidth > 10 && el.clientHeight > 10) {
+      try { fitRef.current?.fit(); } catch {}
+    }
+  }, [termFont]);
 
   // ── IME focus-scroll guard ───────────────────────────────────────────────
   // Defense-in-depth for the `overflow: clip` fix in TierTerminal.css.

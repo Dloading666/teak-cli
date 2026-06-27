@@ -86,6 +86,11 @@ export interface DirEntryInfo {
   size: number;
 }
 
+export interface FontInfo {
+  family: string;
+  monospace: boolean;
+}
+
 // ─── Typed Commands ──────────────────────────────────────────────────────────
 
 export const commands = {
@@ -164,6 +169,7 @@ export const commands = {
     invoke<string>('save_clipboard_image', { dataBase64, extension }),
 
   listDirectory: (path: string) => invoke<DirEntryInfo[]>('list_directory', { path }),
+  listSystemFonts: () => invoke<FontInfo[]>('list_system_fonts'),
 
   // ── Git-backed changes panel ──────────────────────────────────────
   // The right-side "修改记录" tab reads the active folder's git working

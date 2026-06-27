@@ -1339,6 +1339,7 @@ export function CenterPanel() {
                   bgUrl={bgUrl}
                   bgType={bgType}
                   termColorScheme={state.termColorScheme}
+                  termFont={state.termFont}
                 />
               </ErrorBoundary>
             )}

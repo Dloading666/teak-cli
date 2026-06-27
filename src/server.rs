@@ -2926,6 +2926,7 @@ pub fn start_ui() -> anyhow::Result<()> {
             fs_watcher: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
+            crate::fonts::list_system_fonts,
             pick_folder,
             window_minimize,
             window_maximize,

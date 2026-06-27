@@ -344,3 +344,87 @@
 .settings-lang-label { flex: 1; }
 .settings-lang-check { display: flex; color: var(--accent, #c4956a); }
 .settings-lang-check svg { width: 14px; height: 14px; }
+
+/* ── Terminal font picker (custom themed dropdown) ─────────────────────── */
+.settings-font-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 11px;
+  font-family: var(--font, system-ui);
+  font-size: 13px;
+  color: var(--text-1, #fff);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-sm, 10px);
+  cursor: pointer;
+  text-align: left;
+}
+.settings-font-trigger:hover { border-color: var(--accent, #c4956a); }
+.settings-font-current { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-font-trigger svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--text-2, rgba(255, 255, 255, 0.6)); }
+
+.settings-font-backdrop { position: fixed; inset: 0; z-index: 10000; }
+.settings-font-menu {
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  padding: 4px;
+  background-color: var(--bg-app, #1b1917);
+  background-image: linear-gradient(var(--bg-panel, #232020), var(--bg-panel, #232020));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 10px 32px rgba(0, 0, 0, 0.4);
+}
+.settings-font-search {
+  margin: 2px 2px 4px;
+  padding: 8px 10px;
+  font-family: var(--font, system-ui);
+  font-size: 12.5px;
+  color: var(--text-1, #fff);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-sm, 8px);
+  outline: none;
+}
+.settings-font-search:focus { border-color: var(--accent, #c4956a); }
+.settings-font-list { overflow-y: auto; }
+.settings-font-group {
+  padding: 7px 10px 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-3, rgba(255, 255, 255, 0.45));
+}
+.settings-font-opt {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm, 8px);
+  color: var(--text-1, #fff);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-font-opt:hover { background: var(--bg-hover, rgba(255, 255, 255, 0.06)); }
+.settings-font-opt.active {
+  background: color-mix(in srgb, var(--accent, #c4956a) 16%, transparent);
+  color: var(--accent, #c4956a);
+}
+.settings-font-hint { padding: 8px 10px; font-size: 12px; color: var(--text-2, rgba(255, 255, 255, 0.55)); }
+.settings-font-preview {
+  margin-top: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--text-2, rgba(255, 255, 255, 0.75));
+  background: var(--bg-app, #1b1917);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-sm, 10px);
+}

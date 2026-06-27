@@ -48,6 +48,9 @@ anyhow = "1"
 
 log = "0.4"
 dirs = "5"
+# Pure-Rust font parsing for the terminal font picker (list installed
+# families + monospace flag). No system deps, unlike font-kit.
+ttf-parser = "0.20"
 base64 = "0.22.1"
 # In-app self-update downloader (Windows). Blocking + rustls, runs on a
 # spawn_blocking thread; streams the installer so we can emit download %.

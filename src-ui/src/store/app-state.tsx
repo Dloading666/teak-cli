@@ -109,6 +109,8 @@ export interface AppState {
 
   // Terminal foreground color override ('' = use theme default)
   termColorScheme: string;
+  // Terminal font family override ('' = bundled CascadiaMono + fallbacks)
+  termFont: string;
 
   // Terminals
   terminals: TerminalSession[];
@@ -199,6 +201,7 @@ type Action =
   | { type: 'CLEAR_BG' }
   | { type: 'SET_WALLPAPER_OPACITY'; opacity: number }
   | { type: 'SET_TERM_SCHEME'; scheme: string }
+  | { type: 'SET_TERM_FONT'; font: string }
   | { type: 'TOGGLE_GAMBIT' }
   | { type: 'TOGGLE_SETTINGS' }
   | { type: 'SET_SETTINGS_OPEN'; open: boolean }
@@ -337,6 +340,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, wallpaperOpacity: Math.max(0, Math.min(100, action.opacity)) };
     case 'SET_TERM_SCHEME':
       return { ...state, termColorScheme: action.scheme };
+    case 'SET_TERM_FONT':
+      return { ...state, termFont: action.font };
     case 'TOGGLE_GAMBIT':
       return { ...state, gambitOpen: !state.gambitOpen };
     case 'TOGGLE_SETTINGS':
@@ -491,6 +496,7 @@ function getInitialState(): AppState {
   let bgPath = '';
   let bgType: 'image' | 'video' | 'none' = 'none';
   let termColorScheme = '';
+  let termFont = '';
   let wallpaperOpacity = 70;
   // Default Enter-to-send; only opt-out if the user explicitly stored 'false'.
   let gambitEnterToSend = true;
@@ -515,6 +521,7 @@ function getInitialState(): AppState {
     }
 
     termColorScheme = localStorage.getItem('cc-term-scheme') || '';
+    termFont = localStorage.getItem('cc-term-font') || '';
     gambitEnterToSend = localStorage.getItem('cc-gambit-enter-send') !== 'false';
     // New key (post-refactor): wallpaper opacity, 0-100, larger = more
     // visible. Old key was `cc-wallpaper-dim` (0-80, larger = darker
@@ -558,6 +565,7 @@ function getInitialState(): AppState {
     bgType,
     wallpaperOpacity,
     termColorScheme,
+    termFont,
     terminals: [{ id: defaultTerminalId, tool: null, folderPath }],
     activeTerminalId: defaultTerminalId,
     gambitOpen: false,

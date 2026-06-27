@@ -5,6 +5,7 @@ mod server;
 mod hook_server;
 mod hook_forwarder;
 mod hook_installer;
+mod fonts;
 mod fs_watcher;
 mod tool_config;
 mod tools;
