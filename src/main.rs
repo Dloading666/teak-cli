@@ -3,6 +3,7 @@
 mod terminal;
 mod server;
 mod hook_server;
+mod hook_forwarder;
 mod hook_installer;
 mod fs_watcher;
 mod tool_config;
@@ -14,6 +15,23 @@ mod git;
 use anyhow::Result;
 
 fn main() -> Result<()> {
+    // ── Native hook forwarder (fast path) ───────────────────────────────
+    // Invoked by Claude Code (`<exe> __hook`) and Codex (`<exe>
+    // __codex-notify <json>`) to forward agent status to the dynamic
+    // island. This MUST run before any GUI / Linux-backend / PATH-inherit
+    // setup below — the PATH fix spawns a login shell, which we don't want
+    // firing on every tool-call hook. Each arm calls process::exit and
+    // never returns. See hook_forwarder.rs for why this replaced the Python
+    // forwarders (no more `python`-not-found errors on Windows).
+    {
+        let argv: Vec<String> = std::env::args().collect();
+        match argv.get(1).map(|s| s.as_str()) {
+            Some("__hook") => hook_forwarder::run_claude_hook(),
+            Some("__codex-notify") => hook_forwarder::run_codex_notify(&argv),
+            _ => {}
+        }
+    }
+
     // ── Linux GUI backend selection ─────────────────────────────────────
     // Older WebKit2GTK (≤ 2.44) had a Wayland blank-window bug on
     // Ubuntu 24.04: WebView never paints, so the original workaround

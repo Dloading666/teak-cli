@@ -3,17 +3,25 @@
 // At app launch, ensure all three integrated CLIs are wired to the dynamic
 // island status bus:
 //
+// The forwarder is the Coffee CLI binary itself (`<exe> __hook` /
+// `<exe> __codex-notify`, implemented in hook_forwarder.rs) — NOT a Python
+// script. The Python forwarders failed on Windows machines without Python
+// (`python` hit the MS Store alias stub → "python not found" hook errors in
+// Claude's transcript); a native subcommand on the always-present binary
+// removes the interpreter dependency entirely. The .py files are still
+// dropped under ~/.coffee-cli/hooks/ as protocol-reference copies only.
+//
 //   Claude Code
-//     1. ~/.coffee-cli/hooks/coffee-cli-hook.py — Claude stdin hook protocol
-//     2. ~/.claude/settings.json — registers our hook on 5 events
-//     3. ~/.claude/settings.local.json — stale entries from v1.8.5 stripped
+//     1. ~/.claude/settings.json — registers `<exe> __hook` on 5 events
+//     2. ~/.claude/settings.local.json — stale entries from v1.8.5 stripped
+//     3. ~/.coffee-cli/hooks/coffee-cli-hook.py — reference copy (unused)
 //
 //   Codex
-//     1. ~/.coffee-cli/hooks/coffee-cli-codex-notify.py — argv[-1] JSON
-//     2. ~/.codex/config.toml — `notify = ["python", "<path>"]` line, only
-//        added if there's no top-level `notify` already (don't clobber user
-//        config). The script is global to all Codex sessions but no-ops
-//        when COFFEE_CLI_* env vars are absent.
+//     1. ~/.codex/config.toml — `notify = ["<exe>", "__codex-notify"]` line,
+//        only added if there's no top-level `notify` already (don't clobber
+//        user config). It's global to all Codex sessions but no-ops when the
+//        COFFEE_CLI_* env vars are absent.
+//     2. ~/.coffee-cli/hooks/coffee-cli-codex-notify.py — reference copy
 //
 //   OpenCode
 //     1. ~/.config/opencode/plugins/coffee-cli-island.js — auto-loaded by
@@ -50,6 +58,14 @@ const SCRIPT_FILENAME: &str = "coffee-cli-hook.py";
 
 const CODEX_NOTIFY_SCRIPT: &str = include_str!("../scripts/coffee-cli-codex-notify.py");
 const CODEX_NOTIFY_FILENAME: &str = "coffee-cli-codex-notify.py";
+
+/// Argv markers for the native forwarder built into the Coffee CLI binary
+/// (see hook_forwarder.rs). The hook command is now `<exe> __hook` /
+/// `<exe> __codex-notify` — no Python. These tokens double as the
+/// "is this our entry?" sentinel so re-installs are idempotent and old
+/// Python-based entries get migrated in place.
+const HOOK_SUBCOMMAND: &str = "__hook";
+const CODEX_NOTIFY_SUBCOMMAND: &str = "__codex-notify";
 
 const OPENCODE_PLUGIN_SCRIPT: &str = include_str!("../scripts/coffee-cli-opencode-plugin.js");
 const OPENCODE_PLUGIN_FILENAME: &str = "coffee-cli-island.js";
@@ -154,10 +170,20 @@ const OPENCODE_DEFAULT_THEME: &str = "lucent-orng";
 const OPENCODE_LEGACY_THEME: &str = "system";
 
 fn install_claude(home: &Path) {
-    let script_path = match write_script(home) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[hook-installer] failed to write claude hook: {}", e);
+    // Keep a protocol-reference copy of the Python forwarder co-located with
+    // the other tools' debug copies. It's no longer the registered command
+    // (the native binary is — see below), so a write failure is non-fatal.
+    if let Err(e) = write_script(home) {
+        eprintln!("[hook-installer] failed to write claude hook reference copy: {}", e);
+    }
+
+    // The hook command is the Coffee CLI binary itself: `<exe> __hook`. No
+    // interpreter dependency — this is what fixes the "python not found"
+    // hook error on Windows machines without Python.
+    let command = match claude_hook_command() {
+        Some(c) => c,
+        None => {
+            eprintln!("[hook-installer] current_exe() failed — cannot install claude hook");
             return;
         }
     };
@@ -166,7 +192,7 @@ fn install_claude(home: &Path) {
     // tried in v1.8.5 but hooks declared there fire unreliably under Claude
     // Code v2.x (workspace-trust gate, cf. anthropics/claude-code#11519).
     let primary = home.join(".claude").join("settings.json");
-    if let Err(e) = patch_settings(&primary, &script_path) {
+    if let Err(e) = patch_settings(&primary, &command) {
         eprintln!(
             "[hook-installer] failed to patch {}: {}",
             primary.display(),
@@ -189,25 +215,28 @@ fn install_claude(home: &Path) {
     }
 }
 
-/// Codex notify forwarder — keeps ~/.coffee-cli/hooks/<filename> fresh and
-/// adds a `notify = [...]` line to ~/.codex/config.toml if (and only if) the
-/// user doesn't already have one. We never overwrite an existing notify
-/// command — too high a risk of stomping on the user's setup.
+/// Codex notify forwarder — registers `notify = ["<exe>", "__codex-notify"]`
+/// in ~/.codex/config.toml if (and only if) the user doesn't already have a
+/// top-level notify. The forwarder is the Coffee CLI binary itself (no
+/// Python). We never overwrite a user's custom notify command — too high a
+/// risk of stomping on their setup.
 fn install_codex(home: &Path) {
-    let script_path = match write_aux_script(
-        home,
-        CODEX_NOTIFY_FILENAME,
-        CODEX_NOTIFY_SCRIPT,
-    ) {
+    // Protocol-reference copy alongside the other forwarders' debug copies.
+    // No longer the registered command, so a write failure is non-fatal.
+    if let Err(e) = write_aux_script(home, CODEX_NOTIFY_FILENAME, CODEX_NOTIFY_SCRIPT) {
+        eprintln!("[hook-installer] failed to write codex notify reference copy: {}", e);
+    }
+
+    let exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("[hook-installer] failed to write codex notify: {}", e);
+            eprintln!("[hook-installer] current_exe() failed — cannot install codex notify: {}", e);
             return;
         }
     };
 
     let config_path = home.join(".codex").join("config.toml");
-    if let Err(e) = patch_codex_config(&config_path, &script_path) {
+    if let Err(e) = patch_codex_config(&config_path, &exe) {
         eprintln!(
             "[hook-installer] failed to patch {}: {}",
             config_path.display(),
@@ -502,29 +531,30 @@ fn write_aux_script(home: &Path, filename: &str, contents: &str) -> anyhow::Resu
     Ok(path)
 }
 
-/// Add a `notify = ["python", "<script>"]` line to ~/.codex/config.toml when
-/// safe. Three cases, matched in order:
+/// Add a `notify = ["<exe>", "__codex-notify"]` line to ~/.codex/config.toml
+/// when safe. Three cases, matched in order:
 ///   1. File doesn't exist or is empty → create it with our notify line.
-///   2. File contains a top-level notify already pointing at our script
-///      (any version of the path) → rewrite it to the current absolute path
-///      so an upgrade or moved $HOME doesn't break the hook.
+///   2. File contains a top-level notify already pointing at our forwarder
+///      (the native subcommand, or the legacy Python script) → rewrite it to
+///      the current absolute exe path so an upgrade or moved $HOME doesn't
+///      break the hook, and migrate the legacy Python form in place.
 ///   3. File contains a top-level notify pointing elsewhere → leave it alone
 ///      and log a warning. Never overwrite a user's custom notify command.
 ///
 /// "Top-level" means before the first `[section]` header. A `notify` entry
 /// inside a `[section]` is a different key entirely (e.g. `[mcp.notify]`)
 /// and we don't touch it.
-fn patch_codex_config(path: &Path, script_path: &Path) -> anyhow::Result<()> {
+fn patch_codex_config(path: &Path, exe: &Path) -> anyhow::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
 
-    let python_cmd = detect_python();
-    let script_str = script_path.display().to_string();
-    // TOML strings escape backslashes and quotes. Windows paths have plenty
-    // of backslashes — escape them so the resulting line parses cleanly.
-    let escaped = script_str.replace('\\', "\\\\").replace('"', "\\\"");
-    let new_line = format!("notify = [\"{}\", \"{}\"]", python_cmd, escaped);
+    let exe_str = exe.display().to_string();
+    // Codex execs the notify argv directly (no shell), so the raw path is
+    // correct. TOML strings escape backslashes and quotes — Windows paths
+    // have plenty of backslashes, so escape them to parse cleanly.
+    let escaped = exe_str.replace('\\', "\\\\").replace('"', "\\\"");
+    let new_line = format!("notify = [\"{}\", \"{}\"]", escaped, CODEX_NOTIFY_SUBCOMMAND);
 
     let existing = if path.exists() {
         fs::read_to_string(path).unwrap_or_default()
@@ -573,9 +603,11 @@ fn patch_codex_config(path: &Path, script_path: &Path) -> anyhow::Result<()> {
             fs::write(path, buf)?;
         }
         Some(idx) => {
-            // Is the existing notify pointing at us? Match by filename so
-            // we recover from $HOME moves and capitalization differences.
-            let points_at_us = top_level_notify_value.contains(CODEX_NOTIFY_FILENAME);
+            // Is the existing notify pointing at us? Match either the native
+            // subcommand (current form) or the legacy Python filename (so we
+            // migrate old installs in place), independent of $HOME / casing.
+            let points_at_us = top_level_notify_value.contains(CODEX_NOTIFY_SUBCOMMAND)
+                || top_level_notify_value.contains(CODEX_NOTIFY_FILENAME);
             if points_at_us {
                 let mut lines: Vec<String> =
                     existing.lines().map(|s| s.to_string()).collect();
@@ -598,7 +630,7 @@ fn patch_codex_config(path: &Path, script_path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn patch_settings(path: &Path, script_path: &Path) -> anyhow::Result<()> {
+fn patch_settings(path: &Path, command: &str) -> anyhow::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -624,8 +656,6 @@ fn patch_settings(path: &Path, script_path: &Path) -> anyhow::Result<()> {
             .insert("hooks".into(), json!({}));
     }
 
-    let python_cmd = detect_python();
-    let command = format!("{} \"{}\"", python_cmd, script_path.display());
     let hook_cmd = json!({ "type": "command", "command": command });
 
     let hooks = root
@@ -663,20 +693,35 @@ fn is_coffee_entry(entry: &Value) -> bool {
             hs.iter().any(|h| {
                 h.get("command")
                     .and_then(|c| c.as_str())
-                    .map(|s| s.contains(SCRIPT_FILENAME))
+                    // Match the legacy Python command (so old entries get
+                    // migrated in place) and the native command, which is
+                    // `"<exe>" __hook` — i.e. `__hook` is the final argv
+                    // token. We check the LAST whitespace-delimited token
+                    // rather than a bare `contains("__hook")` so a user's own
+                    // hook whose command path merely *contains* "__hook"
+                    // (e.g. /home/u/.__hooks/lint.sh) is never misclassified
+                    // as ours and stripped.
+                    .map(|s| {
+                        s.contains(SCRIPT_FILENAME)
+                            || s.split_whitespace().last() == Some(HOOK_SUBCOMMAND)
+                    })
                     .unwrap_or(false)
             })
         })
         .unwrap_or(false)
 }
 
-fn detect_python() -> String {
-    // Windows: the `python` launcher (installed with Python.org and the MS
-    // Store build) resolves to Python 3. On Unix, prefer `python3` which is
-    // always the real 3.x interpreter.
-    if cfg!(target_os = "windows") {
-        "python".to_string()
+/// Build the Claude Code hook command: `"<exe>" __hook`. Claude runs
+/// shell-form hooks via Git Bash on Windows, where backslash paths are
+/// fragile — emit forward slashes there (Git Bash and CreateProcess both
+/// accept `C:/...`). Returns None only if `current_exe()` fails.
+fn claude_hook_command() -> Option<String> {
+    let exe = std::env::current_exe().ok()?;
+    let p = exe.display().to_string();
+    let p = if cfg!(target_os = "windows") {
+        p.replace('\\', "/")
     } else {
-        "python3".to_string()
-    }
+        p
+    };
+    Some(format!("\"{}\" {}", p, HOOK_SUBCOMMAND))
 }

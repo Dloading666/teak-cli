@@ -1707,16 +1707,19 @@ export function CenterPanel() {
                 aria-label="Open library"
               >
                 <div className="mode-switch-icon">
-                  {/* Gear at entry = "manage your tools" (broad scope).
-                      Per-tool gears inside = "configure this tool"
-                      (narrow scope). Same symbol, nested semantics —
-                      same pattern as magnifying glass for global vs
-                      in-page search. Globally trained "齿轮 = 设置"
-                      mental model beats the abstract 9-dot grid for
-                      mass-market users. */}
+                  {/* 2×2 app grid = "open the tools/apps library" — the
+                      macOS Launchpad / iOS App Library metaphor for this
+                      button's actual job. The "+" in the last cell reads as
+                      "more / add a tool". Replaces the former gear, which
+                      collided with the settings-screen gear and mis-read as
+                      "设置" rather than "应用页". A grid is concrete here, not
+                      abstract — it depicts the apps the button opens. */}
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    <rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/>
+                    <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/>
+                    <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/>
+                    <line x1="17.25" y1="14.3" x2="17.25" y2="20.2"/>
+                    <line x1="14.3" y1="17.25" x2="20.2" y2="17.25"/>
                   </svg>
                 </div>
               </button>
