@@ -90,6 +90,20 @@ export const ja = {
   // Session
   'session.max': '同時に開けるセッションは最大 5 つです。',
 
+  // Settings modal (titlebar gear)
+  'settings.title': '設定',
+  'settings.appearance': '外観',
+  'settings.wallpaper': '壁紙',
+  'settings.terminal': 'ターミナル',
+  'settings.gambit': '一手',
+  'settings.language': '言語',
+  'settings.wallpaper.pick': '画像または動画を選択',
+  'settings.wallpaper.clear': '壁紙を削除',
+  'settings.wallpaper.opacity': '不透明度',
+  'settings.terminal.scheme': '文字色',
+  'settings.send.title': 'メッセージを送信',
+  'settings.send.newline': '改行',
+
   // Theme Menu
   'theme.section.color': 'カラー',
   'theme.section.shape': 'シェイプ',
@@ -113,7 +127,7 @@ export const ja = {
 
   // Gambit · 一手
   'gambit.title': '一手',
-  'gambit.placeholder': '静かに一手を思案... (Ctrl+Enterで送信、Enterで改行、画像貼付可)',
+  'gambit.placeholder': '静かに一手を思案... ({send}で送信、{newline}で改行、画像貼付可)',
   'gambit.send_failed_hint': 'アクティブなセッションを先に開いてください',
   'gambit.send_empty_hint': 'メッセージを入力するか画像を貼り付けてください (Ctrl+V)',
 

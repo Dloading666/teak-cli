@@ -92,6 +92,20 @@ export const en = {
   // Session
   'session.max': 'Maximum 5 sessions can be open at once.',
 
+  // Settings modal (titlebar gear)
+  'settings.title': 'Settings',
+  'settings.appearance': 'Appearance',
+  'settings.wallpaper': 'Wallpaper',
+  'settings.terminal': 'Terminal',
+  'settings.language': 'Language',
+  'settings.wallpaper.pick': 'Choose image or video',
+  'settings.wallpaper.clear': 'Remove wallpaper',
+  'settings.wallpaper.opacity': 'Opacity',
+  'settings.terminal.scheme': 'Text color',
+  'settings.gambit': 'Gambit',
+  'settings.send.title': 'Send message',
+  'settings.send.newline': 'for a new line',
+
   // Theme Menu
   'theme.section.color': 'Colors',
   'theme.section.shape': 'Shape',
@@ -115,7 +129,7 @@ export const en = {
 
   // Gambit — floating compose window. Chess term for a calculated opening move.
   'gambit.title': 'GAMBIT',
-  'gambit.placeholder': 'Compose your move... (Ctrl+Enter to send, Enter for newline, paste images)',
+  'gambit.placeholder': 'Compose your move... ({send} to send, {newline} for newline, paste images)',
   'gambit.send_failed_hint': 'Open an active session first',
   'gambit.send_empty_hint': 'Type a message or paste an image first (Ctrl+V)',
 

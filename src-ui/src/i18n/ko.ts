@@ -90,6 +90,20 @@ export const ko = {
   // Session
   'session.max': '동시에 최대 5개의 세션만 열 수 있습니다.',
 
+  // Settings modal (titlebar gear)
+  'settings.title': '설정',
+  'settings.appearance': '외관',
+  'settings.wallpaper': '배경화면',
+  'settings.terminal': '터미널',
+  'settings.gambit': '한 수',
+  'settings.language': '언어',
+  'settings.wallpaper.pick': '이미지 또는 동영상 선택',
+  'settings.wallpaper.clear': '배경화면 제거',
+  'settings.wallpaper.opacity': '불투명도',
+  'settings.terminal.scheme': '글자 색',
+  'settings.send.title': '메시지 전송',
+  'settings.send.newline': '줄바꿈',
+
   // Theme Menu
   'theme.section.color': '색상',
   'theme.section.shape': '형태',
@@ -113,7 +127,7 @@ export const ko = {
 
   // Gambit · 한 수
   'gambit.title': '한 수',
-  'gambit.placeholder': '한 수를 고르는 중... (Ctrl+Enter 전송, Enter 줄바꿈, 이미지 붙여넣기)',
+  'gambit.placeholder': '한 수를 고르는 중... ({send} 전송, {newline} 줄바꿈, 이미지 붙여넣기)',
   'gambit.send_failed_hint': '활성 세션을 먼저 여세요',
   'gambit.send_empty_hint': '내용을 입력하거나 이미지를 붙여넣으세요 (Ctrl+V)',
 

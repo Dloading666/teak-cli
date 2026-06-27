@@ -377,7 +377,11 @@
   color: var(--text-3, rgba(255, 255, 255, 0.3));
 }
 
-/* Inline title edit — seamless, no border, same sizing as title */
+/* Inline title edit — seamless, no border, same sizing as title.
+   A <textarea> (not <input>) so long titles soft-wrap to multiple lines
+   while typing, matching the committed <span> below. Height is auto-grown
+   to scrollHeight in JS (see autoGrowTitle); resize/overflow off so no
+   manual handle or inner scrollbar appears. */
 .task-title-edit {
   flex: 1;
   font-size: 13px;
@@ -390,6 +394,12 @@
   padding: 0;
   margin: 0;
   outline: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: block;
+  box-sizing: border-box;
 }
 
 /* ─── Inline edit pencil (flows after the title text) ──────────────────────── */
@@ -430,12 +440,27 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* ─── Right-side action cluster ────────────────────────────────────────────── */
+/* Fixed-width box reserving the WIDEST mode (two 18px slots + 4px gap = 40px).
+   Because the box width never changes, the title's flex space is identical
+   across modes — no horizontal text jitter when entering/leaving edit.
+   Centered: normal mode's two icons fill the 40px exactly (so centering is a
+   no-op there), while edit mode's single ✓ sits centered in the reserved
+   space rather than pinned flush-right. */
+.task-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 40px;
+  flex-shrink: 0;
+}
+
 /* ─── Right-side fixed action slot ─────────────────────────────────────────── */
 /* One button, one position — identity swaps based on card mode:
      .task-slot-send    (normal)        → paper-plane, send to active agent
      .task-slot-confirm (editing title) → checkmark, commit edit
-     .task-slot-delete  (section delete mode) → trash, remove the task
-   Single slot avoids layout jitter as modes change. */
+     .task-slot-delete  (section delete mode) → trash, remove the task */
 .task-slot {
   display: flex;
   align-items: center;

@@ -8,7 +8,7 @@
 // unrelated global state changes (agent status, other tabs' folder changes,
 // etc.) don't cascade into this component.
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -315,6 +315,17 @@ function TierTerminalImpl({
   // scanner in `onData` below for the consume/advance logic.
   const markerScanBufRef = useRef<string>('');
   const markerScanOffsetRef = useRef<number>(0);
+
+  // ── Stale-frame ghost suppression on tab switch (issue #47) ──────────────
+  // Inactive tabs are display:none (CenterPanel). While hidden, xterm's WebGL
+  // canvas keeps its LAST drawn framebuffer. On switch-back the browser
+  // composites that stale frame, and xterm's redraw is deferred to rAF (the
+  // activation effect below even waits a double-rAF before fit()), so for
+  // 1-2 frames the user sees the *previous* agent UI ghosted in before it
+  // snaps to current. We mask the canvas the instant the tab re-activates
+  // (pre-paint, via useLayoutEffect) so the solid terminal background shows
+  // through instead, then unmask once xterm paints its first fresh frame.
+  const [canvasHidden, setCanvasHidden] = useState(false);
 
   // ── Terminal context menu ────────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
@@ -1051,22 +1062,59 @@ function TierTerminalImpl({
   // When this session becomes the active tab, refit + focus after layout.
   // Uses double-rAF instead of a 150ms setTimeout so perceived switch latency
   // drops from 150ms to ~32ms (two frames).
-  useEffect(() => {
+  //
+  // useLayoutEffect (not useEffect) so the mask below is committed BEFORE the
+  // browser paints the now-visible tab — useEffect runs post-paint, which is
+  // exactly when the stale WebGL frame would flash through (issue #47). We
+  // only mask when xterm already exists (a real switch-back, not first mount,
+  // where the splash covers init and there is no stale frame yet).
+  useLayoutEffect(() => {
     if (!isActive) return;
+    if (xtermRef.current) setCanvasHidden(true);
+
     let f1 = 0, f2 = 0;
+    let revealed = false;
+    let renderSub: { dispose: () => void } | null = null;
+    const reveal = () => {
+      if (revealed) return;
+      revealed = true;
+      renderSub?.dispose();
+      renderSub = null;
+      setCanvasHidden(false);
+    };
+
     f1 = requestAnimationFrame(() => {
       f2 = requestAnimationFrame(() => {
-        fitRef.current?.fit();
+        // fit() can throw if the container is momentarily zero-size during a
+        // layout race — guard it (same as the ResizeObserver path) so a throw
+        // never skips the onRender subscription + resize IPC below and strand
+        // the resize. reveal() is still backstopped by the fallback regardless.
+        try { fitRef.current?.fit(); } catch {}
         xtermRef.current?.focus();
         const term = xtermRef.current;
-        if (!term || term.cols <= 0 || term.rows <= 0) return;
+        if (!term || term.cols <= 0 || term.rows <= 0) { reveal(); return; }
+        // Force a redraw of the current buffer, then unmask on the first real
+        // frame xterm draws — guarantees the fresh content is on the canvas
+        // before we reveal it.
+        renderSub = term.onRender(() => reveal());
+        term.refresh(0, term.rows - 1);
         const prev = lastResizeRef.current;
-        if (prev && prev.cols === term.cols && prev.rows === term.rows) return;
-        lastResizeRef.current = { cols: term.cols, rows: term.rows };
-        commands.tierTerminalResize(sessionId, term.cols, term.rows).catch(() => {});
+        if (!prev || prev.cols !== term.cols || prev.rows !== term.rows) {
+          lastResizeRef.current = { cols: term.cols, rows: term.rows };
+          commands.tierTerminalResize(sessionId, term.cols, term.rows).catch(() => {});
+        }
       });
     });
-    return () => { cancelAnimationFrame(f1); cancelAnimationFrame(f2); };
+
+    // Safety net: never strand the canvas masked if onRender doesn't fire.
+    const fallback = setTimeout(reveal, 150);
+    return () => {
+      cancelAnimationFrame(f1);
+      cancelAnimationFrame(f2);
+      clearTimeout(fallback);
+      renderSub?.dispose();
+      revealed = true;
+    };
   }, [isActive, sessionId]);
 
   // ── Startup splash dismissal ────────────────────────────────────────────
@@ -1179,6 +1227,12 @@ function TierTerminalImpl({
       <div
         ref={wrapRef}
         className="tier-xterm-wrap"
+        // Hidden for the 1-2 frames after a tab switch-back so the stale WebGL
+        // framebuffer never flashes; the backdrop behind the wrap shows through
+        // until xterm repaints — solid theme bg (opaque), the wallpaper layer
+        // (hasBg), or the glass tint (transparent themes), whichever applies.
+        // See the activation effect above (issue #47).
+        style={canvasHidden ? { opacity: 0 } : undefined}
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();

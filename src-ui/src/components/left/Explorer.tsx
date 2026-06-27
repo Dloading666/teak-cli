@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppState } from '../../store/app-state';
-import type { ThemeColor, ThemeShape, IconTheme, ToolType } from '../../store/app-state';
+import type { IconTheme, ToolType } from '../../store/app-state';
 import { useT } from '../../i18n/useT';
+import { isMaskTintTheme } from '../../lib/personalization';
 import { ScrollPanel } from '../common/ScrollPanel';
 import { clipboardWrite } from '../../lib/clipboard';
 import { beginExplorerDrag } from '../../lib/explorer-drag';
@@ -252,263 +253,6 @@ export function ContextMenu({ menu, onClose }: { menu: CtxMenuState; onClose: ()
   );
 }
 
-// ─── Language Dropdown ───────────────────────────────────────────────────────
-
-const LANGUAGES = [
-  { code: 'en',    label: 'English',    glyph: 'A'  },
-  { code: 'zh-CN', label: '简体中文',   glyph: '文' },
-  { code: 'zh-TW', label: '繁體中文',   glyph: '文' },
-  { code: 'ja',    label: '日本語',     glyph: 'あ' },
-  { code: 'ko',    label: '한국어',     glyph: '가' },
-  { code: 'es',    label: 'Español',    glyph: 'Ñ'  },
-  { code: 'fr',    label: 'Français',   glyph: 'Fr' },
-  { code: 'de',    label: 'Deutsch',    glyph: 'De' },
-  { code: 'pt',    label: 'Português',  glyph: 'Pt' },
-  { code: 'ru',    label: 'Русский',    glyph: 'Я'  },
-  { code: 'vi',    label: 'Tiếng Việt', glyph: 'Vi' },
-];
-
-function getLangGlyph(code: string): string {
-  return LANGUAGES.find(l => l.code === code)?.glyph || 'A';
-}
-
-function LangDropdown({ anchorRef, currentLang, onSelect, onClose }: {
-  anchorRef: React.RefObject<HTMLButtonElement | null>;
-  currentLang: string;
-  onSelect: (code: string) => void;
-  onClose: () => void;
-}) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
-    };
-    const closeKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', closeKey);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', closeKey);
-    };
-  }, [onClose]);
-
-  // Position below the anchor button
-  const rect = anchorRef.current?.getBoundingClientRect();
-  const style: React.CSSProperties = {
-    position: 'fixed',
-    top: rect ? rect.bottom + 4 : 0,
-    left: rect ? rect.left : 0,
-    minWidth: 160,
-  };
-
-  return createPortal(
-    <div className="ctx-menu lang-dropdown" ref={menuRef} style={style}>
-      {LANGUAGES.map(lang => (
-        <button
-          key={lang.code}
-          className={`ctx-menu-item ${lang.code === currentLang ? 'lang-active' : ''}`}
-          onClick={() => onSelect(lang.code)}
-        >
-          <span style={{ fontSize: 14, width: 20, textAlign: 'center', flexShrink: 0 }}>{lang.glyph}</span>
-          <span style={{ flex: 1 }}>{lang.label}</span>
-          {lang.code === currentLang && <span style={{ fontSize: 12, opacity: 0.7 }}>✓</span>}
-        </button>
-      ))}
-    </div>,
-    document.body
-  );
-}
-
-// ─── Theme Menu (color × shape) ──────────────────────────────────────────────
-
-const THEME_COLORS: { code: ThemeColor; labelKey: string; swatch: string; ring: string }[] = [
-  { code: 'light',      labelKey: 'theme.color.light',      swatch: '#FAFAF7', ring: '#c4956a' },
-  { code: 'dark',       labelKey: 'theme.color.dark',       swatch: '#1a1917', ring: '#c4956a' },
-  { code: 'cappuccino', labelKey: 'theme.color.cappuccino', swatch: '#1a1a1a', ring: '#4a4a4a' },
-  { code: 'sakura',     labelKey: 'theme.color.sakura',     swatch: '#221b28', ring: '#f8b4c8' },
-  { code: 'lavender',   labelKey: 'theme.color.lavender',   swatch: '#221f2e', ring: '#c8b6ff' },
-  { code: 'mint',       labelKey: 'theme.color.mint',       swatch: '#142623', ring: '#7ae8c8' },
-  // Natural-material palette — independent of shape and terminal font color.
-  // All three intentionally land darker than the existing "dark"/"cappuccino"
-  // themes so they read as "near-black with a faint hue", not "colored theme".
-  { code: 'obsidian',   labelKey: 'theme.color.obsidian',   swatch: '#0a0a0a', ring: '#5a5a5a' },
-  { code: 'cobalt',     labelKey: 'theme.color.cobalt',     swatch: '#0a1020', ring: '#5a85b8' },
-  { code: 'moss',       labelKey: 'theme.color.moss',       swatch: '#0b1612', ring: '#6a9878' },
-  // Vibrant batch — tinted-dark base (swatch = --bg-app) with a saturated
-  // accent ring. Reads colourful next to the muted set above. Crimson is the
-  // Spider-Man hero (pairs with the carbon shape).
-  { code: 'crimson',    labelKey: 'theme.color.crimson',    swatch: '#2a0d10', ring: '#e23b42' },
-  { code: 'sunset',     labelKey: 'theme.color.sunset',     swatch: '#241408', ring: '#f5803b' },
-  { code: 'amber',      labelKey: 'theme.color.amber',      swatch: '#20180a', ring: '#e8a72c' },
-  { code: 'emerald',    labelKey: 'theme.color.emerald',    swatch: '#0a1c12', ring: '#24c281' },
-  { code: 'teal',       labelKey: 'theme.color.teal',       swatch: '#0a2125', ring: '#2bc4c4' },
-  { code: 'indigo',     labelKey: 'theme.color.indigo',     swatch: '#12142e', ring: '#6172f0' },
-  { code: 'fuchsia',    labelKey: 'theme.color.fuchsia',    swatch: '#210f1d', ring: '#d94aa0' },
-];
-
-const THEME_SHAPES: { code: ThemeShape; label: string }[] = [
-  { code: 'soft',  label: 'Soft'  },
-  { code: 'slab',  label: 'Slab'  },
-  { code: 'sharp', label: 'Sharp' },
-  { code: 'glass', label: 'Glass' },
-  { code: 'panel', label: 'Panel' },
-  { code: 'carbon', label: 'Carbon' },
-];
-
-import { TERM_COLOR_SCHEMES } from '../center/TierTerminal';
-
-const ICON_ART_THEMES: { id: IconTheme; folderSrc: string }[] = [
-  { id: 'outline',      folderSrc: '/icons/themes/outline/folder-closed.svg'      },
-  { id: 'material',     folderSrc: '/icons/themes/material/folder-closed.svg'     },
-  { id: 'vscode-icons', folderSrc: '/icons/themes/vscode-icons/folder-closed.svg' },
-  { id: 'catppuccin-mocha', folderSrc: '/icons/themes/catppuccin-mocha/folder-closed.svg' },
-  { id: 'devicon',      folderSrc: '/icons/themes/devicon/folder-closed.svg'      },
-  { id: 'fluent',       folderSrc: '/icons/themes/fluent/folder-closed.svg'       },
-  { id: 'symbols',      folderSrc: '/icons/themes/symbols/folder-closed.svg'      },
-  { id: 'coffee',       folderSrc: '/icons/themes/coffee/folder-closed.svg'       },
-];
-
-function ThemeMenu({ anchorRef, currentTheme, currentShape, currentIconTheme, hasBg, termColorScheme, wallpaperOpacity, onSelectTheme, onSelectShape, onSelectIconTheme, onPickBg, onClearBg, onSelectScheme, onSetWallpaperOpacity, onClose, t }: {
-  anchorRef: React.RefObject<HTMLButtonElement | null>;
-  currentTheme: ThemeColor;
-  currentShape: ThemeShape;
-  currentIconTheme: IconTheme;
-  hasBg: boolean;
-  termColorScheme: string;
-  wallpaperOpacity: number;
-  onSelectTheme: (t: ThemeColor) => void;
-  onSelectShape: (s: ThemeShape) => void;
-  onSelectIconTheme: (t: IconTheme) => void;
-  onPickBg: () => void;
-  onClearBg: () => void;
-  onSelectScheme: (id: string) => void;
-  onSetWallpaperOpacity: (n: number) => void;
-  onClose: () => void;
-  t: (key: any) => string;
-}) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
-    };
-    const closeKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', closeKey);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', closeKey);
-    };
-  }, [onClose]);
-
-  const rect = anchorRef.current?.getBoundingClientRect();
-  const style: React.CSSProperties = {
-    position: 'fixed',
-    top: rect ? rect.bottom + 6 : 0,
-    left: rect ? Math.max(8, rect.left - 120) : 0,
-    minWidth: 260,
-  };
-
-  return createPortal(
-    <div className="ctx-menu theme-menu" ref={menuRef} style={style}>
-      <div className="theme-menu-section-label">{t('theme.section.color')}</div>
-      <div className="theme-swatch-grid">
-        {THEME_COLORS.map(c => (
-          <button
-            key={c.code}
-            className={`theme-swatch ${c.code === currentTheme ? 'active' : ''}`}
-            onClick={() => onSelectTheme(c.code)}
-            style={{ background: c.swatch, ['--swatch-ring' as any]: c.ring }}
-          >
-            <span className="theme-swatch-label">{t(c.labelKey as any)}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="ctx-menu-divider" />
-      <div className="theme-menu-section-label">{t('theme.section.shape')}</div>
-      <div className="theme-shape-row">
-        {THEME_SHAPES.map(s => (
-          <button
-            key={s.code}
-            className={`theme-shape-chip ${s.code === currentShape ? 'active' : ''}`}
-            onClick={() => onSelectShape(s.code)}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="ctx-menu-divider" />
-
-      {/* Wallpaper picker + dim slider on its own row */}
-      <div className="theme-wallpaper-row">
-        <button
-          className={`theme-bg-btn ${hasBg ? 'has-bg' : ''}`}
-          onClick={hasBg ? onClearBg : onPickBg}
-        >
-          {hasBg ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-          ) : (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-          )}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={5}
-          value={wallpaperOpacity}
-          onChange={(e) => onSetWallpaperOpacity(parseInt(e.target.value, 10))}
-          className="theme-dim-slider"
-          aria-label="Wallpaper opacity"
-        />
-        <span className="theme-dim-value">{wallpaperOpacity}%</span>
-      </div>
-
-      {/* Terminal foreground color scheme row */}
-      <div className="theme-bg-row">
-        <button
-          className={`term-fg-chip reset ${termColorScheme === '' ? 'active' : ''}`}
-          onClick={() => onSelectScheme('')}
-        >Aa</button>
-        {TERM_COLOR_SCHEMES.map(s => (
-          <button
-            key={s.id}
-            className={`term-fg-chip ${termColorScheme === s.id ? 'active' : ''}`}
-            style={{ color: s.fg }}
-            onClick={() => onSelectScheme(termColorScheme === s.id ? '' : s.id)}
-          >Aa</button>
-        ))}
-      </div>
-
-      <div className="ctx-menu-divider" />
-      <div className="theme-menu-section-label">{t('theme.section.icons')}</div>
-      <div className="theme-shape-row icon-theme-row">
-        {ICON_ART_THEMES.map(({ id, folderSrc }) => (
-          <button
-            key={id}
-            className={`icon-theme-chip ${currentIconTheme === id ? 'active' : ''}`}
-            onClick={() => onSelectIconTheme(id)}
-          >
-            {isMaskTintTheme(id) ? (
-              <span
-                className="icon-theme-chip-preview-mask"
-                style={{ WebkitMaskImage: `url("${folderSrc}")`, maskImage: `url("${folderSrc}")` }}
-                aria-label={id}
-              />
-            ) : (
-              <img src={folderSrc} alt={id} width="22" height="22" />
-            )}
-          </button>
-        ))}
-      </div>
-    </div>,
-    document.body
-  );
-}
-
 function formatBytes(b: number) {
   return b < 1024 ? b + ' B' : (b / 1024).toFixed(1) + ' KB';
 }
@@ -525,15 +269,6 @@ function getIconPath(theme: IconTheme, name: string): string {
 
 function getFileIconSrc(ext: string, theme: IconTheme): string {
   return `/icons/themes/${theme}/${getFileIcon(ext)}`;
-}
-
-// Themes whose SVGs use fill="currentColor" and should be tinted by the
-// current color theme's --accent. Rendered as <span> with mask-image so the
-// stroke color tracks the theme instead of being hardcoded in the SVG.
-const MASK_TINT_THEMES: IconTheme[] = ['devicon'];
-
-function isMaskTintTheme(theme: IconTheme): boolean {
-  return MASK_TINT_THEMES.includes(theme);
 }
 
 /** Renders a theme icon. For mask-tint themes, uses a <span> with mask-image
@@ -853,14 +588,6 @@ export function Explorer() {
     return () => window.removeEventListener('fs-refresh', handler);
   }, [folderPath]);
 
-  // Theme menu state
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
-  const themeBtnRef = useRef<HTMLButtonElement>(null);
-
-  // Language dropdown state
-  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
-  const langBtnRef = useRef<HTMLButtonElement>(null);
-
   // Update check
   const [hasUpdate, setHasUpdate] = useState(false);
   useEffect(() => {
@@ -1092,27 +819,10 @@ export function Explorer() {
         </div>
         
         <div className="window-controls">
-          {/* Language first — one-time setup, lives at the far-left of the
-              controls cluster so frequent actions sit closer to the edge. */}
-          <button
-            ref={langBtnRef}
-            className="icon-btn xs lang-btn lang-glyph"
-            onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-          >
-            {getLangGlyph(state.currentLang)}
-          </button>
-          <button
-            ref={themeBtnRef}
-            className="icon-btn xs"
-            onClick={() => setThemeMenuOpen(v => !v)}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="9" cy="9" r="2" />
-              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-            </svg>
-          </button>
-          {/* Gambit last — frequently used, rightmost position for muscle
+          {/* Theme + language pickers moved to the titlebar gear →
+              SettingsModal. Gambit stays here — it's a compose action,
+              not a setting. */}
+          {/* Gambit — frequently used, rightmost position for muscle
               memory and thumb reach at the panel edge. */}
           <button
             className={`icon-btn xs ${state.gambitOpen ? 'active' : ''}`}
@@ -1222,66 +932,8 @@ export function Explorer() {
       {/* Right-click context menu */}
       {ctxMenu && <ContextMenu menu={ctxMenu} onClose={closeCtxMenu} />}
 
-      {/* Language dropdown */}
-      {langDropdownOpen && (
-        <LangDropdown
-          anchorRef={langBtnRef}
-          currentLang={state.currentLang}
-          onSelect={(code) => {
-            dispatch({ type: 'SET_LANG', lang: code });
-            try {
-              localStorage.setItem('cc-lang', code);
-              if (code !== 'en') localStorage.setItem('cc-native-lang', code);
-            } catch {}
-            setLangDropdownOpen(false);
-          }}
-          onClose={() => setLangDropdownOpen(false)}
-        />
-      )}
-
-      {/* Theme menu (color × shape × icon style × wallpaper × term fg) */}
-      {themeMenuOpen && (
-        <ThemeMenu
-          anchorRef={themeBtnRef}
-          currentTheme={state.currentTheme}
-          currentShape={state.currentShape}
-          currentIconTheme={state.iconTheme}
-          hasBg={state.bgType !== 'none' && state.bgPath !== ''}
-          termColorScheme={state.termColorScheme}
-          wallpaperOpacity={state.wallpaperOpacity}
-          onSelectTheme={(t) => dispatch({ type: 'SET_THEME', theme: t })}
-          onSelectShape={(s) => dispatch({ type: 'SET_SHAPE', shape: s })}
-          onSelectIconTheme={(t) => {
-            dispatch({ type: 'SET_ICON_THEME', theme: t });
-            try { localStorage.setItem('cc-icon-theme', t); } catch {}
-          }}
-          onPickBg={async () => {
-            try {
-              const { open } = await import('@tauri-apps/plugin-dialog');
-              const selected = await open({
-                filters: [{ name: 'Background', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm'] }],
-              });
-              if (selected && typeof selected === 'string') {
-                const ext = selected.split('.').pop()?.toLowerCase() || '';
-                const bgType = ['mp4', 'webm'].includes(ext) ? 'video' : 'image';
-                try { localStorage.setItem('cc-bg-path', selected); localStorage.setItem('cc-bg-type', bgType); } catch {}
-                dispatch({ type: 'SET_BG', path: selected, bgType });
-              }
-            } catch (err) { console.error('[ThemeMenu] Background picker failed:', err); }
-          }}
-          onClearBg={() => {
-            try { localStorage.removeItem('cc-bg-path'); localStorage.removeItem('cc-bg-type'); } catch {}
-            dispatch({ type: 'CLEAR_BG' });
-          }}
-          onSelectScheme={(id) => {
-            try { id ? localStorage.setItem('cc-term-scheme', id) : localStorage.removeItem('cc-term-scheme'); } catch {}
-            dispatch({ type: 'SET_TERM_SCHEME', scheme: id });
-          }}
-          onSetWallpaperOpacity={(n) => dispatch({ type: 'SET_WALLPAPER_OPACITY', opacity: n })}
-          onClose={() => setThemeMenuOpen(false)}
-          t={t}
-        />
-      )}
+      {/* Theme + language pickers now live in the titlebar-gear SettingsModal
+          (App-level), not here. */}
     </div>
   );
 }

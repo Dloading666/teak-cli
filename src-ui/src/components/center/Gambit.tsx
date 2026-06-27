@@ -529,6 +529,10 @@ function GambitImpl({
   const ctxMenuRef = useRef<HTMLDivElement | null>(null);
   const isMac = navigator.platform.toUpperCase().includes('MAC');
   const ctxMod = isMac ? '⌘' : 'Ctrl';
+  // Send/newline key labels for the placeholder hint — track the user's
+  // configured send mode (settings → 妙手) so the hint never lies.
+  const sendCombo = appState.gambitEnterToSend ? 'Enter' : `${ctxMod}+Enter`;
+  const newlineCombo = appState.gambitEnterToSend ? 'Shift+Enter' : 'Enter';
 
   // Windows-style dismiss: ANY interaction outside the menu closes it.
   //   - mousedown anywhere outside  → close (click inside runs the button's onClick)
@@ -668,12 +672,21 @@ function GambitImpl({
       setAttachedSkills(prev => prev.slice(0, -1));
       return;
     }
-    // Ctrl+Enter (or Cmd+Enter on macOS) sends. Plain Enter inserts a newline
-    // — matches office/editor expectation. Shift+Enter also inserts a newline
-    // (native textarea behavior).
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      handleSend();
+    // Send key is user-configurable (settings modal → Keyboard), because the
+    // muscle-memory split (chat-app Enter-to-send vs editor Ctrl+Enter) differs
+    // per person and per OS.
+    //   • enterToSend (default): plain Enter sends; Shift/Ctrl/Cmd+Enter = newline.
+    //   • else:                  Ctrl/Cmd+Enter sends; plain Enter = newline.
+    if (e.key === 'Enter') {
+      const hasMod = e.ctrlKey || e.metaKey;
+      if (appState.gambitEnterToSend) {
+        if (e.shiftKey || hasMod) return; // newline
+        e.preventDefault();
+        handleSend();
+      } else if (hasMod) {
+        e.preventDefault();
+        handleSend();
+      }
     }
   };
 
@@ -906,7 +919,7 @@ function GambitImpl({
           className="gambit-textarea"
           style={{ textIndent: pillsWidth }}
           value={draft}
-          placeholder={attachedSkills.length > 0 ? '' : t('gambit.placeholder')}
+          placeholder={attachedSkills.length > 0 ? '' : t('gambit.placeholder', { send: sendCombo, newline: newlineCombo })}
           onChange={(e) => onDraftChange(e.target.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}

@@ -90,6 +90,20 @@ export const es = {
   // Session
   'session.max': 'Se pueden abrir un máximo de 5 sesiones a la vez.',
 
+  // Settings modal (titlebar gear)
+  'settings.title': 'Ajustes',
+  'settings.appearance': 'Apariencia',
+  'settings.wallpaper': 'Fondo',
+  'settings.terminal': 'Terminal',
+  'settings.gambit': 'Gambit',
+  'settings.language': 'Idioma',
+  'settings.wallpaper.pick': 'Elegir imagen o vídeo',
+  'settings.wallpaper.clear': 'Quitar fondo',
+  'settings.wallpaper.opacity': 'Opacidad',
+  'settings.terminal.scheme': 'Color del texto',
+  'settings.send.title': 'Enviar mensaje',
+  'settings.send.newline': 'para nueva línea',
+
   // Theme Menu
   'theme.section.color': 'Colores',
   'theme.section.shape': 'Forma',

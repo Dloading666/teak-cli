@@ -119,6 +119,15 @@ export interface AppState {
   // per-tab (stored on TerminalSession.gambitDraft).
   gambitOpen: boolean;
 
+  // Personalization settings modal (opened by the titlebar gear). App-level
+  // so the titlebar gear and the App-mounted modal share one flag.
+  settingsOpen: boolean;
+
+  // Gambit compose-box send key. true → Enter sends (Shift/Ctrl/Cmd+Enter =
+  // newline); false → Ctrl/Cmd+Enter sends (Enter = newline). Chosen in the
+  // settings modal because the muscle-memory split is per-user / per-OS.
+  gambitEnterToSend: boolean;
+
   // IDE-style layout toggles driven from titlebar controls.
   // Default both panels visible — matches first-time user expectation.
   leftPanelHidden: boolean;
@@ -191,6 +200,9 @@ type Action =
   | { type: 'SET_WALLPAPER_OPACITY'; opacity: number }
   | { type: 'SET_TERM_SCHEME'; scheme: string }
   | { type: 'TOGGLE_GAMBIT' }
+  | { type: 'TOGGLE_SETTINGS' }
+  | { type: 'SET_SETTINGS_OPEN'; open: boolean }
+  | { type: 'SET_GAMBIT_ENTER_TO_SEND'; value: boolean }
   | { type: 'SET_GAMBIT_DRAFT'; id: string; draft: string }
   | { type: 'SET_PANE_TOOL'; tabId: string; paneIdx: number; tool: ToolType; toolData?: string; folderPath?: string | null }
   | { type: 'SET_PANE_SENTINEL'; tabId: string; paneIdx: number; enabled: boolean }
@@ -327,6 +339,12 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, termColorScheme: action.scheme };
     case 'TOGGLE_GAMBIT':
       return { ...state, gambitOpen: !state.gambitOpen };
+    case 'TOGGLE_SETTINGS':
+      return { ...state, settingsOpen: !state.settingsOpen };
+    case 'SET_SETTINGS_OPEN':
+      return { ...state, settingsOpen: action.open };
+    case 'SET_GAMBIT_ENTER_TO_SEND':
+      return { ...state, gambitEnterToSend: action.value };
     case 'SET_GAMBIT_DRAFT':
       return {
         ...state,
@@ -474,6 +492,8 @@ function getInitialState(): AppState {
   let bgType: 'image' | 'video' | 'none' = 'none';
   let termColorScheme = '';
   let wallpaperOpacity = 70;
+  // Default Enter-to-send; only opt-out if the user explicitly stored 'false'.
+  let gambitEnterToSend = true;
   try {
     const storedPath = localStorage.getItem('cc-bg-path');
     const storedType = localStorage.getItem('cc-bg-type') as 'image' | 'video' | 'none' | null;
@@ -495,6 +515,7 @@ function getInitialState(): AppState {
     }
 
     termColorScheme = localStorage.getItem('cc-term-scheme') || '';
+    gambitEnterToSend = localStorage.getItem('cc-gambit-enter-send') !== 'false';
     // New key (post-refactor): wallpaper opacity, 0-100, larger = more
     // visible. Old key was `cc-wallpaper-dim` (0-80, larger = darker
     // overlay). On first load after upgrade, fall back to the legacy
@@ -540,6 +561,8 @@ function getInitialState(): AppState {
     terminals: [{ id: defaultTerminalId, tool: null, folderPath }],
     activeTerminalId: defaultTerminalId,
     gambitOpen: false,
+    settingsOpen: false,
+    gambitEnterToSend,
     leftPanelHidden,
     rightPanelHidden,
     multiAgentLayout,

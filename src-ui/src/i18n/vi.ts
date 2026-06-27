@@ -93,6 +93,20 @@ export const vi = {
   // Session
   'session.max': 'Tối đa 5 phiên có thể mở cùng lúc.',
 
+  // Settings modal (titlebar gear)
+  'settings.title': 'Cài đặt',
+  'settings.appearance': 'Giao diện',
+  'settings.wallpaper': 'Hình nền',
+  'settings.terminal': 'Terminal',
+  'settings.gambit': 'Nước cờ',
+  'settings.language': 'Ngôn ngữ',
+  'settings.wallpaper.pick': 'Chọn ảnh hoặc video',
+  'settings.wallpaper.clear': 'Xóa hình nền',
+  'settings.wallpaper.opacity': 'Độ mờ',
+  'settings.terminal.scheme': 'Màu chữ',
+  'settings.send.title': 'Gửi tin nhắn',
+  'settings.send.newline': 'để xuống dòng',
+
   // Theme Menu
   'theme.section.color': 'Màu sắc',
   'theme.section.shape': 'Hình dạng',
@@ -116,7 +130,7 @@ export const vi = {
 
   // Gambit · Nước cờ
   'gambit.title': 'Nước cờ',
-  'gambit.placeholder': 'Cân nhắc nước cờ... (Ctrl+Enter để gửi, Enter xuống dòng, dán ảnh được)',
+  'gambit.placeholder': 'Cân nhắc nước cờ... ({send} để gửi, {newline} xuống dòng, dán ảnh được)',
   'gambit.send_failed_hint': 'Hãy mở một phiên hoạt động trước',
   'gambit.send_empty_hint': 'Nhập nội dung hoặc dán ảnh trước (Ctrl+V)',
 

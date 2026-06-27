@@ -90,6 +90,20 @@ export const zhCN = {
   // Session
   'session.max': '最多只能同时打开 5 个会话。',
 
+  // Settings modal (titlebar gear)
+  'settings.title': '设置',
+  'settings.appearance': '外观',
+  'settings.wallpaper': '壁纸',
+  'settings.terminal': '终端',
+  'settings.language': '语言',
+  'settings.wallpaper.pick': '选择图片或视频',
+  'settings.wallpaper.clear': '移除壁纸',
+  'settings.wallpaper.opacity': '透明度',
+  'settings.terminal.scheme': '文字颜色',
+  'settings.gambit': '妙手',
+  'settings.send.title': '发送消息',
+  'settings.send.newline': '换行',
+
   // Theme Menu
   'theme.section.color': '配色',
   'theme.section.shape': '形态',
@@ -113,7 +127,7 @@ export const zhCN = {
 
   // Gambit · 妙手
   'gambit.title': '妙手',
-  'gambit.placeholder': '静心琢磨，再落子... (Ctrl+Enter 发送, Enter 换行, 可粘贴图片)',
+  'gambit.placeholder': '静心琢磨，再落子... ({send} 发送, {newline} 换行, 可粘贴图片)',
   'gambit.send_failed_hint': '请先打开活动会话',
   'gambit.send_empty_hint': '先输入内容或粘贴图片 (Ctrl+V)',
 

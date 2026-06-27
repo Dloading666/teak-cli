@@ -91,6 +91,20 @@ export const ru = {
   // Session
   'session.max': 'Можно открывать не более 5 сессий одновременно.',
 
+  // Settings modal (titlebar gear)
+  'settings.title': 'Настройки',
+  'settings.appearance': 'Оформление',
+  'settings.wallpaper': 'Обои',
+  'settings.terminal': 'Терминал',
+  'settings.gambit': 'Gambit',
+  'settings.language': 'Язык',
+  'settings.wallpaper.pick': 'Выбрать изображение или видео',
+  'settings.wallpaper.clear': 'Убрать обои',
+  'settings.wallpaper.opacity': 'Непрозрачность',
+  'settings.terminal.scheme': 'Цвет текста',
+  'settings.send.title': 'Отправить сообщение',
+  'settings.send.newline': 'для новой строки',
+
   // Theme Menu
   'theme.section.color': 'Цвета',
   'theme.section.shape': 'Форма',

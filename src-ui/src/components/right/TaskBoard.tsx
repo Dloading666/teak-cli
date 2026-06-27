@@ -133,7 +133,15 @@ export function TaskBoard() {
   // Inline title editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const editInputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the title textarea to fit wrapped content (mirrors how the
+  // committed <span> title wraps), so long titles show on multiple lines
+  // WHILE typing instead of only after Enter.
+  const autoGrowTitle = useCallback((el: HTMLTextAreaElement) => {
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
 
 
   // Drag state — ALL refs to avoid stale closures
@@ -204,8 +212,9 @@ export function TaskBoard() {
     if (editingId && editInputRef.current) {
       editInputRef.current.focus();
       editInputRef.current.select();
+      autoGrowTitle(editInputRef.current); // fit a pre-existing long title
     }
-  }, [editingId]);
+  }, [editingId, autoGrowTitle]);
 
   // ─── Task Actions ─────────────────────────────────────────────────────────
   const handleAdd = useCallback(() => {
@@ -625,12 +634,22 @@ export function TaskBoard() {
                             ellipsis-truncates before the pencil so the pencil
                             is never pushed off-screen. */}
                         {isEditingThis ? (
-                          <input
+                          <textarea
                             ref={editInputRef}
                             className="task-title-edit"
                             value={editingTitle}
-                            onChange={e => setEditingTitle(e.target.value)}
+                            rows={1}
+                            onChange={e => {
+                              setEditingTitle(e.target.value);
+                              autoGrowTitle(e.currentTarget);
+                            }}
                             onKeyDown={e => {
+                              // IME composition in progress — let the IME keep
+                              // Enter for confirming candidates (CJK input);
+                              // committing here would drop the composition.
+                              if (e.nativeEvent.isComposing) return;
+                              // Enter commits (titles stay single-paragraph);
+                              // long text soft-wraps automatically, not via Enter.
                               if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
                               if (e.key === 'Escape') cancelEdit();
                             }}
@@ -655,47 +674,50 @@ export function TaskBoard() {
                           </span>
                         )}
 
-                        {/* Right-side action cluster.
-                            Editing mode: single ✓ confirm button.
-                            Normal mode: [delete] [send] — both opacity-faded
-                            at rest, revealed on card hover. Widths stay
-                            reserved so the title never shifts as icons fade. */}
-                        {isEditingThis ? (
-                          <button
-                            className="task-slot task-slot-confirm"
-                            onClick={e => { e.stopPropagation(); commitEdit(); }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          </button>
-                        ) : (
-                          <>
+                        {/* Right-side action cluster — fixed-width box so the
+                            title's available width is IDENTICAL across modes
+                            (edit = single ✓, normal = [delete][send]). Without
+                            the reserved box the title shifts horizontally when
+                            entering/leaving edit. The lone ✓ is centered in the
+                            reserved space (see .task-actions). */}
+                        <div className="task-actions">
+                          {isEditingThis ? (
                             <button
-                              className="task-slot task-slot-delete"
-                              onClick={e => { e.stopPropagation(); handleRemove(task.id); }}
+                              className="task-slot task-slot-confirm"
+                              onClick={e => { e.stopPropagation(); commitEdit(); }}
                             >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/>
-                                <path d="M10 11v6"/><path d="M14 11v6"/>
-                                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
                               </svg>
                             </button>
-                            <button
-                              className="task-slot task-slot-send"
-                              onClick={e => { e.stopPropagation(); sendToAgent(task); }}
-                              disabled={!state.activeTerminalId}
-                            >
-                              {/* Play triangle — reads as "start running this
-                                  task"; polygon spans the full viewBox to
-                                  match the sibling icon weight. */}
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                                <polygon points="5 3 21 12 5 21"/>
-                              </svg>
-                            </button>
-                          </>
-                        )}
+                          ) : (
+                            <>
+                              <button
+                                className="task-slot task-slot-delete"
+                                onClick={e => { e.stopPropagation(); handleRemove(task.id); }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6"/>
+                                  <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/>
+                                  <path d="M10 11v6"/><path d="M14 11v6"/>
+                                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                              </button>
+                              <button
+                                className="task-slot task-slot-send"
+                                onClick={e => { e.stopPropagation(); sendToAgent(task); }}
+                                disabled={!state.activeTerminalId}
+                              >
+                                {/* Play triangle — reads as "start running this
+                                    task"; polygon spans the full viewBox to
+                                    match the sibling icon weight. */}
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                  <polygon points="5 3 21 12 5 21"/>
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       <div className={`task-desc-area ${isExpanded ? 'open' : ''}`}>

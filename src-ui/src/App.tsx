@@ -7,6 +7,7 @@ import { subscribeAgentStatus } from './lib/agent-status-bus';
 import { routeFileDrop } from './lib/file-drop';
 import { TitleBar } from './components/common/TitleBar';
 import { ResizeEdges } from './components/common/ResizeEdges';
+import { SettingsModal } from './components/common/SettingsModal';
 import { Explorer } from './components/left/Explorer';
 import { CenterPanel } from './components/center/CenterPanel';
 import { ActiveGambit } from './components/center/ActiveGambit';
@@ -255,6 +256,11 @@ export function App() {
           status events, etc.) and can be dragged freely across the whole
           app window. Internally reads the active tab's gambit state. */}
       <ActiveGambit />
+
+      {/* Personalization settings — centered modal opened by the titlebar
+          gear. App-level overlay (gated on state.settingsOpen) so it floats
+          above the whole workspace, like ActiveGambit. */}
+      <SettingsModal />
 
       {/* 8 transparent resize-edge strips (window chrome). Three-platform
           unified — Windows + macOS already get edge cursors via OS shims,

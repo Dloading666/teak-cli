@@ -90,6 +90,20 @@ export const zhTW = {
   // Session
   'session.max': '最多只能同時開啟 5 個會話。',
 
+  // Settings modal (titlebar gear)
+  'settings.title': '設定',
+  'settings.appearance': '外觀',
+  'settings.wallpaper': '桌布',
+  'settings.terminal': '終端',
+  'settings.language': '語言',
+  'settings.wallpaper.pick': '選擇圖片或影片',
+  'settings.wallpaper.clear': '移除桌布',
+  'settings.wallpaper.opacity': '透明度',
+  'settings.terminal.scheme': '文字顏色',
+  'settings.gambit': '妙手',
+  'settings.send.title': '發送訊息',
+  'settings.send.newline': '換行',
+
   // Theme Menu
   'theme.section.color': '配色',
   'theme.section.shape': '形態',
@@ -113,7 +127,7 @@ export const zhTW = {
 
   // Gambit · 妙手
   'gambit.title': '妙手',
-  'gambit.placeholder': '靜心琢磨，再落子... (Ctrl+Enter 發送, Enter 換行, 可貼上圖片)',
+  'gambit.placeholder': '靜心琢磨，再落子... ({send} 發送, {newline} 換行, 可貼上圖片)',
   'gambit.send_failed_hint': '請先開啟活動工作階段',
   'gambit.send_empty_hint': '先輸入內容或貼上圖片 (Ctrl+V)',
 
