@@ -67,10 +67,12 @@ interface TaskNoteViewProps {
   // time still composes against the freshest array — guards against a
   // multi-window sync landing mid-drag.
   onReorder: (updater: (prev: TaskItem[]) => TaskItem[]) => void;
+  // Empty-board "view the usage guide" button → (re)adds the welcome note.
+  onShowGuide: () => void;
 }
 
 export function TaskNoteView({
-  tasks, addingId, removingId, canSend, onSetStatus, onUpdateTitle, onSetHeight, onRemove, onSend, onReorder,
+  tasks, addingId, removingId, canSend, onSetStatus, onUpdateTitle, onSetHeight, onRemove, onSend, onReorder, onShowGuide,
 }: TaskNoteViewProps) {
   const t = useT();
 
@@ -229,7 +231,7 @@ export function TaskNoteView({
   if (ordered.length === 0) {
     return (
       <div className="task-note-list task-note-list--empty">
-        <TaskEmptyState />
+        <TaskEmptyState onShowGuide={onShowGuide} />
       </div>
     );
   }

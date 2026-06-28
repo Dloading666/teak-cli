@@ -608,6 +608,31 @@
   letter-spacing: 0.02em;
   color: var(--text-1, #e8e4de);
 }
+
+/* "View the usage guide" — subtle accent pill under the empty-state greeting.
+   A <button>, so the glass/carbon nuclear-transparency rule leaves it alone. */
+.task-empty-guide {
+  margin-top: 16px;
+  padding: 7px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent, #c4956a) 40%, transparent);
+  border-radius: var(--radius-pill, 999px);
+  background: transparent;
+  color: var(--accent, #c4956a);
+  font-family: var(--font, system-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.task-empty-guide:hover {
+  background: color-mix(in srgb, var(--accent, #c4956a) 12%, transparent);
+  border-color: var(--accent, #c4956a);
+}
+
+.task-empty-guide:active {
+  transform: scale(0.97);
+}
 /* ─── Floating Action Button ────────────────────────────────────────────────── */
 
 .task-fab-container {

@@ -17,6 +17,19 @@ export interface TaskItem {
   height?: number;
 }
 
+// Builds the welcome/guide note. Shared by the first-launch seed (TaskBoard)
+// and the empty-state "show guide" button, so both produce an identical roomy
+// note. Caller passes the already-localized guide text.
+export function makeWelcomeNote(text: string): TaskItem {
+  return {
+    id: crypto.randomUUID(),
+    title: text,
+    status: 'todo',
+    createdAt: Date.now(),
+    height: 240,
+  };
+}
+
 // Click-to-advance order for the to-do checkbox (todo → working → done → todo).
 export const NEXT_STATUS: Record<TaskStatus, TaskStatus> = {
   todo: 'working',

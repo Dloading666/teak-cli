@@ -125,6 +125,7 @@ export const zhCN = {
 3. 右上「修改记录」看 AI 改了哪些文件；设置里换主题、语言，或切回「待办式」
 
 看完删掉这张，开始你的第一个任务吧。`,
+  'task.show_guide': '查看使用攻略',
 
   // Theme Menu
   'theme.section.color': '配色',

@@ -7,7 +7,7 @@ import './TaskBoard.css';
 import { ChangesBoard } from './ChangesBoard';
 import { TaskNoteView } from './TaskNoteView';
 import { TaskEmptyState } from './TaskEmptyState';
-import { NEXT_STATUS, STATUS_ORDER, type TaskItem, type TaskStatus } from './task-types';
+import { makeWelcomeNote, NEXT_STATUS, STATUS_ORDER, type TaskItem, type TaskStatus } from './task-types';
 
 // ─── Persistence (Rust file backend with localStorage fallback) ──────────────
 
@@ -153,13 +153,7 @@ export function TaskBoard() {
       if (data.length === 0 && !seeded) {
         try { localStorage.setItem('cc-tasks-seeded', '1'); } catch {}
         dispatch({ type: 'SET_TASK_VIEW_MODE', mode: 'note' }); // remembers the view too
-        setTasks([{
-          id: crypto.randomUUID(),
-          title: t('task.welcome_note'),
-          status: 'todo',
-          createdAt: Date.now(),
-          height: 240,
-        }]);
+        setTasks([makeWelcomeNote(t('task.welcome_note'))]);
         return;
       }
 
@@ -278,6 +272,15 @@ export function TaskBoard() {
   const setHeight = useCallback((id: string, height: number) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, height } : t));
   }, []);
+
+  // Manually (re)add the welcome guide note — wired to the empty-state button.
+  // Switches to the sticky-note view so the long guide reads as a note, not a
+  // long title row. (New users still get it auto-seeded once; this is the
+  // deletable, on-demand way to bring it back.)
+  const handleShowGuide = () => {
+    setTasks(prev => [makeWelcomeNote(t('task.welcome_note')), ...prev]);
+    if (viewMode !== 'note') dispatch({ type: 'SET_TASK_VIEW_MODE', mode: 'note' });
+  };
 
   const handleRemove = useCallback((id: string) => {
     setRemovingId(id);
@@ -597,6 +600,7 @@ export function TaskBoard() {
               onRemove={handleRemove}
               onSend={sendToAgent}
               onReorder={setTasks}
+              onShowGuide={handleShowGuide}
             />
           ) : (
           <div ref={listRef} className="task-list" style={{ paddingBottom: '80px' }}>
@@ -764,7 +768,7 @@ export function TaskBoard() {
           );
         })}
 
-        {tasks.length === 0 && <TaskEmptyState />}
+        {tasks.length === 0 && <TaskEmptyState onShowGuide={handleShowGuide} />}
       </div>
           )}
 

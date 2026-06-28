@@ -129,6 +129,7 @@ Three steps to start:
 3. "Changes" (top-right) shows which files the AI touched; Settings has themes, language, and the To-do / Sticky-note switch
 
 Delete this note whenever you're ready, and start your first task.`,
+  'task.show_guide': 'View the usage guide',
 
   // Theme Menu
   'theme.section.color': 'Colors',

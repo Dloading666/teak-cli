@@ -7,7 +7,13 @@ import type { ReactNode } from 'react';
 import { useT } from '../../i18n/useT';
 import { useAppState } from '../../store/app-state';
 
-export function TaskEmptyState() {
+interface TaskEmptyStateProps {
+  // When provided, an empty board offers a "view the usage guide" button that
+  // (re)adds the welcome note — the manual, deletable way to bring it back.
+  onShowGuide?: () => void;
+}
+
+export function TaskEmptyState({ onShowGuide }: TaskEmptyStateProps) {
   const t = useT();
   const { state } = useAppState();
   const isZh = state.currentLang.startsWith('zh');
@@ -51,6 +57,11 @@ export function TaskEmptyState() {
       >
         {greeting}
       </div>
+      {onShowGuide && (
+        <button type="button" className="task-empty-guide" onClick={onShowGuide}>
+          {t('task.show_guide')}
+        </button>
+      )}
     </div>
   );
 }
