@@ -6,7 +6,11 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 16px;
+  /* No top padding: the account header that used to sit here (and cancel a
+     16px top padding via negative margin) was removed in #57, so a bare 16px
+     was left padding the tabs ~16px lower than the center/left tab baseline.
+     Only the .right-tabs top margin spaces the tabs now. */
+  padding: 0 16px 16px;
   gap: 12px;
   overflow: hidden;
 }
@@ -14,12 +18,6 @@
 /* Global cursor override — desktop native (Apple HIG) */
 .task-board * {
   cursor: default !important;
-}
-
-/* Pull the user profile header up to negate the 16px container padding and perfectly align with left pane */
-/* Also negate the 12px flex gap of .task-board so it doesn't push the tabs too far down */
-.task-board .panel-header {
-  margin: -16px -16px -12px -16px;
 }
 
 .header-actions {
