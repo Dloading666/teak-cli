@@ -278,7 +278,9 @@ export function TaskBoard() {
   // long title row. (New users still get it auto-seeded once; this is the
   // deletable, on-demand way to bring it back.)
   const handleShowGuide = () => {
-    setTasks(prev => [makeWelcomeNote(t('task.welcome_note')), ...prev]);
+    // Idempotent: only seed onto an empty board, so a fast double-click (or any
+    // future non-empty caller) can't stack duplicate guide notes.
+    setTasks(prev => prev.length > 0 ? prev : [makeWelcomeNote(t('task.welcome_note'))]);
     if (viewMode !== 'note') dispatch({ type: 'SET_TASK_VIEW_MODE', mode: 'note' });
   };
 
