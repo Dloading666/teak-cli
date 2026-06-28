@@ -222,10 +222,7 @@ export function TaskNoteView({
                 ))}
               </div>
 
-              <div className="task-note-time">
-                <span className="task-note-date">{date}</span>
-                <span className="task-note-clock">{time}</span>
-              </div>
+              <div className="task-note-time">{date} {time}</div>
 
               <div className="task-note-actions">
                 <button

@@ -18,53 +18,36 @@
   padding-bottom: 0;
 }
 
-/* ─── Note card ─────────────────────────────────────────────────────────────── */
+/* ─── Note card: a header band stacked on a roomy writing body ───────────────── */
 
 .task-note-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 11px 12px 12px;
   border-radius: var(--radius-md, 12px);
-  background: rgba(255, 255, 255, 0.035);
-  /* Quiet status tint on the leading edge — reinforces the active dot without
-     shouting. Colour set per status class below. */
-  border-left: 3px solid transparent;
-  transition: background-color 0.2s, opacity 0.25s, transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* The "paper" / writing surface. The header band (below) sits a shade
+     lighter on top of this so the two read as distinct — the sticky-note look.
+     No status-coloured edge: status is carried by the dots alone. */
+  background: rgba(255, 255, 255, 0.03);
+  transition: opacity 0.25s, transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.task-note-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
+/* Done notes fade back; otherwise no per-status card tint. */
+.task-note-card.status-done { opacity: 0.55; }
+.task-note-card.status-done:hover { opacity: 0.85; }
 
-.task-note-card.status-working { border-left-color: color-mix(in srgb, #ff5f57 55%, transparent); }
-.task-note-card.status-todo    { border-left-color: color-mix(in srgb, #febc2e 50%, transparent); }
-.task-note-card.status-done    { border-left-color: color-mix(in srgb, #28c840 45%, transparent); opacity: 0.55; }
+.task-note-card.dragging { opacity: 0.25; }
 
-.task-note-card.status-done:hover { opacity: 0.8; }
-
-/* Dragged card collapses to a faint placeholder; the floating ghost carries
-   the visible card. */
-.task-note-card.dragging {
-  opacity: 0.25;
-}
-
-/* Exit animation — fades + slides out during the parent's 300ms removal window
-   (matches the to-do list's removal feel). */
+/* Exit animation — fades + slides out during the parent's 300ms removal window. */
 .task-note-card.removing {
   animation: task-note-out 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   pointer-events: none;
 }
-
 @keyframes task-note-out {
-  to {
-    opacity: 0;
-    transform: translateX(28px) scale(0.97);
-  }
+  to { opacity: 0; transform: translateX(28px) scale(0.97); }
 }
 
-/* Drop indicator — a 2px accent line at the edge the card would insert against. */
+/* Drop indicator — a flat accent line at the edge the card would insert against. */
 .task-note-card.drop-before::before,
 .task-note-card.drop-after::after {
   content: '';
@@ -74,17 +57,22 @@
   height: 2px;
   border-radius: 2px;
   background: var(--accent, #c4956a);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 .task-note-card.drop-before::before { top: -6px; }
 .task-note-card.drop-after::after { bottom: -6px; }
 
-/* ─── Head row: dots · timestamp · actions ──────────────────────────────────── */
+/* ─── Header band — the strip that makes it read as a sticky note ────────────── */
+/* A shade lighter than the body + a hairline divider. Whitelisted in global.css
+   so the carbon/glass nuclear-transparency rule keeps this background. */
 
 .task-note-head {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-md, 12px) var(--radius-md, 12px) 0 0;
 }
 
 .task-note-dots {
@@ -94,6 +82,8 @@
   flex-shrink: 0;
 }
 
+/* Plain solid circle — faint tint of its own colour when inactive, full colour
+   when active. No glow, halo, or gradient. */
 .task-note-dot {
   width: 11px;
   height: 11px;
@@ -102,49 +92,39 @@
   border-radius: 50%;
   flex-shrink: 0;
   cursor: pointer;
-  /* Faint tint of the dot's own colour when inactive, so all three read as a
-     red/amber/green traffic light; the active one goes full-colour. */
-  background: color-mix(in srgb, var(--dot) 24%, transparent);
-  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+  background: color-mix(in srgb, var(--dot) 28%, transparent);
+  transition: background 0.15s, transform 0.15s;
 }
-
 .task-note-dot:hover {
-  background: color-mix(in srgb, var(--dot) 55%, transparent);
-  transform: scale(1.1);
+  background: color-mix(in srgb, var(--dot) 60%, transparent);
+  transform: scale(1.12);
 }
-
 .task-note-dot.active {
   background: var(--dot);
-  /* Static halo — no animation, safe on WebKit2GTK (Linux). */
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot) 18%, transparent);
 }
 
+/* Timestamp — date + time as one uniform run (same colour, same font). */
 .task-note-time {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
   margin-left: auto;
   font-family: var(--font, system-ui);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: var(--text-3, rgba(255, 255, 255, 0.4));
+  color: var(--text-3, rgba(255, 255, 255, 0.42));
   white-space: nowrap;
   user-select: none;
-}
-
-.task-note-clock {
-  color: var(--text-2, rgba(255, 255, 255, 0.6));
-  font-variant-numeric: tabular-nums;
 }
 
 .task-note-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
+/* Always visible — the header band is a permanent toolbar. (The single-line
+   to-do row hides its icons because always-on there reads as clutter; a note's
+   roomy header has room to show them, which feels more deliberate.) */
 .task-note-btn {
   display: flex;
   align-items: center;
@@ -157,34 +137,23 @@
   background: transparent;
   color: var(--accent, #c4956a);
   cursor: pointer;
-  /* Calm at rest; revealed on card hover (mirrors the list view's action
-     slots) so the resting card stays clean. */
-  opacity: 0;
-  transition: opacity 0.15s, filter 0.15s, background 0.15s;
+  opacity: 0.75;
+  transition: opacity 0.15s, filter 0.15s;
 }
-
-.task-note-card:hover .task-note-btn {
-  opacity: 0.85;
-}
-
 .task-note-btn:hover:not(:disabled) {
   opacity: 1;
   filter: brightness(1.25);
 }
-
 .task-note-send:disabled {
-  opacity: 0;
+  opacity: 0.3;
   cursor: not-allowed;
 }
-.task-note-card:hover .task-note-send:disabled {
-  opacity: 0.25;
-}
 
-/* ─── Note body ─────────────────────────────────────────────────────────────── */
+/* ─── Body — the writing area ────────────────────────────────────────────────── */
 
 .task-note-body {
   width: 100%;
-  min-height: 56px;
+  min-height: 54px;
   resize: none;
   overflow: hidden;
   border: none;
@@ -194,7 +163,7 @@
   font-family: var(--font, system-ui);
   font-size: 13.5px;
   line-height: 1.55;
-  padding: 2px 2px 0;
+  padding: 10px 12px 12px;
   white-space: pre-wrap;
   word-break: break-word;
   box-sizing: border-box;
@@ -216,8 +185,6 @@
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 11px 12px 12px;
   border-radius: var(--radius-md, 12px);
   background: var(--bg-panel, rgba(40, 40, 42, 0.98));
   border: 1px solid var(--accent, #c4956a);
