@@ -30,6 +30,12 @@ const STATUS_DOTS: { status: TaskStatus; color: string }[] = [
   { status: 'done', color: '#28c840' },
 ];
 
+// Note body height. Un-resized notes auto-grow from a roomy default; the
+// bottom-edge handle clamps a manual height between these bounds.
+const DEFAULT_NOTE_HEIGHT = 88;
+const NOTE_MIN_HEIGHT = 44;
+const NOTE_MAX_HEIGHT = 600;
+
 function formatNoteTime(ts: number): { date: string; time: string } {
   const d = new Date(ts);
   const date = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
@@ -53,6 +59,8 @@ interface TaskNoteViewProps {
   canSend: boolean;
   onSetStatus: (id: string, status: TaskStatus) => void;
   onUpdateTitle: (id: string, title: string) => void;
+  // Persists a bottom-edge-resized body height (called once on drop).
+  onSetHeight: (id: string, height: number) => void;
   onRemove: (id: string) => void;
   onSend: (task: TaskItem) => void;
   // Functional updater (the parent's setTasks) so a reorder computed at drop
@@ -62,7 +70,7 @@ interface TaskNoteViewProps {
 }
 
 export function TaskNoteView({
-  tasks, addingId, removingId, canSend, onSetStatus, onUpdateTitle, onRemove, onSend, onReorder,
+  tasks, addingId, removingId, canSend, onSetStatus, onUpdateTitle, onSetHeight, onRemove, onSend, onReorder,
 }: TaskNoteViewProps) {
   const t = useT();
 
@@ -79,11 +87,16 @@ export function TaskNoteView({
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropLine, setDropLine] = useState<DropLine | null>(null);
 
+  // Live preview height while dragging one card's bottom edge; persisted via
+  // onSetHeight only on pointer-up, so a resize is one disk write, not a stream.
+  const [resizing, setResizing] = useState<{ id: string; height: number } | null>(null);
+
   const handlePointerDown = (e: React.PointerEvent, id: string) => {
     const target = e.target as HTMLElement;
     // Never start a drag from an interactive control — the note body needs
-    // click-to-place-caret + text selection, and the dots/buttons need clicks.
-    if (target.closest('textarea') || target.closest('button')) return;
+    // click-to-place-caret + text selection, dots/buttons need clicks, and the
+    // bottom-edge handle owns its own resize gesture.
+    if (target.closest('textarea') || target.closest('button') || target.closest('.task-note-resize')) return;
 
     const cardEl = target.closest('.task-note-card') as HTMLElement;
     if (!cardEl) return;
@@ -179,6 +192,32 @@ export function TaskNoteView({
     window.addEventListener('pointerup', onUp);
   };
 
+  // ── Bottom-edge resize ──────────────────────────────────────────────────
+  const handleResizeDown = (e: React.PointerEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation(); // don't let the card's reorder gesture start
+    const body = (e.currentTarget as HTMLElement)
+      .closest('.task-note-card')
+      ?.querySelector('.task-note-body') as HTMLElement | null;
+    const startHeight = body ? body.getBoundingClientRect().height : DEFAULT_NOTE_HEIGHT;
+    const startY = e.clientY;
+
+    const onMove = (me: PointerEvent) => {
+      const next = Math.max(NOTE_MIN_HEIGHT, Math.min(NOTE_MAX_HEIGHT, startHeight + (me.clientY - startY)));
+      setResizing({ id, height: Math.round(next) });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      setResizing(cur => {
+        if (cur && cur.id === id) onSetHeight(id, cur.height);
+        return null;
+      });
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
   if (ordered.length === 0) {
     return (
       <div className="task-note-list task-note-list--empty">
@@ -252,9 +291,16 @@ export function TaskNoteView({
 
             <NoteBody
               value={task.title}
+              height={resizing?.id === task.id ? resizing.height : (task.height ?? null)}
               autoFocus={addingId === task.id}
               placeholder={t('task.note_placeholder')}
               onChange={next => onUpdateTitle(task.id, next)}
+            />
+
+            {/* Bottom-edge resize handle — drag to grow/shrink the note. */}
+            <div
+              className="task-note-resize"
+              onPointerDown={e => handleResizeDown(e, task.id)}
             />
           </div>
         );
@@ -269,20 +315,29 @@ export function TaskNoteView({
 
 interface NoteBodyProps {
   value: string;
+  // Explicit user-resized height in px, or null to auto-grow with content.
+  height: number | null;
   autoFocus: boolean;
   placeholder: string;
   onChange: (next: string) => void;
 }
 
-function NoteBody({ value, autoFocus, placeholder, onChange }: NoteBodyProps) {
+function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+    if (height != null) {
+      // Manually resized — hold the chosen height; content scrolls past it.
+      el.style.height = `${height}px`;
+    } else {
+      // Auto-grow with content, floored at a roomy default so a fresh note
+      // already reads as a sticky note you can write a lot into.
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(DEFAULT_NOTE_HEIGHT, el.scrollHeight)}px`;
+    }
+  }, [value, height]);
 
   useEffect(() => {
     if (autoFocus && ref.current) {
@@ -298,6 +353,7 @@ function NoteBody({ value, autoFocus, placeholder, onChange }: NoteBodyProps) {
       value={value}
       placeholder={placeholder}
       rows={2}
+      style={{ overflowY: height != null ? 'auto' : 'hidden' }}
       onChange={e => onChange(e.target.value)}
       onPointerDown={e => e.stopPropagation()}
     />

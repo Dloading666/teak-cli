@@ -11,6 +11,10 @@ export interface TaskItem {
   description?: string;
   status: TaskStatus;
   createdAt: number;
+  // Sticky-note view only: the user-dragged body height in px (bottom-edge
+  // resize). Undefined = auto-grow to fit content from a roomy default. Ignored
+  // by the to-do list view. Persisted so a note keeps the size you gave it.
+  height?: number;
 }
 
 // Click-to-advance order for the to-do checkbox (todo → working → done → todo).

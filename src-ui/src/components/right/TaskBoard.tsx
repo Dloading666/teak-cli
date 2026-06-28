@@ -251,6 +251,13 @@ export function TaskBoard() {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, title } : t));
   }, []);
 
+  // Note-view body height (bottom-edge resize). Persisted on the task so the
+  // note keeps its size; the note view drives live preview locally and only
+  // calls this once on drop.
+  const setHeight = useCallback((id: string, height: number) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, height } : t));
+  }, []);
+
   const handleRemove = useCallback((id: string) => {
     setRemovingId(id);
     if (expandedId === id) setExpandedId(null);
@@ -565,6 +572,7 @@ export function TaskBoard() {
               canSend={!!state.activeTerminalId}
               onSetStatus={setStatus}
               onUpdateTitle={updateTitle}
+              onSetHeight={setHeight}
               onRemove={handleRemove}
               onSend={sendToAgent}
               onReorder={setTasks}
