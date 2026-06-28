@@ -69,9 +69,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 5px 10px;
+  /* A DARK band (matching the app's darker surfaces), sitting a shade darker
+     than the writing body below it — reads as the note's header, not a white
+     strip. Tighter padding keeps the strip short. */
+  background: rgba(0, 0, 0, 0.24);
   border-radius: var(--radius-md, 12px) var(--radius-md, 12px) 0 0;
 }
 
@@ -103,14 +105,16 @@
   background: var(--dot);
 }
 
-/* Timestamp — date + time as one uniform run (same colour, same font). */
+/* Timestamp — date + time as one uniform run (same colour, same font),
+   centred in the header between the dots and the action buttons. */
 .task-note-time {
-  margin-left: auto;
+  flex: 1;
+  text-align: center;
   font-family: var(--font, system-ui);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: var(--text-3, rgba(255, 255, 255, 0.42));
+  color: var(--text-2, rgba(255, 255, 255, 0.55));
   white-space: nowrap;
   user-select: none;
 }
@@ -129,8 +133,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border: none;
   border-radius: var(--radius-xs, 6px);
@@ -153,7 +157,7 @@
 
 .task-note-body {
   width: 100%;
-  min-height: 54px;
+  min-height: 44px;
   resize: none;
   overflow: hidden;
   border: none;
@@ -163,7 +167,7 @@
   font-family: var(--font, system-ui);
   font-size: 13.5px;
   line-height: 1.55;
-  padding: 10px 12px 12px;
+  padding: 9px 12px 11px;
   white-space: pre-wrap;
   word-break: break-word;
   box-sizing: border-box;
