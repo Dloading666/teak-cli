@@ -196,26 +196,34 @@ export function TaskNoteView({
   const handleResizeDown = (e: React.PointerEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation(); // don't let the card's reorder gesture start
-    const body = (e.currentTarget as HTMLElement)
+    const handle = e.currentTarget as HTMLElement;
+    const body = handle
       .closest('.task-note-card')
       ?.querySelector('.task-note-body') as HTMLElement | null;
     const startHeight = body ? body.getBoundingClientRect().height : DEFAULT_NOTE_HEIGHT;
     const startY = e.clientY;
+    // Pointer capture keeps move/up/cancel coming to this element even if the
+    // pointer leaves the window or focus is stolen (WebView2) — so a resize
+    // can't get stuck mid-gesture and the listeners always tear down. Element
+    // listeners (vs window) also go away with the node if the card unmounts.
+    try { handle.setPointerCapture(e.pointerId); } catch {}
 
     const onMove = (me: PointerEvent) => {
       const next = Math.max(NOTE_MIN_HEIGHT, Math.min(NOTE_MAX_HEIGHT, startHeight + (me.clientY - startY)));
       setResizing({ id, height: Math.round(next) });
     };
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+    const finish = () => {
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', finish);
+      handle.removeEventListener('pointercancel', finish);
       setResizing(cur => {
         if (cur && cur.id === id) onSetHeight(id, cur.height);
         return null;
       });
     };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', finish);
+    handle.addEventListener('pointercancel', finish);
   };
 
   if (ordered.length === 0) {
@@ -328,15 +336,14 @@ function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyP
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (height != null) {
-      // Manually resized — hold the chosen height; content scrolls past it.
-      el.style.height = `${height}px`;
-    } else {
-      // Auto-grow with content, floored at a roomy default so a fresh note
-      // already reads as a sticky note you can write a lot into.
-      el.style.height = 'auto';
-      el.style.height = `${Math.max(DEFAULT_NOTE_HEIGHT, el.scrollHeight)}px`;
-    }
+    // The resized height is a FLOOR, not a fixed size: the note is at least the
+    // height you dragged (or a roomy default), and still grows to fit longer
+    // content. So text is never clipped behind a scrollbar (which is globally
+    // hidden anyway) — drag bigger for room, drag smaller and it stops at the
+    // text.
+    el.style.height = 'auto';
+    const floor = height ?? DEFAULT_NOTE_HEIGHT;
+    el.style.height = `${Math.max(floor, el.scrollHeight)}px`;
   }, [value, height]);
 
   useEffect(() => {
@@ -353,7 +360,6 @@ function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyP
       value={value}
       placeholder={placeholder}
       rows={2}
-      style={{ overflowY: height != null ? 'auto' : 'hidden' }}
       onChange={e => onChange(e.target.value)}
       onPointerDown={e => e.stopPropagation()}
     />
