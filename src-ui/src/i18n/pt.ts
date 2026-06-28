@@ -111,6 +111,17 @@ export const pt = {
   'task.view.list.sub': 'Lista compacta, marque uma a uma',
   'task.view.note.sub': 'Notas amplas: escreva e envie tudo',
   'task.note_placeholder': 'Anote algo e envie tudo ao seu agente…',
+  'task.welcome_note': `Bem-vindo ao Coffee CLI ☕
+
+Isto é uma nota adesiva: escreva o que quiser e toque em ▶ (canto superior direito) para enviar tudo à sua IA. Sem mais aquela caixinha de texto apertada.
+
+Três passos para começar:
+1. Escolha uma ferramenta no centro (Claude / Codex / OpenCode…), escolha uma pasta e pronto
+2. Os três pontos definem a prioridade (vermelho / âmbar / verde) e se ordenam sozinhos; arraste a borda inferior para redimensionar a nota
+3. "Histórico" (canto superior direito) mostra quais arquivos a IA mexeu; em Configurações ficam os temas, o idioma e a troca entre "Lista de tarefas" e "Notas adesivas"
+
+Apague esta nota quando quiser e comece a sua primeira tarefa.`,
+  'task.show_guide': 'Ver o guia de uso',
 
   // Theme Menu
   'theme.section.color': 'Cores',

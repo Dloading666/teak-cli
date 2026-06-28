@@ -113,6 +113,17 @@ export const vi = {
   'task.view.list.sub': 'Danh sách gọn, tick từng mục',
   'task.view.note.sub': 'Ghi chú lớn — viết thoải mái, gửi cả đoạn',
   'task.note_placeholder': 'Ghi vài dòng rồi gửi cả đoạn cho agent…',
+  'task.welcome_note': `Chào mừng đến với Coffee CLI ☕
+
+Đây là một tờ ghi chú dán: viết bất cứ điều gì, rồi bấm ▶ (góc trên bên phải) để gửi cả đoạn cho AI của bạn. Không còn ô nhập liệu chật chội nữa.
+
+Ba bước để bắt đầu:
+1. Chọn một công cụ ở giữa (Claude / Codex / OpenCode…), chọn một thư mục là chạy được ngay
+2. Ba chấm tròn đặt mức ưu tiên (đỏ / vàng / xanh) và tự sắp xếp; kéo mép dưới để thay đổi kích thước ghi chú
+3. "Lịch sử" (góc trên bên phải) cho biết AI đã đụng vào những tệp nào; phần Cài đặt có giao diện, ngôn ngữ và nút chuyển giữa "Danh sách việc cần làm" và "Ghi chú dán"
+
+Xóa tờ ghi chú này khi bạn sẵn sàng và bắt đầu tác vụ đầu tiên.`,
+  'task.show_guide': 'Xem hướng dẫn sử dụng',
 
   // Theme Menu
   'theme.section.color': 'Màu sắc',
