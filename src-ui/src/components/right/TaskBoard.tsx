@@ -70,7 +70,7 @@ const SECTION_LABEL_KEYS: Record<TaskStatus, 'task.section.working' | 'task.sect
 
 export function TaskBoard() {
   const t = useT();
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
   const viewMode = state.taskViewMode;
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -140,13 +140,34 @@ export function TaskBoard() {
   const isLoadedRef = useRef(false);
   const pendingEchoesRef = useRef<Set<string>>(new Set());
 
-  // Load tasks from Rust backend on mount
+  // Load tasks from Rust backend on mount. A first-ever launch (no tasks AND
+  // never seeded) drops one roomy welcome/guide note and opens the sticky-note
+  // view so it lands as a proper note; existing users are just flagged seeded
+  // (so they never get it). The seed is allowed to persist (no skip).
   useEffect(() => {
     loadTasksFromBackend().then(data => {
       isLoadedRef.current = true;
+      let seeded = false;
+      try { seeded = localStorage.getItem('cc-tasks-seeded') === '1'; } catch {}
+
+      if (data.length === 0 && !seeded) {
+        try { localStorage.setItem('cc-tasks-seeded', '1'); } catch {}
+        dispatch({ type: 'SET_TASK_VIEW_MODE', mode: 'note' }); // remembers the view too
+        setTasks([{
+          id: crypto.randomUUID(),
+          title: t('task.welcome_note'),
+          status: 'todo',
+          createdAt: Date.now(),
+          height: 240,
+        }]);
+        return;
+      }
+
+      if (!seeded) { try { localStorage.setItem('cc-tasks-seeded', '1'); } catch {} }
       skipNextSyncRef.current = true; // Prevent saving the initialized data purely due to React effect
       setTasks(data);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save tasks to Rust backend whenever tasks change

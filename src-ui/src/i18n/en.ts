@@ -118,6 +118,17 @@ export const en = {
   'task.view.list.sub': 'Compact checklist, tick off one by one',
   'task.view.note.sub': 'Roomy notes — jot freely, send the whole thing',
   'task.note_placeholder': 'Jot something down, send it all to your agent…',
+  // Seeded once for brand-new users as a roomy welcome note (sticky-note view).
+  'task.welcome_note': `Welcome to Coffee CLI ☕
+
+This is a sticky note — jot anything down, then hit ▶ (top-right) to send the whole thing to your AI. No more cramped little input box.
+
+Three steps to start:
+1. Pick a tool in the middle (Claude / Codex / OpenCode…), choose a folder, and you're off
+2. The three dots set priority (red / amber / green) and auto-sort; drag the bottom edge to resize the note
+3. "Changes" (top-right) shows which files the AI touched; Settings has themes, language, and the To-do / Sticky-note switch
+
+Delete this note whenever you're ready, and start your first task.`,
 
   // Theme Menu
   'theme.section.color': 'Colors',
