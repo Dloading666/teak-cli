@@ -112,6 +112,14 @@ function GambitImpl({
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // The scroll container that owns the vertical scrollbar (the textarea itself
+  // is overflow:hidden and auto-grows to its full content height). We need a
+  // handle to it so the auto-grow effect can preserve / follow its scrollTop.
+  const inputRef = useRef<HTMLDivElement>(null);
+  // The draft value the auto-grow effect last sized for. Lets it tell a real
+  // content edit (typing / paste) from a non-content trigger (pill toggle,
+  // window resize) so only the former is allowed to move the scroll position.
+  const lastSizedDraftRef = useRef(draft);
 
   const [pos, setPos] = useState({ x: initialX, y: initialY });
   const [size, setSize] = useState({ w: DEFAULT_WIDTH, h: DEFAULT_HEIGHT });
@@ -514,8 +522,40 @@ function GambitImpl({
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
+    const scroller = inputRef.current;
+    // Did this run come from an actual content edit (typing / paste), or from
+    // one of the effect's other triggers — a pill add/remove or a window
+    // resize? Only a content edit may move the scroll position; a resize or a
+    // pill toggle must hold the view exactly where the user left it (even if
+    // the caret happens to be parked at the very end).
+    const contentChanged = lastSizedDraftRef.current !== draft;
+    lastSizedDraftRef.current = draft;
+    const prevScrollTop = scroller?.scrollTop ?? 0;
+    // Auto-grow: collapse to remeasure, then fit the box to its content.
     ta.style.height = 'auto';
     ta.style.height = `${ta.scrollHeight}px`;
+    if (!scroller) return;
+    // Remeasuring via height:'auto' momentarily collapses the (rows=1) textarea
+    // for the synchronous reflow that reading scrollHeight forces; while
+    // collapsed the scroll container has almost no content, so the browser
+    // clamps its scrollTop to 0 and the clamp sticks once the real height is
+    // restored. Re-applying the captured scrollTop undoes that — it's the cure
+    // for the "every keystroke jumps the view back to the top" bug (worst in
+    // floating mode, fixed ~180px height). When the user is actively typing at
+    // the very end of the draft, follow the caret to the bottom instead so the
+    // newest line stays visible.
+    //   Known gap: an edit that pushes a MID-text caret below the fold isn't
+    //   chased (we just hold position) — doing so would need caret-pixel
+    //   measurement, and the simpler "let the textarea scroll itself" cure is
+    //   blocked by the absolutely-positioned skill-pill overlay (text would
+    //   slide under the stationary pills). Still strictly better than the old
+    //   jump-to-top, so accepted.
+    const followCaretToBottom =
+      contentChanged &&
+      document.activeElement === ta &&
+      ta.selectionStart === ta.value.length &&
+      ta.selectionEnd === ta.value.length;
+    scroller.scrollTop = followCaretToBottom ? scroller.scrollHeight : prevScrollTop;
   }, [draft, attachedSkills.length, size.w]);
 
   // Measure the pill overlay → first-line indent for the textarea. +8px so
@@ -885,6 +925,7 @@ function GambitImpl({
           next to it on line 1 and wraps to the LEFT margin on line 2. */}
       <div
         className="gambit-input"
+        ref={inputRef}
         onMouseDown={(e) => {
           // Click anywhere in the box (padding, the pill overlay, a pill
           // chip body) → focus the textarea. preventDefault stops focus
