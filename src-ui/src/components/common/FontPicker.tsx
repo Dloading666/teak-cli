@@ -29,7 +29,7 @@ export function FontPicker({ fonts, value, onChange }: FontPickerProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const defaultLabel = t('settings.terminal.font.default' as any) || '默认(内置)';
+  const defaultLabel = t('settings.terminal.font.default' as any);
   const label = value || defaultLabel;
 
   const toggle = () => {
@@ -109,21 +109,21 @@ export function FontPicker({ fonts, value, onChange }: FontPickerProps) {
             <input
               ref={searchRef}
               className="settings-font-search"
-              placeholder={t('settings.font.search' as any) || '搜索字体…'}
+              placeholder={t('settings.font.search' as any)}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
             <div className="settings-font-list">
               {!query && renderOpt('', '')}
               {fonts === null && (
-                <div className="settings-font-hint">{t('diff.loading' as any) || '加载中…'}</div>
+                <div className="settings-font-hint">{t('diff.loading' as any)}</div>
               )}
               {mono.length > 0 && (
-                <div className="settings-font-group">{t('settings.font.monospace' as any) || '等宽'}</div>
+                <div className="settings-font-group">{t('settings.font.monospace' as any)}</div>
               )}
               {mono.map((f) => renderOpt(f.family, `"${f.family}", monospace`))}
               {other.length > 0 && (
-                <div className="settings-font-group">{t('settings.font.other' as any) || '其他字体'}</div>
+                <div className="settings-font-group">{t('settings.font.other' as any)}</div>
               )}
               {other.map((f) => renderOpt(f.family, `"${f.family}"`))}
             </div>
