@@ -334,13 +334,13 @@ export function SettingsModal() {
                   ))}
                 </div>
 
-                <div className="settings-section-label">{t('settings.terminal.font' as any) || '字体'}</div>
+                <div className="settings-section-label">{t('settings.terminal.font' as any)}</div>
                 <FontPicker fonts={fonts} value={state.termFont} onChange={setFont} />
                 <div
                   className="settings-font-preview"
                   style={{ fontFamily: state.termFont ? `"${state.termFont}", monospace` : 'monospace' }}
                 >
-                  Coffee CLI · 终端字体预览 AaBb 123 {'{ }'} =&gt;
+                  {'Coffee CLI · AaBb 0123 {}=>'}
                 </div>
               </>
             )}
