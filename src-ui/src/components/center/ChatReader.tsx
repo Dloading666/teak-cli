@@ -16,7 +16,12 @@ interface ChatMessage {
   turn_count?: number;
 }
 
-export function ChatReader({ sessionId }: { sessionId: string }) {
+interface ChatReaderProps {
+  sessionId: string;
+  showToast: (msg: string) => void;
+}
+
+export function ChatReader({ sessionId, showToast }: ChatReaderProps) {
   const t = useT();
   const { state, dispatch } = useAppState();
 
@@ -291,7 +296,10 @@ export function ChatReader({ sessionId }: { sessionId: string }) {
 
     commands.tierTerminalResume(
       currentSession.id, targetId, currentSession.tool, currentSession.session_token, 80, 24, currentSession.cwd
-    ).catch(console.error);
+    ).catch((err) => {
+      console.error(err);
+      showToast(`${t('history.resume_failed' as any)}${String(err)}`);
+    });
   };
 
   return (

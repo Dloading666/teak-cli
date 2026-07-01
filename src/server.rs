@@ -897,7 +897,44 @@ fn is_system_injected(text: &str) -> bool {
     SYSTEM_INJECTION_TAGS.iter().any(|tag| t.starts_with(tag))
 }
 
-fn parse_agent_jsonl(file_path: &std::path::Path, tool_name: &str) -> Option<SavedSession> {
+/// Claude Code mangles a project's absolute path into its `~/.claude/projects/`
+/// folder name by replacing every non-alphanumeric ASCII character with a
+/// single `-` (verified against live folder names on disk, e.g.
+/// `D:\Coffee-CLI\.claude\worktrees\foo` -> `D--Coffee-CLI--claude-worktrees-foo`).
+/// That mapping is **not reversible**: a literal `-` already inside a path
+/// segment (extremely common — "Coffee-CLI", any kebab-case folder) is
+/// indistinguishable from an encoded separator once collapsed. A previous
+/// version of this function tried to reverse it by splitting the folder name
+/// on "--", which silently produced a plausible-but-wrong path for any
+/// project whose name contained a hyphen — the wrong path would fail the
+/// `path.exists()` guard in `terminal::spawn`, so the CWD override was
+/// silently dropped and `claude --resume <token>` launched from Coffee
+/// CLI's own process directory instead of the session's real project.
+///
+/// Fixed by going the other direction: `~/.claude.json`'s top-level
+/// `projects` object is keyed by the *real*, unmangled absolute path for
+/// every project Claude Code knows about. Forward-encode each candidate
+/// with the same rule and compare — encoding is deterministic and lossless
+/// in this direction, so a match is exact, never a guess.
+fn resolve_claude_cwd_via_registry(home: &std::path::Path, encoded_folder: &str) -> Option<String> {
+    let raw = std::fs::read_to_string(home.join(".claude.json")).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let projects = json.get("projects")?.as_object()?;
+
+    let encode = |real_path: &str| -> String {
+        real_path
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+            .collect()
+    };
+
+    projects
+        .keys()
+        .find(|real_path| encode(real_path) == encoded_folder)
+        .cloned()
+}
+
+fn parse_agent_jsonl(file_path: &std::path::Path, tool_name: &str, home: Option<&std::path::Path>) -> Option<SavedSession> {
     use std::io::BufRead;
     let file = std::fs::File::open(file_path).ok()?;
     let reader = std::io::BufReader::new(file);
@@ -967,21 +1004,20 @@ fn parse_agent_jsonl(file_path: &std::path::Path, tool_name: &str) -> Option<Sav
         }
     }
     
-    // Fallback: If cwd is still empty, derive it from the parent project folder name
-    // e.g., "D--Coffee-Code" -> "D:\Coffee-Code", "C--Users--..." -> "C:\Users\..."
-    if cwd.is_empty() {
-        if let Some(parent) = file_path.parent() {
-            if let Some(folder_name) = parent.file_name().and_then(|n| n.to_str()) {
-                if folder_name.contains("--") {
-                    let mut parts = folder_name.split("--");
-                    if let Some(drive) = parts.next() {
-                        let rest: Vec<&str> = parts.collect();
-                        let decoded_path = if cfg!(target_os = "windows") {
-                            format!("{}:\\{}", drive, rest.join("\\"))
-                        } else {
-                            format!("/{}/{}", drive, rest.join("/"))
-                        };
-                        cwd = decoded_path;
+    // Fallback: JSONL had no embedded cwd (older session, or a line we didn't
+    // recognize). Claude Code's own `~/.claude.json` projects registry is the
+    // only reliable source at that point — see resolve_claude_cwd_via_registry
+    // for why guessing from the folder name is actively wrong, not just
+    // occasionally imprecise. Only Claude has that registry; for any other
+    // tool routed through this generic parser, an unresolved cwd is left
+    // blank rather than guessed, since a wrong-but-existing path silently
+    // sends `--resume` into the wrong project.
+    if cwd.is_empty() && tool_name == "claude" {
+        if let Some(home) = home {
+            if let Some(parent) = file_path.parent() {
+                if let Some(folder_name) = parent.file_name().and_then(|n| n.to_str()) {
+                    if let Some(real_path) = resolve_claude_cwd_via_registry(home, folder_name) {
+                        cwd = real_path;
                     }
                 }
             }
@@ -2189,7 +2225,7 @@ fn load_native_history_blocking() -> Result<Vec<SavedSession>, String> {
             "codex"       => parse_codex_session_jsonl(path),
             "qwen"        => parse_qwen_session_jsonl(path),
             "antigravity" => parse_gemini_session_jsonl(path, &antigravity_project_map),
-            other         => parse_agent_jsonl(path, other),
+            other         => parse_agent_jsonl(path, other, home.as_deref()),
         };
         if let Some(session) = parsed {
             result.push(session);
@@ -2555,6 +2591,22 @@ fn tier_terminal_resume(
         .ok_or_else(|| format!("Unknown tool: {}", tool))?;
     let resume_program = preset.resume_program
         .ok_or_else(|| format!("Tool '{}' does not support resume", tool))?;
+
+    // Claude Code resumes are scoped to the project directory the session
+    // originally ran in (its ~/.claude/projects/<mangled-path>/ folder). If
+    // we couldn't determine that real directory (see
+    // resolve_claude_cwd_via_registry), spawning anyway would silently run
+    // `claude --resume <token>` from Coffee CLI's OWN process directory
+    // instead — indistinguishable from a working resume until the user
+    // notices the wrong project loaded (or Claude fails to find the
+    // session at all). A loud, catchable error here beats a silent
+    // wrong-directory resume, which was reported as "it just crashes/
+    // resumes into a random folder" with no indication why.
+    if tool == "claude" && cwd.trim().is_empty() {
+        return Err(
+            "Could not determine this session's original project folder — refusing to resume into the wrong directory".to_string()
+        );
+    }
 
     // Validate session_token against the tool's token_format.
     // Prevents flag injection: "uuid --dangerously-skip-permissions" would fail this check.
@@ -3136,4 +3188,110 @@ pub fn start_ui() -> anyhow::Result<()> {
         });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod resume_cwd_tests {
+    use super::resolve_claude_cwd_via_registry;
+    use std::io::Write;
+
+    // Isolated per-test home dir under the OS temp dir — avoids clobbering
+    // the real ~/.claude.json and avoids tests racing each other on a
+    // shared path (each test gets a name-derived subfolder).
+    fn temp_home(test_name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("coffee-cli-test-{}", test_name));
+        let _ = std::fs::remove_dir_all(&dir); // clean slate if a prior run left it behind
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write_claude_json(home: &std::path::Path, project_paths: &[&str]) {
+        let projects_obj = project_paths
+            .iter()
+            .map(|p| format!("{:?}: {{}}", p)) // {:?} on &str gives a valid escaped JSON string
+            .collect::<Vec<_>>()
+            .join(",");
+        let json = format!(r#"{{"projects": {{{}}}}}"#, projects_obj);
+        let mut f = std::fs::File::create(home.join(".claude.json")).unwrap();
+        f.write_all(json.as_bytes()).unwrap();
+    }
+
+    // Real folder name observed on disk, verified by hand against the
+    // known real path — this is the exact case that motivated the fix
+    // (a project name containing a hyphen, "Coffee-CLI", made the old
+    // split("--") fallback reconstruct a nonexistent path).
+    #[test]
+    fn resolves_real_world_hyphenated_project_path() {
+        let home = temp_home("hyphenated-project");
+        let real_path = r"D:\Coffee-CLI\.claude\worktrees\exciting-swanson-f7e8be";
+        write_claude_json(&home, &[real_path]);
+
+        let resolved = resolve_claude_cwd_via_registry(
+            &home,
+            "D--Coffee-CLI--claude-worktrees-exciting-swanson-f7e8be",
+        );
+
+        assert_eq!(resolved, Some(real_path.to_string()));
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn resolves_second_real_world_project_path() {
+        let home = temp_home("echobird-project");
+        let real_path = r"E:\EchoBird";
+        write_claude_json(&home, &[real_path]);
+
+        let resolved = resolve_claude_cwd_via_registry(&home, "E--EchoBird");
+
+        assert_eq!(resolved, Some(real_path.to_string()));
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn returns_none_when_no_project_matches_the_encoded_folder() {
+        let home = temp_home("no-match");
+        write_claude_json(&home, &[r"D:\some\other\project"]);
+
+        let resolved = resolve_claude_cwd_via_registry(&home, "D--Coffee-CLI--claude-worktrees-foo");
+
+        assert_eq!(resolved, None);
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn returns_none_when_claude_json_is_missing() {
+        let home = temp_home("missing-config");
+        // Deliberately don't write .claude.json.
+
+        let resolved = resolve_claude_cwd_via_registry(&home, "D--anything");
+
+        assert_eq!(resolved, None);
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    // The old split("--") fallback got this case actively wrong: it would
+    // reconstruct "D:\Coffee-CLI\claude-worktrees-exciting-swanson-f7e8be"
+    // (missing the leading dot before "claude", "worktrees" and
+    // "exciting-swanson-f7e8be" wrongly merged) instead of the real path.
+    // The registry lookup sidesteps that ambiguity entirely by encoding
+    // forward from the known-real path rather than decoding backward from
+    // the mangled folder name — this test locks in that it does NOT fall
+    // back to producing the old wrong guess when the registry has no match.
+    #[test]
+    fn does_not_reconstruct_the_old_broken_guess_when_unresolvable() {
+        let home = temp_home("no-registry-entry-for-hyphenated-project");
+        write_claude_json(&home, &[]); // registry present but empty — no candidates at all
+
+        let resolved = resolve_claude_cwd_via_registry(
+            &home,
+            "D--Coffee-CLI--claude-worktrees-exciting-swanson-f7e8be",
+        );
+
+        assert_ne!(
+            resolved,
+            Some(r"D:\Coffee-CLI\claude-worktrees-exciting-swanson-f7e8be".to_string())
+        );
+        assert_eq!(resolved, None);
+        let _ = std::fs::remove_dir_all(&home);
+    }
 }

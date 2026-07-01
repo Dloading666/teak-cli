@@ -83,6 +83,7 @@ export const vi = {
 
   // Actions
   'action.resume_terminal': 'Tiếp tục phiên này',
+  'history.resume_failed': 'Không thể tiếp tục phiên: ',
 
   // Time
   'time.just_now': 'Vừa xong',

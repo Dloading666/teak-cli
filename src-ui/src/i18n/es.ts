@@ -80,6 +80,7 @@ export const es = {
 
   // Actions
   'action.resume_terminal': 'Continuar esta sesión',
+  'history.resume_failed': 'Error al reanudar la sesión: ',
 
   // Time
   'time.just_now': 'Ahora mismo',

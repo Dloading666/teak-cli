@@ -1296,7 +1296,7 @@ export function CenterPanel() {
             }}
           >
             {t.tool === 'history' ? (
-              <ChatReader sessionId={t.id} />
+              <ChatReader sessionId={t.id} showToast={showToast} />
             ) : t.tool === 'two-split' ? (
               <FourSplitGrid
                 tab={t}

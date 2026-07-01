@@ -81,6 +81,7 @@ export const de = {
 
   // Actions
   'action.resume_terminal': 'Diese Sitzung fortsetzen',
+  'history.resume_failed': 'Sitzung konnte nicht fortgesetzt werden: ',
 
   // Time
   'time.just_now': 'Gerade eben',

@@ -80,6 +80,7 @@ export const zhCN = {
 
   // Actions
   'action.resume_terminal': '继续本轮对话',
+  'history.resume_failed': '恢复会话失败：',
 
   // Time
   'time.just_now': '刚刚',

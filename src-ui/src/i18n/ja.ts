@@ -80,6 +80,7 @@ export const ja = {
 
   // Actions
   'action.resume_terminal': 'このセッションを続ける',
+  'history.resume_failed': 'セッションの再開に失敗しました：',
 
   // Time
   'time.just_now': 'たった今',

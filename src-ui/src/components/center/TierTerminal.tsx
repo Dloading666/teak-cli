@@ -403,12 +403,6 @@ function TierTerminalImpl({
   const lastOutputAtRef = useRef(0);
   const [processExited, setProcessExited] = useState(false);
   const [startFailed, setStartFailed] = useState(false);
-  // First exit event to arrive (onExit from child-watcher, or onStatus from
-  // reader EOF) wins the right to write the "[Process exited]" scrollback
-  // line. Prevents duplication when both fire. The child-watcher's onExit
-  // typically arrives first with the real exit code; reader-EOF onStatus
-  // then arrives with a hardcoded 0 and correctly becomes a no-op.
-  const exitMessageWrittenRef = useRef(false);
   // Rolling buffer for agent-to-agent marker scanning. PTY chunks can split
   // `[COFFEE-TELL:...]` / `[COFFEE-DONE:...]` across boundaries; the buffer
   // reassembles chunks so markers match reliably. `markerScanOffsetRef`
@@ -886,31 +880,24 @@ function TierTerminalImpl({
             }
           }
         },
-        onStatus: (running, exitCode) => {
+        onStatus: (running, _exitCode) => {
           if (!mounted || running) return;
           setProcessExited(true);
           dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
-          if (exitMessageWrittenRef.current) return;
-          exitMessageWrittenRef.current = true;
-          const msg = exitCode === 0
-            ? '\r\n\x1b[32m[Process exited normally]\x1b[0m\r\n'
-            : `\r\n\x1b[31m[Process exited with code ${exitCode}]\x1b[0m\r\n`;
-          xtermRef.current?.write(msg);
         },
-        onExit: (exitCode) => {
+        onExit: (_exitCode) => {
           // Authoritative "process is actually dead" signal from the Rust
           // child-watcher thread. Critical for the lockup scenario where an
           // intermediate cmd.exe keeps the PTY slave open so reader never
           // sees EOF — without this, the terminal looked frozen forever.
+          //
+          // No banner written to the terminal on exit (tried this before —
+          // see git history — it read as Coffee CLI editorializing over the
+          // upstream tool's own output). The CLI's own exit text, if any,
+          // already speaks for itself.
           if (!mounted) return;
           setProcessExited(true);
           dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
-          if (exitMessageWrittenRef.current) return;
-          exitMessageWrittenRef.current = true;
-          const msg = exitCode === 0
-            ? '\r\n\x1b[32m[Process exited normally]\x1b[0m\r\n'
-            : `\r\n\x1b[31m[Process exited with code ${exitCode}]\x1b[0m\r\n`;
-          xtermRef.current?.write(msg);
         },
         onCwd: (cwd) => {
           if (!mounted) return;

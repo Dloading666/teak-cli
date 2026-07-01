@@ -81,6 +81,7 @@ export const ru = {
 
   // Actions
   'action.resume_terminal': 'Продолжить сессию',
+  'history.resume_failed': 'Не удалось возобновить сессию: ',
 
   // Time
   'time.just_now': 'Только что',
