@@ -97,6 +97,8 @@ export const ko = {
   'settings.terminal': '터미널',
   'settings.gambit': '한 수',
   'settings.language': '언어',
+  'settings.feedback': '버그 / 피드백',
+  'settings.feedback.desc': '버그를 발견했거나 제안이 있으신가요? 아래를 클릭해 문제를 제출해 주세요:',
   'settings.wallpaper.pick': '이미지 또는 동영상 선택',
   'settings.wallpaper.clear': '배경화면 제거',
   'settings.wallpaper.opacity': '불투명도',

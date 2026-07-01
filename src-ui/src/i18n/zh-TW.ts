@@ -96,6 +96,8 @@ export const zhTW = {
   'settings.wallpaper': '桌布',
   'settings.terminal': '終端',
   'settings.language': '語言',
+  'settings.feedback': 'BUG / 建議',
+  'settings.feedback.desc': '遇到 BUG 或建議，點擊下方提交你的問題：',
   'settings.wallpaper.pick': '選擇圖片或影片',
   'settings.wallpaper.clear': '移除桌布',
   'settings.wallpaper.opacity': '透明度',

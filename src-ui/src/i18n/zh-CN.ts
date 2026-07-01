@@ -96,6 +96,8 @@ export const zhCN = {
   'settings.wallpaper': '壁纸',
   'settings.terminal': '终端',
   'settings.language': '语言',
+  'settings.feedback': 'BUG / 建议',
+  'settings.feedback.desc': '遇到 BUG 或建议，点击下方提交你的问题：',
   'settings.wallpaper.pick': '选择图片或视频',
   'settings.wallpaper.clear': '移除壁纸',
   'settings.wallpaper.opacity': '透明度',

@@ -98,6 +98,8 @@ export const de = {
   'settings.terminal': 'Terminal',
   'settings.gambit': 'Gambit',
   'settings.language': 'Sprache',
+  'settings.feedback': 'Fehler & Feedback',
+  'settings.feedback.desc': 'Einen Fehler gefunden oder einen Vorschlag? Klicke unten, um dein Problem zu melden:',
   'settings.wallpaper.pick': 'Bild oder Video wählen',
   'settings.wallpaper.clear': 'Hintergrund entfernen',
   'settings.wallpaper.opacity': 'Deckkraft',

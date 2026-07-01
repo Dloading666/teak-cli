@@ -97,6 +97,8 @@ export const fr = {
   'settings.terminal': 'Terminal',
   'settings.gambit': 'Gambit',
   'settings.language': 'Langue',
+  'settings.feedback': 'Bugs et suggestions',
+  'settings.feedback.desc': 'Vous avez trouvé un bug ou avez une suggestion ? Cliquez ci-dessous pour soumettre votre problème :',
   'settings.wallpaper.pick': 'Choisir une image ou une vidéo',
   'settings.wallpaper.clear': "Supprimer le fond d'écran",
   'settings.wallpaper.opacity': 'Opacité',

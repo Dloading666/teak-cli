@@ -100,6 +100,8 @@ export const vi = {
   'settings.terminal': 'Terminal',
   'settings.gambit': 'Nước cờ',
   'settings.language': 'Ngôn ngữ',
+  'settings.feedback': 'Lỗi & Góp ý',
+  'settings.feedback.desc': 'Gặp lỗi hoặc có góp ý? Nhấp vào bên dưới để gửi vấn đề của bạn:',
   'settings.wallpaper.pick': 'Chọn ảnh hoặc video',
   'settings.wallpaper.clear': 'Xóa hình nền',
   'settings.wallpaper.opacity': 'Độ mờ',

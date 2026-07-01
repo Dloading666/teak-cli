@@ -98,6 +98,8 @@ export const pt = {
   'settings.terminal': 'Terminal',
   'settings.gambit': 'Gambit',
   'settings.language': 'Idioma',
+  'settings.feedback': 'Bugs e sugestões',
+  'settings.feedback.desc': 'Encontrou um bug ou tem uma sugestão? Clique abaixo para enviar seu problema:',
   'settings.wallpaper.pick': 'Escolher imagem ou vídeo',
   'settings.wallpaper.clear': 'Remover papel de parede',
   'settings.wallpaper.opacity': 'Opacidade',

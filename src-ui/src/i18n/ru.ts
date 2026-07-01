@@ -98,6 +98,8 @@ export const ru = {
   'settings.terminal': 'Терминал',
   'settings.gambit': 'Gambit',
   'settings.language': 'Язык',
+  'settings.feedback': 'Баги и предложения',
+  'settings.feedback.desc': 'Нашли баг или есть предложение? Нажмите ниже, чтобы отправить проблему:',
   'settings.wallpaper.pick': 'Выбрать изображение или видео',
   'settings.wallpaper.clear': 'Убрать обои',
   'settings.wallpaper.opacity': 'Непрозрачность',

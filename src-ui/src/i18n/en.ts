@@ -98,6 +98,8 @@ export const en = {
   'settings.wallpaper': 'Wallpaper',
   'settings.terminal': 'Terminal',
   'settings.language': 'Language',
+  'settings.feedback': 'Bug / Feedback',
+  'settings.feedback.desc': 'Found a bug or have a suggestion? Click below to submit your issue:',
   'settings.wallpaper.pick': 'Choose image or video',
   'settings.wallpaper.clear': 'Remove wallpaper',
   'settings.wallpaper.opacity': 'Opacity',
