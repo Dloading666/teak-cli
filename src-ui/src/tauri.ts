@@ -124,6 +124,13 @@ export const commands = {
   setBackgroundMode: (hidden: boolean) =>
     invoke<void>('set_background_mode', { hidden }),
 
+  /** Per-tab visibility signal — narrower than setBackgroundMode. Flip when
+   *  this session's terminal element enters/leaves the viewport (a tab
+   *  switch, not just the whole window hiding) so its backend emitter can
+   *  widen its coalesce window while nobody is looking at that tab. */
+  setSessionActive: (sessionId: string, active: boolean) =>
+    invoke<void>('set_session_active', { sessionId, active }),
+
   // Session Resume
   getNativeHistory: () => invoke<SavedSession[]>('get_native_history'),
   /** Per-session activity for the contribution heatmap.

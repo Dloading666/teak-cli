@@ -258,6 +258,86 @@ function TermContextMenu({ menu, onClose, onCopy, onPaste, onSelectAll }: {
   );
 }
 
+// ── Shared WebGL renderer budget ─────────────────────────────────────────────
+// Chromium/WebView2 caps *active* WebGL contexts at ~16 per renderer process.
+// With one terminal per tab/pane, a long session blows past that and the
+// browser force-loses the OLDEST context. We mirror VS Code's terminal (whose
+// team maintains xterm.js) with two process-wide guards:
+//   • `webglDisabled` latch — once ANY terminal fails to acquire, or loses, its
+//     GL context, every terminal that hasn't already attached (this one, if it
+//     just failed, + all future ones) renders via the DOM renderer instead.
+//     Terminals that already hold a live context keep it — the latch only
+//     stops new competition for a slot that isn't coming back. xterm
+//     auto-falls back to DOM when no render addon is loaded, so this degrades
+//     gracefully instead of stranding a tab on a dead renderer.
+//   • one cached GPU probe — the probe opens a throwaway GL context, so running
+//     it per-terminal wasted a context slot every time.
+let webglDisabled = false;
+let gpuIsHardware: boolean | null = null;
+
+function detectHardwareWebgl(): boolean {
+  try {
+    const testCanvas = document.createElement('canvas');
+    const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+    if (!gl) {
+      console.log('[TierTerminal] WebGL unavailable → DOM renderer');
+      return false;
+    }
+    const debugExt = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
+    if (!debugExt) {
+      // Privacy-hardened builds hide the renderer string; assume real hardware.
+      // (Defaulting to DOM here used to spike CPU on locked-down machines.)
+      console.log('[TierTerminal] GPU info hidden → WebGL (assuming hardware acceleration)');
+      return true;
+    }
+    const renderer = (gl as WebGLRenderingContext).getParameter(debugExt.UNMASKED_RENDERER_WEBGL) as string;
+    const isSoftware = /llvmpipe|softpipe|swrast|swiftshader|software|microsoft basic render|mesa offscreen/i.test(renderer);
+    console.log(`[TierTerminal] GPU: ${renderer} → ${isSoftware ? 'DOM' : 'WebGL'} (software=${isSoftware})`);
+    return !isSoftware;
+  } catch {
+    console.warn('[TierTerminal] WebGL probe failed → DOM renderer');
+    return false;
+  }
+}
+
+function probeWebglOnce(): boolean {
+  if (gpuIsHardware === null) gpuIsHardware = detectHardwareWebgl();
+  return gpuIsHardware;
+}
+
+// Attach the WebGL renderer to `term`, respecting the shared context budget.
+// Idempotent per terminal (guards on `webglRef`); a no-op once the latch is
+// tripped or on a software GPU. Safe to call on first reveal, so a tab that is
+// never shown never spends a context. DOM fallback loses customGlyphs /
+// rescaleOverlappingGlyphs, so box-drawing may misalign on degraded terminals.
+function attachWebglRenderer(
+  term: Terminal,
+  webglRef: { current: WebglAddon | null },
+): void {
+  if (webglDisabled || webglRef.current) return;
+  if (!probeWebglOnce()) return; // software GPU → DOM renderer is cheaper
+  try {
+    const webgl = new WebglAddon();
+    webgl.onContextLoss(() => {
+      // Browser force-loses a context when the ~16 cap is hit or the GPU driver
+      // resets. Drop THIS terminal's renderer and latch the budget so no FUTURE
+      // terminal competes for a slot that isn't coming back. Terminals that
+      // already hold a live context (attached before this loss) are left
+      // alone — revoking a still-working context would be more destructive
+      // than the problem this is solving.
+      webglDisabled = true;
+      try { webgl.dispose(); } catch { /* already gone */ }
+      webglRef.current = null;
+    });
+    term.loadAddon(webgl);
+    webglRef.current = webgl;
+  } catch (err) {
+    // No context available even now → give up on WebGL process-wide.
+    webglDisabled = true;
+    console.error('[TierTerminal] WebGL attach failed → DOM renderer', err);
+  }
+}
+
 interface TierTerminalProps {
   sessionId: string;
   tool: ToolType;
@@ -303,6 +383,7 @@ function TierTerminalImpl({
   const wrapRef  = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitRef   = useRef<FitAddon | null>(null);
+  const webglRef = useRef<WebglAddon | null>(null);
 
   // ── Startup splash state ─────────────────────────────────────────────────
   const [showSplash, setShowSplash] = useState(true);
@@ -440,43 +521,38 @@ function TierTerminalImpl({
     // M-series, Intel Iris Xe, AMD APU) handle xterm WebGL fine; the
     // older "dedicated-GPU only" gate was misclassifying Apple Silicon
     // and Intel UHD laptops as DOM-only and tanking their CPU.
-    let useWebgl = false;
-    try {
-      const testCanvas = document.createElement('canvas');
-      const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
-      if (gl) {
-        const debugExt = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
-        if (debugExt) {
-          const renderer = (gl as WebGLRenderingContext).getParameter(debugExt.UNMASKED_RENDERER_WEBGL) as string;
-          const isSoftware = /llvmpipe|softpipe|swrast|swiftshader|software|microsoft basic render|mesa offscreen/i.test(renderer);
-          useWebgl = !isSoftware;
-          console.log(`[TierTerminal] GPU: ${renderer} → ${useWebgl ? 'WebGL' : 'DOM'} (software=${isSoftware})`);
-        } else {
-          // No debug extension — assume the GPU is real. Modern browsers
-          // hide UNMASKED_RENDERER_WEBGL behind a privacy flag in some
-          // contexts; defaulting to DOM here was the old behavior and
-          // caused the same per-window CPU spike on locked-down builds.
-          useWebgl = true;
-          console.log('[TierTerminal] GPU info hidden → WebGL (assuming hardware acceleration)');
+    // WebGL is a scarce shared resource (Chromium caps it at ~16 contexts; see
+    // attachWebglRenderer). Only spend a context once this terminal is actually
+    // on-screen, so tabs opened but never viewed cost zero context. Kept once
+    // attached (no renderer thrash on tab switch, matching VS Code's terminal).
+    // This laziness is per-TAB, not per-pane: a split tab (FourSplitGrid) dims
+    // its inactive panes with opacity, not display:none, so every pane in an
+    // ACTIVE split tab already has offsetParent set and attaches WebGL
+    // synchronously below — a 4-pane split alone can spend 4 of the ~16
+    // budget the moment it's opened. The shared latch still caps the damage
+    // (falls back to DOM once exhausted); this just isn't "lazy" within a
+    // split the way it is across tabs.
+    if (termRef.current!.offsetParent !== null) {
+      // Already on-screen — the common case: a freshly-opened active tab.
+      // Attach synchronously so the tab you're looking at never shows a
+      // one-frame DOM→WebGL swap.
+      attachWebglRenderer(term, webglRef);
+    } else {
+      // Created while hidden (background/restored tab, or a split pane whose
+      // tab isn't shown). Attach on first reveal. Element-level visibility is
+      // correct for both single tabs and split panes (all visible panes
+      // intersect), unlike the focus-scoped `isActive` prop. One-shot.
+      const webglIO = new IntersectionObserver((entries) => {
+        // `mounted` guards a dispose race: a queued callback firing after the
+        // effect cleanup would loadAddon() onto a disposed terminal, and the
+        // catch inside attachWebglRenderer would wrongly trip the latch to DOM.
+        if (mounted && entries.some((e) => e.isIntersecting)) {
+          attachWebglRenderer(term, webglRef);
+          webglIO.disconnect();
         }
-      } else {
-        console.log('[TierTerminal] WebGL unavailable → DOM renderer');
-      }
-    } catch {
-      console.warn('[TierTerminal] WebGL probe failed → DOM renderer');
-    }
-
-    // Always use WebGL renderer when possible — DOM renderer does NOT support
-    // customGlyphs or rescaleOverlappingGlyphs, causing ASCII art (Claude mascot,
-    // box borders) to misalign. WebGL supports allowTransparency for wallpapers.
-    if (useWebgl) {
-      try {
-        const webgl = new WebglAddon();
-        webgl.onContextLoss(() => { webgl.dispose(); });
-        term.loadAddon(webgl);
-      } catch (err) {
-        console.error('[TierTerminal] WebGL instantiation failed, falling back to DOM renderer', err);
-      }
+      });
+      webglIO.observe(termRef.current!);
+      unlisteners.push(() => webglIO.disconnect());
     }
 
     fit.fit();
@@ -851,6 +927,32 @@ function TierTerminalImpl({
 
         await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined);
 
+        // Continuously report on-screen visibility to the backend so its
+        // emitter can widen its coalesce window for a tab that's open but not
+        // the one being looked at — independent of whole-window
+        // BACKGROUND_MODE, which only covers the OS-hidden case. Unlike the
+        // one-shot WebGL observer above, this one never disconnects: it flips
+        // every tab switch for the life of the session. Placed after
+        // tierTerminalStart resolves (not earlier, alongside the WebGL
+        // observer) so the backend session is guaranteed to exist before the
+        // first report — a race would otherwise silently drop it and this
+        // session would default to full-cadence forever.
+        if (mounted && termRef.current) {
+          const visibilityIO = new IntersectionObserver((entries) => {
+            // Re-check `mounted` inside the callback (not just at registration
+            // above): IntersectionObserver callbacks are delivered via the
+            // browser's rendering-update step, not synchronously with
+            // disconnect(), so one can still be in flight when cleanup runs.
+            // Backend no-ops on an unknown session either way, but matching
+            // the WebGL observer's discipline keeps this from firing at all.
+            if (!mounted) return;
+            const visible = entries.some((e) => e.isIntersecting);
+            commands.setSessionActive(sessionId, visible).catch(() => {});
+          });
+          visibilityIO.observe(termRef.current);
+          unlisteners.push(() => visibilityIO.disconnect());
+        }
+
         // After PTY is running, wait two frames for layout to settle then
         // send the true terminal size. This fixes TUI adaptive-width tools
         // (Claude Code, etc.) that respond to SIGWINCH — the initial fit may
@@ -904,6 +1006,7 @@ function TierTerminalImpl({
       ro.disconnect();
       term.dispose();
       xtermRef.current = null;
+      webglRef.current = null;
       unlisteners.forEach(u => u());
       // Skip kill if this session was detached to a new window
       if (detachedSessions.has(sessionId)) {

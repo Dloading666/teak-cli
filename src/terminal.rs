@@ -430,6 +430,15 @@ pub struct TerminalSession {
     pub(crate) _master: Arc<Mutex<Option<Box<dyn portable_pty::MasterPty + Send>>>>,
     /// Shared activity state for status detection.
     pub activity: Arc<Mutex<SessionActivity>>,
+    /// True when this session's terminal is actually on-screen — its tab is
+    /// the active center-panel tab, or (for split panes) its parent tab is
+    /// active. Flipped by `set_session_active`, called from a frontend
+    /// IntersectionObserver on the terminal's DOM element. This is narrower
+    /// than `BACKGROUND_MODE`: a tab can be backgrounded this way while the
+    /// Coffee CLI window itself is still focused and foreground. Defaults
+    /// true so a session runs at full cadence until the frontend's first
+    /// visibility report lands.
+    pub is_tab_active: Arc<AtomicBool>,
     /// Ring buffer of recent base64-encoded output chunks. Originally
     /// populated for DetachedTerminal's history replay (retired 2026-04)
     /// and the MCP `read_pane` tool (also archived). Currently referenced
@@ -859,6 +868,9 @@ pub fn spawn(
     // emitter lock. Set to false exactly once, from the emitter cleanup path.
     let alive_flag: Arc<AtomicBool> = Arc::new(AtomicBool::new(true));
 
+    // See `TerminalSession::is_tab_active` doc comment — defaults active.
+    let is_tab_active: Arc<AtomicBool> = Arc::new(AtomicBool::new(true));
+
     // Store session (with shared writer reference + master kept alive + activity)
     let output_buffer: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
     {
@@ -875,6 +887,7 @@ pub fn spawn(
             _master: master_clone,
             activity: activity_clone,
             output_buffer: buffer_clone,
+            is_tab_active: is_tab_active.clone(),
         });
     }
 
@@ -914,6 +927,15 @@ pub fn spawn(
         loop {
             // 500ms when foreground, 5s when window is hidden — agent status
             // updates can lag a few seconds when the user isn't looking.
+            //
+            // Deliberately does NOT also check `is_tab_active` the way the
+            // emitter below does (see that flush_interval for the per-tab
+            // signal). The working/idle dot is read from the tab strip even
+            // for a tab that isn't the active one — throttling detection for
+            // a backgrounded-but-still-visible-in-the-strip tab would make
+            // that indicator lag exactly when it's most useful (watching a
+            // background AI-CLI tab finish). Only whole-window hidden
+            // (nothing on screen to read) earns the slower cadence here.
             let interval_ms = if BACKGROUND_MODE.load(Ordering::Relaxed) { 5000 } else { 500 };
             std::thread::sleep(std::time::Duration::from_millis(interval_ms));
             // Cheap atomic check — no mutex contention with the emitter.
@@ -1067,6 +1089,7 @@ pub fn spawn(
     let session_id_out = session_id.clone();
     let activity_for_emitter = activity.clone();
     let output_buffer_for_emitter = output_buffer.clone();
+    let is_active_for_emitter = is_tab_active.clone();
 
     std::thread::spawn(move || {
         use std::sync::mpsc::RecvTimeoutError;
@@ -1074,13 +1097,18 @@ pub fn spawn(
 
         // 8 ms is below human-perceptible latency (~16 ms frame) but large
         // enough to collapse a typical AI-CLI token-stream burst (hundreds of
-        // small writes) into a single emit. When the window is hidden, widen
-        // to 200 ms so a backgrounded Coffee CLI window stops generating
-        // 125 IPC events / sec / session for output the user can't see.
+        // small writes) into a single emit. Widen to 200 ms whenever nobody
+        // can see this output right now — either the whole Coffee CLI window
+        // is hidden (BACKGROUND_MODE), or this session's own tab isn't the
+        // one on screen (is_tab_active, e.g. a background tab while the
+        // window itself stays focused). Both cases stop paying full 8 ms
+        // parse+emit cadence for a stream nobody is watching.
         const FLUSH_INTERVAL_FG: StdDuration = StdDuration::from_millis(8);
         const FLUSH_INTERVAL_BG: StdDuration = StdDuration::from_millis(200);
         let flush_interval = || {
-            if BACKGROUND_MODE.load(Ordering::Relaxed) {
+            if BACKGROUND_MODE.load(Ordering::Relaxed)
+                || !is_active_for_emitter.load(Ordering::Relaxed)
+            {
                 FLUSH_INTERVAL_BG
             } else {
                 FLUSH_INTERVAL_FG

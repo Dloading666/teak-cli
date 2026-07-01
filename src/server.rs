@@ -793,6 +793,23 @@ fn set_background_mode(hidden: bool) {
         .store(hidden, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// Per-tab visibility flag, flipped by a frontend IntersectionObserver on
+/// each terminal's DOM element. Narrower than `set_background_mode`: a tab
+/// can be inactive this way while the Coffee CLI window itself is still
+/// focused and foreground (e.g. one of several open AI-CLI tabs that isn't
+/// the one currently shown). Widens that single session's emitter coalesce
+/// window instead of parsing/emitting output nobody can see at full cadence.
+/// No-op if the session doesn't exist yet (frontend can fire before the PTY
+/// finishes spawning) or has already been killed.
+#[tauri::command]
+fn set_session_active(session_id: String, active: bool, state: State<'_, AppState>) -> Result<(), String> {
+    let map = state.terminal_session.lock().unwrap();
+    if let Some(session) = map.get(&session_id) {
+        session.is_tab_active.store(active, std::sync::atomic::Ordering::Relaxed);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn tier_terminal_kill(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let map = state.terminal_session.lock().unwrap();
@@ -2938,6 +2955,7 @@ pub fn start_ui() -> anyhow::Result<()> {
             tier_terminal_kill,
             tier_terminal_resize,
             set_background_mode,
+            set_session_active,
             tier_terminal_resume,
             get_native_history,
             get_message_heatmap,
