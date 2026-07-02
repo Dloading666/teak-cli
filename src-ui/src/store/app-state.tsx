@@ -510,7 +510,11 @@ const VALID_ICON_THEMES: IconTheme[] = [
 
 function getInitialState(): AppState {
   let theme: ThemeColor = 'dark';
-  let shape: ThemeShape = 'carbon';
+  // Default 'soft' (matches the index.html pre-paint script, which already
+  // defaults to soft) — its rounded corners show off the titlebar tabs best
+  // for new users. Previously 'carbon', which React re-applied after mount and
+  // overrode index.html's soft default.
+  let shape: ThemeShape = 'soft';
   let iconTheme: IconTheme = 'devicon';
   let lang = 'zh-CN';
   let folderPath: string | null = null;
