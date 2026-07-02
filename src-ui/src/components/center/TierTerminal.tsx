@@ -499,6 +499,30 @@ function TierTerminalImpl({
 
       term.open(termRef.current);
 
+      // ── Fix CJK IME punctuation duplication on Linux WebKitGTK (Tauri) ──
+      // On WebKitGTK + ibus, committing a CJK punctuation mark fires BOTH
+      // xterm's composition path (compositionstart/update/end) AND its input
+      // path, so each mark reaches the PTY twice and the whole run of
+      // punctuation re-accumulates on every keystroke (测试，，。。 …). We cut
+      // the composition path off at the source: capture-phase stopPropagation
+      // on the hidden helper textarea's three composition events means xterm's
+      // CompositionHelper never engages, leaving a single clean input path.
+      //
+      // __IS_LINUX__-gated on purpose — Chromium (Windows) / WKWebView (macOS)
+      // never had this bug and rely on CompositionHelper for normal IME, so we
+      // must not suppress it there. Ships on stable xterm 6.0.0 for every
+      // platform; replaces the earlier Linux-only 6.1.0-beta release artifact.
+      // Source: PR #38 / xtermjs#5374.
+      if (__IS_LINUX__) {
+        const imeTextarea = termRef.current.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
+        if (imeTextarea) {
+          const stopComposition = (e: Event) => e.stopPropagation();
+          imeTextarea.addEventListener('compositionstart', stopComposition, { capture: true });
+          imeTextarea.addEventListener('compositionupdate', stopComposition, { capture: true });
+          imeTextarea.addEventListener('compositionend', stopComposition, { capture: true });
+        }
+      }
+
       // Disable font ligatures on the DOM renderer rows to prevent
       // box-drawing characters from being merged into ligature glyphs.
       const xtermRows = termRef.current.querySelector('.xterm-rows') as HTMLElement | null;
