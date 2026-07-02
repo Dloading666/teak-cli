@@ -119,6 +119,55 @@ fn main() -> Result<()> {
         }
     }
 
+    // ── PATH inheritance fix (Windows) ──────────────────────────────────
+    // Windows has no login-shell rc to source, but the same class of problem
+    // exists as on macOS/Linux: depending on HOW the app is launched (some
+    // shortcuts, launchers, or a parent process with a trimmed PATH), the
+    // process can inherit a PATH that is MISSING the per-user dirs where CLI
+    // agents install — npm global (%APPDATA%\npm, home of e.g. opencode.cmd),
+    // pnpm, bun, cargo. Symptom: `cmd /c opencode …` prints "'opencode' is not
+    // recognized" even though opencode is installed. We can't source a shell,
+    // so we APPEND the well-known per-user bin dirs that actually exist on
+    // disk and aren't already on PATH. Append-only + existence-gated: it can
+    // only make more tools resolvable, never removes or shadows anything, so
+    // it's a harmless no-op when the inherited PATH was already complete.
+    // GUI launch only — hook subcommands exit far above this.
+    #[cfg(target_os = "windows")]
+    unsafe {
+        let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            candidates.push(std::path::Path::new(&appdata).join("npm"));
+        }
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            candidates.push(std::path::Path::new(&local).join("pnpm"));
+            candidates.push(std::path::Path::new(&local).join("Microsoft").join("WinGet").join("Links"));
+        }
+        if let Ok(home) = std::env::var("USERPROFILE") {
+            candidates.push(std::path::Path::new(&home).join(".bun").join("bin"));
+            candidates.push(std::path::Path::new(&home).join(".cargo").join("bin"));
+        }
+        let current = std::env::var("PATH").unwrap_or_default();
+        let present: std::collections::HashSet<String> = current
+            .split(';')
+            .map(|e| e.trim().trim_end_matches('\\').to_ascii_lowercase())
+            .collect();
+        let additions: Vec<String> = candidates
+            .into_iter()
+            .filter(|d| d.is_dir())
+            .map(|d| d.to_string_lossy().into_owned())
+            .filter(|s| !present.contains(&s.trim_end_matches('\\').to_ascii_lowercase()))
+            .collect();
+        if !additions.is_empty() {
+            let joined = additions.join(";");
+            let new_path = if current.is_empty() {
+                joined
+            } else {
+                format!("{current};{joined}")
+            };
+            std::env::set_var("PATH", new_path);
+        }
+    }
+
     // CLI subcommand dispatch — short-circuit GUI launch when invoked
     // with a known subcommand. This is opt-in; double-clicking the
     // executable still gets the GUI (no argv).
