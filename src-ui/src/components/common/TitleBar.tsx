@@ -71,7 +71,7 @@ export function TitleBar() {
           far-left strip belongs to the left sidebar (and hosts the macOS
           traffic lights). Collapses in lockstep with the panel via the shared
           --w-left var + the same 250ms curve. */}
-      <div className={`titlebar-left-slot${state.leftPanelHidden ? ' is-collapsed' : ''}`} />
+      <div id="titlebar-brand-slot" className={`titlebar-left-slot${state.leftPanelHidden ? ' is-collapsed' : ''}`} />
       {/* Tool tabs (Windows-Terminal style) render here — CenterPanel portals
           its .chrome-tabs-header into this slot so the tabs sit on the drag bar
           above the center column, with the layout toggles + window controls to
@@ -98,6 +98,29 @@ export function TitleBar() {
           "crossed-lines" look the user flagged. Active signal still travels
           via .is-active background only. */}
       <div className="titlebar-layout-toggles">
+        {/* Gambit compose — moved here from the left panel so it stays visible
+            even when the left panel is hidden. Leftmost in the right cluster. */}
+        <button
+          className={`titlebar-btn titlebar-btn--layout${state.gambitOpen ? ' is-active' : ''}`}
+          onClick={() => dispatch({ type: 'TOGGLE_GAMBIT' })}
+          aria-label="Gambit compose"
+          aria-pressed={state.gambitOpen}
+        >
+          {/* Always the keyboard glyph — the open state reads from the
+              .is-active background highlight, so there's no need to swap
+              the icon to an X. */}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="M6 8h.001" />
+            <path d="M10 8h.001" />
+            <path d="M14 8h.001" />
+            <path d="M18 8h.001" />
+            <path d="M8 12h.001" />
+            <path d="M12 12h.001" />
+            <path d="M16 12h.001" />
+            <path d="M7 16h10" />
+          </svg>
+        </button>
         {showMaLayout && (
           <>
             <button

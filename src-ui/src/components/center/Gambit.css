@@ -1,107 +1,21 @@
-/* Gambit.css — floating draggable compose window */
-
-/* ─── Drag performance class ────────────────────────────────────
-   While dragging, the browser has to recompute backdrop-filter on
-   every frame by re-sampling the pixels behind the moving element —
-   the single most expensive visual effect we have. Suppress it
-   during drag so the element tracks the cursor 1:1, then restore it
-   on mouseup.
-   The box-shadow is intentionally NOT overridden here — earlier
-   versions swapped in a heavier drop shadow during drag, but the
-   visible "click → shadow changes shape" pop made the card feel like
-   it was lifting off, which clashes with the static-glow aesthetic
-   the rest of the app uses. Inheriting the static var(--gambit-shadow)
-   keeps drag visually identical to the resting state, the only
-   difference being position. */
-.gambit.gambit--dragging {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-
-/* ─── Collapsed ball (Messenger-chat-head style) ────────────────
-   When collapsed, the entire card shrinks into a 48×48 draggable
-   circle. Click to expand, drag to reposition. True close still
-   lives in the Explorer toggle button. */
-/* Double-class selector (.gambit.gambit--ball, specificity 0-2-0) beats
-   the .gambit base rule below at line 141 which sets color: var(--text-1).
-   Without this, ball icons rendered as muted text-1 instead of the accent
-   color the design called for. */
-.gambit.gambit--ball {
-    width: 48px !important;
-    height: 48px !important;
-    border-radius: 50% !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* Inherit the theme palette — treat the ball as a "mini Gambit window":
-       same background as the full card, accent color for the icon inside.
-       Keeps the collapsed form visually consistent with every other themed
-       element in Gambit (title, placeholder, send arrow). */
-    background: var(--bg-panel);
-    color: var(--accent, #C4956A);
-    cursor: grab;
-    /* Intentionally NO `transition: transform` — React reuses the same DOM
-       node between the expanded window and the collapsed ball, so a transform
-       transition would visibly slide the node between the two positions
-       (window top-left → dot-anchored ball position), making the shrink look
-       like it ran diagonally across the screen. Snap instantly instead;
-       keep the filter tween only for the hover brightness effect. */
-    transition: filter 0.12s ease;
-    box-shadow:
-        0 6px 18px rgba(var(--shadow-rgb), 0.28),
-        0 2px 4px rgba(var(--shadow-rgb), 0.14);
-}
-
-[data-theme="light"] .gambit--ball {
-    box-shadow:
-        0 4px 14px rgba(var(--shadow-rgb), 0.14),
-        0 1px 3px rgba(var(--shadow-rgb), 0.08);
-}
-
-.gambit--ball:hover {
-    filter: brightness(1.12);
-}
-
-.gambit--ball:active {
-    cursor: grabbing;
-}
-
-/* The ball overrides all shape-specific shadow decorations — stays round and
-   clean regardless of current data-shape theme. */
-[data-shape] .gambit--ball {
-    box-shadow:
-        0 6px 18px rgba(var(--shadow-rgb), 0.28),
-        0 2px 4px rgba(var(--shadow-rgb), 0.14);
-}
+/* Gambit.css — docked compose panel (anchored at the bottom of the center panel) */
 
 /* Panel shape: line-only terminal-multiplexer aesthetic. The default
-   .gambit 4-layer soft glow looks fuzzy against Panel's hard-edge
-   tmux/iTerm2 vibe — Panel is supposed to read as drawn-on-terminal
-   chrome, not as a floating glassy card. So we override both the
-   ball and the main window to a single sharp 1px ring (spread=1,
-   blur=0), coloured with `var(--border)` so it sits in exactly the
-   same visual register as the side-panel dividers and the
-   main-content outline that already structure the Panel layout.
-   Higher-specificity selector (.gambit.gambit--ball = 2 classes +
-   attr) beats the [data-shape] .gambit--ball rule above. */
-[data-shape="panel"] .gambit.gambit--ball {
-    box-shadow: 0 0 0 1px var(--border);
-}
-
-[data-shape="panel"] .gambit:not(.gambit--ball) {
+   .gambit multi-layer soft glow looks fuzzy against Panel's hard-edge
+   tmux/iTerm2 vibe — override to a single sharp 1px ring coloured with
+   `var(--border)` so it sits in the same visual register as the
+   side-panel dividers and the main-content outline. */
+[data-shape="panel"] .gambit {
     box-shadow: 0 0 0 1px var(--border);
 }
 
 /* Soft + Sharp: same theme-uniform 1px ring as Panel. The default
    multi-layer drop shadow read as a halo against busy desktops in
-   these two minimalist shapes — Soft's rounded corners and Sharp's
-   hard corners both want a clean theme border, not a floating-card
-   glow. Slab keeps its 3D inset edges + glow (deliberate physical-
-   slab aesthetic), Glass has its own treatment in global.css. */
-[data-shape="soft"] .gambit.gambit--ball,
-[data-shape="sharp"] .gambit.gambit--ball,
-[data-shape="soft"] .gambit:not(.gambit--ball),
-[data-shape="sharp"] .gambit:not(.gambit--ball) {
+   these two minimalist shapes. Slab keeps its 3D inset edges + glow
+   (deliberate physical-slab aesthetic), Glass has its own treatment
+   in global.css. */
+[data-shape="soft"] .gambit,
+[data-shape="sharp"] .gambit {
     box-shadow: 0 0 0 1px var(--border);
 }
 
@@ -114,7 +28,7 @@
     z-index: 200; /* above xterm (z:1); ctx-menu at 9999 stays above this */
     display: flex;
     flex-direction: column;
-    /* Paper-like floating card: bg follows the active theme palette. */
+    /* Paper-like docked panel: bg follows the active theme palette. */
     background: var(--bg-panel);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
@@ -186,62 +100,22 @@
    enough at 80% on the closest layer that the special-case override
    stopped pulling its weight visually. */
 
-/* ─── Docked mode (anchored near bottom of center panel) ──────
-   Mirrors the VS Code "bottom panel" UX in spirit but keeps Gambit's
-   floating-card identity: native rounded corners, soft glow ring, and
-   backdrop-filter all stay in dock mode. The card sits with 8px of
-   breathing room on left/right/bottom (set inline in Gambit.tsx) so
-   its shadow has room to fall off and read as the same component the
-   user dragged a moment ago — just anchored.
-
-   The only behavioral changes vs. floating are: header drag is a
-   no-op, the bottom-right corner resize handle hides, and a top-edge
-   strip lets the user resize height. Visual chrome — including which
-   shape (soft/slab/glass/sharp/panel) is active — passes through. */
+/* ─── Docked panel (anchored at the bottom of the center panel) ──────
+   Mirrors the VS Code "bottom panel" UX: native rounded corners, soft
+   glow ring, and backdrop-filter all stay. The panel sits with 8px of
+   breathing room on left/right/bottom (set inline in Gambit.tsx) so its
+   shadow has room to fall off. A top-edge strip lets the user resize
+   height; visual chrome — including which shape (soft/slab/glass/sharp/
+   panel) is active — passes through. */
 .gambit.gambit--docked {
-    animation: none;     /* fade-in is jarring when toggling dock mid-session */
+    animation: none;     /* fade-in is jarring when opening mid-session */
     will-change: auto;   /* not GPU-translated when docked */
 }
 
-.gambit.gambit--docked .gambit-header {
-    /* In dock mode the title strip would consume ~40px of precious vertical
-       real estate just to host one icon button. Float the header at the
-       top-right corner instead so the textarea climbs to the very top of
-       the dock surface. The title text is hidden (the dock IS Gambit — a
-       label is redundant when the form is permanent).
-
-       top: 6px (NOT 0) is deliberate: the dock-resize flex row occupies
-       the top 6px of the dock surface. If the header overlapped it,
-       hovering in their shared right-corner area would show the header's
-       (default) cursor instead of dock-resize's ns-resize one — producing
-       the "cursor sometimes changes, sometimes doesn't" UX bug. Pushing
-       the header down past the resize zone makes the strip uninterrupted.
-       Must stay in sync with .gambit-dock-resize { height } above. */
-    position: absolute;
-    top: 6px;
-    right: 0;
-    /* Compensate for icon's intrinsic whitespace (4px horizontal: 2px svg
-       glyph margin + 2px button-vs-svg centering) so the visible icon
-       right edge ≈ 14px from card edge — matching the textarea's
-       padding-left of 14. Vertical padding 3 keeps the icon's visible
-       top within the 14px side budget too: 6 (dock-resize) + 3 + 2
-       (button center) + 3 (icon margin) = 14 from card top. */
-    padding: 3px 10px;
-    background: transparent;
-    cursor: default;
-    z-index: 3;  /* above textarea + thumb strip */
-}
-
-.gambit.gambit--docked .gambit-title {
-    display: none;
-}
-
 .gambit.gambit--docked .gambit-textarea {
-    /* In dock mode the dock-resize flex row already eats 6px of top space;
-       trim the textarea's top padding so text doesn't sit too low, and pad
-       the right so it never runs under the floating dock-toggle button. */
+    /* The dock-resize flex row eats 6px of top space; trim the textarea's
+       top padding so text doesn't sit too low. */
     padding-top: 4px;
-    padding-right: 40px;
 }
 /* Keep the pill overlay aligned with the textarea's first line in dock mode. */
 .gambit.gambit--docked .gambit-pills {
@@ -298,98 +172,6 @@
 .gambit-dock-resize:hover::after,
 .gambit-dock-resize:active::after {
     background: var(--accent, #C4956A);
-}
-
-/* Dock toggle button (left side of header, mirrors gambit-collapse).
-   Icon is a rectangle with a thick bottom edge — same visual idiom as
-   VS Code's "toggle bottom panel" so the metaphor is instantly obvious. */
-.gambit-dock-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    color: var(--text-2, #9e9c98);
-    cursor: pointer;
-    transition: color 0.12s;
-}
-/* Match gambit-collapse's invisible hitbox expansion so a small icon
-   still has a comfortable click target. */
-.gambit-dock-toggle::before {
-    content: '';
-    position: absolute;
-    inset: -8px;
-}
-.gambit-dock-toggle:hover {
-    color: var(--accent, #C4956A);
-}
-.gambit-dock-toggle--active {
-    color: var(--accent, #C4956A);
-}
-
-/* ─── Header (drag handle) ─────────────────────────────────── */
-/* Paper-style: no background tint, no divider — the title floats on the
-   card. Drag cursor is the only hint that this strip is grabbable.
-   Symmetric padding on all four sides so the title (left) and collapse
-   dot (right) sit with visually equal gaps to every edge — height is
-   implicit from padding + content instead of a fixed value that would
-   fight the vertical breathing room. */
-.gambit-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    background: transparent;
-    cursor: move;
-    flex-shrink: 0;
-}
-
-.gambit-title {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--text-2, #9e9c98);
-    opacity: 0.8;
-}
-
-.gambit-collapse {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* Hug the inner SVG (20×20) so the visible dot's right gap matches the
-       symmetric header padding. Dot was previously 14×14 with a 9px-diameter
-       circle — too small to find and hit. Click hitbox is further enlarged
-       via ::before below. */
-    position: relative;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    color: var(--text-2, #9e9c98);
-    cursor: pointer;
-    /* Hover simply tints the dot to accent — no background pill, keeps the
-       borderless paper aesthetic. */
-    transition: color 0.12s;
-}
-
-/* Invisible hitbox expansion: 14×14 visual, ~30×30 clickable. The dot was
-   too small to reliably click at default window scale. Anchor math in
-   Gambit.tsx (DOT_CENTER_FROM_RIGHT / DOT_CENTER_FROM_TOP) measures the
-   visual center, so widening the hitbox doesn't shift the collapse anchor. */
-.gambit-collapse::before {
-    content: '';
-    position: absolute;
-    inset: -8px;
-}
-
-.gambit-collapse:hover {
-    color: var(--accent, #C4956A);
 }
 
 /* ─── Skill pills (attached skills, inline in the input box) ──── */
@@ -736,37 +518,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-/* ─── Resize handle (bottom-right corner) ──────────────────── */
-.gambit-resize-handle {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 14px;
-    height: 14px;
-    cursor: nwse-resize;
-    background:
-        linear-gradient(135deg, transparent 0, transparent 7px,
-                                rgba(255, 255, 255, 0.25) 7px,
-                                rgba(255, 255, 255, 0.25) 8px,
-                                transparent 8px,
-                                transparent 10px,
-                                rgba(255, 255, 255, 0.25) 10px,
-                                rgba(255, 255, 255, 0.25) 11px,
-                                transparent 11px);
-}
-
-[data-theme="light"] .gambit-resize-handle {
-    background:
-        linear-gradient(135deg, transparent 0, transparent 7px,
-                                rgba(0, 0, 0, 0.25) 7px,
-                                rgba(0, 0, 0, 0.25) 8px,
-                                transparent 8px,
-                                transparent 10px,
-                                rgba(0, 0, 0, 0.25) 10px,
-                                rgba(0, 0, 0, 0.25) 11px,
-                                transparent 11px);
 }
 
 /* Right-click context menu styles live in TierTerminal.css under

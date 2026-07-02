@@ -1,32 +1,26 @@
-// ActiveGambit.tsx — app-level host for the floating compose window.
+// ActiveGambit.tsx — app-level host for the docked compose panel.
 //
-// Gambit is a global overlay: it can be dragged to any corner of the
-// application window, and its Send target is always the currently active
-// tab. To keep it isolated from per-tab re-renders (xterm output, agent
-// status events, etc.), it lives at the App level instead of inside any
-// TierTerminal.
+// Gambit is a global overlay docked at the bottom of the center panel, and
+// its Send target is always the currently active tab. To keep it isolated
+// from per-tab re-renders (xterm output, agent status events, etc.), it
+// lives at the App level instead of inside any TierTerminal.
 //
 // This wrapper:
 // - Reads the active tab's gambit state (open / draft) from the reducer
-// - Derives the initial window position from that tab's xterm cursor via
-//   the tab-actions registry
 // - Wires Send through the registry so the text ends up in the right xterm
 // - Hands a stable set of props to the memoized Gambit component so parent
-//   re-renders don't ripple into the draggable element.
+//   re-renders don't ripple into it.
 //
 // Visibility is global (state.gambitOpen) so the panel doesn't flicker
 // in/out when the user switches tabs. Draft content remains per-tab —
 // switching tabs swaps what's shown inside the (still-open) panel so
 // text can't be misdirected to the wrong terminal.
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useAppState, isSplitTool, paneSessionId, matchesGambitHotkey } from '../../store/app-state';
 import { getTabActions } from '../../lib/tab-actions';
 import { getFocusedPane } from '../../lib/pane-focus';
 import { Gambit } from './Gambit';
-
-const DEFAULT_WIDTH = 520;
-const DEFAULT_HEIGHT = 180;
 
 export function ActiveGambit() {
   const { state, dispatch } = useAppState();
@@ -37,19 +31,6 @@ export function ActiveGambit() {
 
   const gambitOpen = state.gambitOpen;
   const gambitDraft = activeSession?.gambitDraft ?? '';
-
-  // Anchored to primitives only — a new `activeSession` object reference on
-  // every dispatch would otherwise thrash the memoization downstream.
-  const initialPos = useMemo(() => {
-    if (!gambitOpen || !activeId) return { x: 120, y: 120 };
-    const cursor = getTabActions(activeId)?.cursorScreenPos();
-    if (!cursor) return { x: 120, y: 120 };
-    return {
-      x: Math.max(8, Math.min(cursor.x, window.innerWidth - DEFAULT_WIDTH - 8)),
-      y: Math.max(40, Math.min(cursor.y, window.innerHeight - DEFAULT_HEIGHT - 8)),
-    };
-    // Recompute only when visibility toggles or the active tab changes.
-  }, [gambitOpen, activeId]);
 
   const handleDraftChange = useCallback((draft: string) => {
     if (!activeId) return;
@@ -125,8 +106,6 @@ export function ActiveGambit() {
     <Gambit
       sessionId={activeId}
       draft={gambitDraft}
-      initialX={initialPos.x}
-      initialY={initialPos.y}
       onDraftChange={handleDraftChange}
       onClose={handleClose}
       onSend={handleSend}

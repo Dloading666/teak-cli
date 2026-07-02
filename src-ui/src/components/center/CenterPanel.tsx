@@ -224,8 +224,8 @@ const SvgKimi      = () => bgIcon(KIMICODE_DATA_URL, '1em', { borderRadius: 'var
 const SvgCrush     = () => bgIcon(CRUSH_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
 const SvgGoose     = () => bgIcon(GOOSE_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
 
-// Coffee 101 card icon — animated coffee mark (same as the left-panel
-// brand header in Explorer.tsx panel-header): steam wave loops 3s, cup
+// Coffee 101 card icon — animated coffee mark (same as the brand mark
+// now portaled into the titlebar from Explorer.tsx): steam wave loops 3s, cup
 // body draws on first paint then fills. Inlined SVG so currentColor
 // follows the theme accent. Sized at 1em so it scales with the launchpad
 // card font-size like other utility cards.

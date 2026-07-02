@@ -1,4 +1,4 @@
-// Gambit.tsx — draggable floating compose window for rich input composition.
+// Gambit.tsx — docked compose panel anchored at the bottom of the center panel.
 //
 // Named for the chess "gambit": a calculated opening move after careful thought.
 // Users compose long messages (and paste screenshots) in a real HTML textarea
@@ -26,8 +26,6 @@ import './Gambit.css';
 interface GambitProps {
   sessionId: string;
   draft: string;
-  initialX: number;
-  initialY: number;
   onDraftChange: (text: string) => void;
   onClose: () => void;
   /** Returns true when the text was accepted by the target xterm, false
@@ -76,33 +74,16 @@ function wrapImagePathsForSend(text: string): string {
   });
 }
 
-const MIN_WIDTH = 320;
-const MIN_HEIGHT = 120;
-const DEFAULT_WIDTH = 520;
-const DEFAULT_HEIGHT = 180;
-
-// Anchor geometry used to keep the collapse dot (top-right of the expanded
-// card) and the collapsed ball at the same screen coordinate during the
-// transition — so the user's eye doesn't jump when they click collapse or
-// click-to-expand. These mirror the CSS: header padding-right 8px + collapse
-// button 24×24, header height 28px.
-const BALL_SIZE = 48;
-const DOT_CENTER_FROM_RIGHT = 20;
-const DOT_CENTER_FROM_TOP = 14;
-
-// Docked-mode height: Gambit lives flush at the bottom of the center panel
-// instead of floating. Height is user-resizable via the top edge and persists
-// across sessions, mirroring how VS Code's bottom panel works.
+// Docked height: Gambit lives flush at the bottom of the center panel.
+// Height is user-resizable via the top edge and persists across sessions,
+// mirroring how VS Code's bottom panel works.
 const DOCK_DEFAULT_HEIGHT = 200;
 const DOCK_MIN_HEIGHT = 120;
 const DOCK_MAX_HEIGHT_RATIO = 0.7; // never let the dock eat more than 70% of viewport height
-const LS_DOCKED = 'cc-gambit-docked';
 const LS_DOCK_H = 'cc-gambit-dock-h';
 
 function GambitImpl({
   draft,
-  initialX,
-  initialY,
   onDraftChange,
   onClose,
   onSend,
@@ -121,18 +102,7 @@ function GambitImpl({
   // window resize) so only the former is allowed to move the scroll position.
   const lastSizedDraftRef = useRef(draft);
 
-  const [pos, setPos] = useState({ x: initialX, y: initialY });
-  const [size, setSize] = useState({ w: DEFAULT_WIDTH, h: DEFAULT_HEIGHT });
-  // Collapsed state: full window shrinks into a small draggable ball,
-  // reminiscent of Messenger chat heads. True close lives only in the
-  // Explorer toggle button (open origin = close origin).
-  const [collapsed, setCollapsed] = useState(false);
-  // Docked: pinned flush at the bottom of the center panel, shrinking the
-  // terminal area upward. Persists across sessions; default false to keep
-  // the floating-card experience for new users.
-  const [docked, setDocked] = useState<boolean>(() => {
-    try { return localStorage.getItem(LS_DOCKED) === '1'; } catch { return false; }
-  });
+  // Docked height (px), user-resizable via the top-edge handle. Persists.
   const [dockedH, setDockedH] = useState<number>(() => {
     try {
       const raw = localStorage.getItem(LS_DOCK_H);
@@ -141,53 +111,36 @@ function GambitImpl({
     } catch {}
     return DOCK_DEFAULT_HEIGHT;
   });
+  // Caches the latest height written to the DOM during a resize drag, so
+  // onUp commits it back to React state once without thrashing intermediate
+  // renders. Null when no resize is in progress.
   const dockResizeRef = useRef<{ startY: number; origH: number; lastH?: number } | null>(null);
-  // lastX/Y/W/H cache the latest values written to the DOM during drag/resize,
-  // so onUp can commit them back to React state once without any intermediate
-  // renders thrashing the effect that registers these very listeners.
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; lastX?: number; lastY?: number } | null>(null);
-  const resizeRef = useRef<{ startX: number; startY: number; origW: number; origH: number; lastW?: number; lastH?: number } | null>(null);
-  // Tracks whether the last mousedown -> mouseup sequence actually moved,
-  // so a click on the collapsed ball can be distinguished from a drag.
-  const movedRef = useRef(false);
 
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
 
-  // ─── Docked mode side effects ────────────────────────────────
-  // When docked (and not collapsed to ball), set a body class + CSS var
-  // so .panel-center can reserve padding-bottom equal to the dock height.
-  // The xterm container's ResizeObserver picks up the shrink and refits.
-  // Cleared on unmount / undock so floating mode behaves identically to
-  // the pre-dock build.
+  // ─── Docked layout side effect ───────────────────────────────
+  // Set a body class + CSS var so .panel-center reserves padding-bottom
+  // equal to the dock height. The xterm container's ResizeObserver picks
+  // up the shrink and refits. Cleared on unmount.
   useEffect(() => {
-    const active = docked && !collapsed;
     const root = document.documentElement;
     const body = document.body;
-    if (active) {
-      body.classList.add('gambit-docked');
-      root.style.setProperty('--gambit-dock-h', `${dockedH}px`);
-    } else {
-      body.classList.remove('gambit-docked');
-      root.style.removeProperty('--gambit-dock-h');
-    }
+    body.classList.add('gambit-docked');
+    root.style.setProperty('--gambit-dock-h', `${dockedH}px`);
     return () => {
       body.classList.remove('gambit-docked');
       root.style.removeProperty('--gambit-dock-h');
     };
-  }, [docked, collapsed, dockedH]);
+  }, [dockedH]);
 
-  // Persist dock preferences. Cheap to write — runs only on toggle / settle.
-  useEffect(() => {
-    try { localStorage.setItem(LS_DOCKED, docked ? '1' : '0'); } catch {}
-  }, [docked]);
+  // Persist dock height. Cheap to write — runs only on settle.
   useEffect(() => {
     try { localStorage.setItem(LS_DOCK_H, String(dockedH)); } catch {}
   }, [dockedH]);
 
-  // Top-edge vertical drag to resize dock height. Mirrors the floating
-  // mode's bottom-right corner handle but constrained to the Y axis.
+  // Top-edge vertical drag to resize dock height (constrained to the Y axis).
   const onDockResizeStart = (e: React.MouseEvent) => {
     dockResizeRef.current = {
       startY: e.clientY,
@@ -197,7 +150,6 @@ function GambitImpl({
     e.stopPropagation();
   };
   useEffect(() => {
-    if (!docked) return;
     const onMove = (e: MouseEvent) => {
       if (!dockResizeRef.current) return;
       const r = dockResizeRef.current;
@@ -223,7 +175,7 @@ function GambitImpl({
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [docked]);
+  }, []);
 
   // Thumbnails are a pure derived view of the draft text — no separate
   // attachment state. User edits/deletes the path string → thumbnails
@@ -304,93 +256,6 @@ function GambitImpl({
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
   }, [previewPath]);
-
-  const onDragStart = (e: React.MouseEvent) => {
-    // Docked mode is positionally fixed — header drag is a no-op.
-    if (docked) return;
-    dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: pos.x,
-      origY: pos.y,
-    };
-    movedRef.current = false;
-    // Toggle a class directly — bypasses React re-render so backdrop-filter
-    // is suppressed starting from the very first mousemove.
-    rootRef.current?.classList.add('gambit--dragging');
-    e.preventDefault();
-  };
-
-  const onResizeStart = (e: React.MouseEvent) => {
-    resizeRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      origW: size.w,
-      origH: size.h,
-    };
-    e.stopPropagation();
-    e.preventDefault();
-  };
-
-  // Drag + resize use direct DOM mutation instead of setState on every
-  // mousemove event. Rationale: the React render pass (re-run effect →
-  // rebind listeners → commit transform) costs 10-20ms per event, making
-  // the dragged element visibly lag behind the cursor at 144Hz. Writing
-  // straight to rootRef.current.style keeps the node GPU-composited and
-  // sub-frame responsive; we only sync back to React state on mouseup.
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const el = rootRef.current;
-      if (!el) return;
-      if (dragRef.current) {
-        const d = dragRef.current;
-        const dx = e.clientX - d.startX;
-        const dy = e.clientY - d.startY;
-        if (!movedRef.current && Math.abs(dx) + Math.abs(dy) > 3) {
-          movedRef.current = true;
-        }
-        // When collapsed the window is a 48px ball, not 520x180 — clamp to
-        // the appropriate extent so the ball can't be dragged off-screen.
-        const w = collapsed ? 48 : size.w;
-        const h = collapsed ? 48 : size.h;
-        const nextX = Math.min(Math.max(0, d.origX + dx), Math.max(0, window.innerWidth - w));
-        const nextY = Math.min(Math.max(30, d.origY + dy), Math.max(30, window.innerHeight - h));
-        el.style.transform = `translate3d(${nextX}px, ${nextY}px, 0)`;
-        d.lastX = nextX;
-        d.lastY = nextY;
-      }
-      if (resizeRef.current) {
-        const r = resizeRef.current;
-        const desiredW = r.origW + (e.clientX - r.startX);
-        const desiredH = r.origH + (e.clientY - r.startY);
-        const nextW = Math.max(MIN_WIDTH, Math.min(desiredW, window.innerWidth - pos.x));
-        const nextH = Math.max(MIN_HEIGHT, Math.min(desiredH, window.innerHeight - pos.y));
-        el.style.width = `${nextW}px`;
-        el.style.height = `${nextH}px`;
-        r.lastW = nextW;
-        r.lastH = nextH;
-      }
-    };
-    const onUp = () => {
-      // Commit any pending drag/resize values back to React state so the
-      // next render and any consumers (e.g. collapseAtDot math) see them.
-      if (dragRef.current && dragRef.current.lastX !== undefined) {
-        setPos({ x: dragRef.current.lastX!, y: dragRef.current.lastY! });
-      }
-      if (resizeRef.current && resizeRef.current.lastW !== undefined) {
-        setSize({ w: resizeRef.current.lastW!, h: resizeRef.current.lastH! });
-      }
-      dragRef.current = null;
-      resizeRef.current = null;
-      rootRef.current?.classList.remove('gambit--dragging');
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-  }, [pos.x, pos.y, size.w, size.h, collapsed]);
 
   // sendFailed briefly flashes a subtle hint next to the Send button so
   // the user understands WHY nothing happened (most common cause in
@@ -515,10 +380,8 @@ function GambitImpl({
 
   // Auto-grow the textarea to fit its content so attached pills can sit
   // inline on the first line and the box grows downward as the user types.
-  // Deps: draft (content), attachedSkills.length (a pill changes the
-  // first-line width left for the textarea), and size.w (resizing the
-  // window narrower re-wraps text → needs a taller box; without this the
-  // overflow:hidden textarea would clip the extra lines).
+  // Deps: draft (content) and attachedSkills.length (a pill changes the
+  // first-line width left for the textarea).
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -540,8 +403,8 @@ function GambitImpl({
     // collapsed the scroll container has almost no content, so the browser
     // clamps its scrollTop to 0 and the clamp sticks once the real height is
     // restored. Re-applying the captured scrollTop undoes that — it's the cure
-    // for the "every keystroke jumps the view back to the top" bug (worst in
-    // floating mode, fixed ~180px height). When the user is actively typing at
+    // for the "every keystroke jumps the view back to the top" bug. When the
+    // user is actively typing at
     // the very end of the draft, follow the caret to the bottom instead so the
     // newest line stays visible.
     //   Known gap: an edit that pushes a MID-text caret below the fold isn't
@@ -556,13 +419,13 @@ function GambitImpl({
       ta.selectionStart === ta.value.length &&
       ta.selectionEnd === ta.value.length;
     scroller.scrollTop = followCaretToBottom ? scroller.scrollHeight : prevScrollTop;
-  }, [draft, attachedSkills.length, size.w]);
+  }, [draft, attachedSkills.length]);
 
   // Measure the pill overlay → first-line indent for the textarea. +8px so
   // text doesn't butt right against the last pill. 0 when there are no pills.
   useLayoutEffect(() => {
     setPillsWidth(pillsRef.current ? pillsRef.current.offsetWidth + 8 : 0);
-  }, [attachedSkills, size.w]);
+  }, [attachedSkills]);
 
   // ─── Context menu ─────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
@@ -784,140 +647,38 @@ function GambitImpl({
     });
   };
 
-  // Anchor the collapse dot and the ball at the same screen coordinate:
-  // when collapsing, move the ball's top-left so its center lands on the
-  // dot's current screen position; when expanding, do the inverse so the
-  // dot reappears exactly where the ball was. Keeps the visual center stable.
-  const collapseAtDot = () => {
-    setPos({
-      x: pos.x + size.w - DOT_CENTER_FROM_RIGHT - BALL_SIZE / 2,
-      y: pos.y + DOT_CENTER_FROM_TOP - BALL_SIZE / 2,
-    });
-    setCollapsed(true);
-  };
-
-  const expandAtBall = () => {
-    const targetX = pos.x + BALL_SIZE / 2 - (size.w - DOT_CENTER_FROM_RIGHT);
-    const targetY = pos.y + BALL_SIZE / 2 - DOT_CENTER_FROM_TOP;
-    // Clamp so the expanded window doesn't spill off-screen if the ball sat
-    // near an edge.
-    setPos({
-      x: Math.max(8, Math.min(targetX, window.innerWidth - size.w - 8)),
-      y: Math.max(30, Math.min(targetY, window.innerHeight - size.h - 8)),
-    });
-    setCollapsed(false);
-    // Return focus to the textarea once it's mounted again.
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  };
-
   // Suppress onClose usage warning — true close is driven by parent (Explorer
   // toggle). The component still accepts onClose in props for API symmetry
   // and future use but doesn't expose it in the UI.
   void onClose;
 
-  // Docked mode overrides collapsed (the ball is a floating-positional
-  // concept and contradicts dock semantics). If both were somehow set
-  // simultaneously, dock wins.
-  if (collapsed && !docked) {
-    return (
-      <div
-        ref={rootRef}
-        className="gambit gambit--ball"
-        style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` }}
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          onDragStart(e);
-        }}
-        onClick={() => {
-          // Distinguish click from drag: only expand if the mouse didn't
-          // move meaningfully between mousedown and mouseup.
-          if (!movedRef.current) expandAtBall();
-        }}
-        // Block the native WebView context menu across the entire Gambit
-        // surface — App.tsx's global suppressor is dev-mode-skipped (for
-        // DevTools access) so we need an always-on local guard here. The
-        // textarea's own onContextMenu opens our custom menu; any other
-        // Gambit area (header, resize handle, padding) simply gets no
-        // menu, which is the correct desktop-app behavior.
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 20h9" />
-          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-        </svg>
-      </div>
-    );
-  }
-
-  // Docked mode = floating card anchored near the bottom of the center
-  // panel with 8px breathing room on left/right/bottom — sits between but
-  // never under the Explorer / right pane. Native chrome (rounded corners,
-  // soft glow, backdrop-filter) is preserved so toggling between floating
-  // and docked feels like the same component, just anchored.
-  const dockStyle: React.CSSProperties = docked
-    ? {
-        transform: 'none',
-        left: leftPanelHidden ? 8 : 'calc(var(--w-left) + 8px)',
-        right: rightPanelHidden ? 8 : 'calc(var(--w-right) + 8px)',
-        bottom: 8,
-        top: 'auto',
-        width: 'auto',
-        height: dockedH,
-      }
-    : {
-        transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
-        width: size.w,
-        height: size.h,
-      };
+  // Docked panel: anchored at the bottom of the center panel with 8px of
+  // breathing room on left/right/bottom — sits between, never under, the
+  // Explorer / right pane. Native chrome (rounded corners, soft glow,
+  // backdrop-filter) is preserved.
+  const dockStyle: React.CSSProperties = {
+    transform: 'none',
+    left: leftPanelHidden ? 8 : 'calc(var(--w-left) + 8px)',
+    right: rightPanelHidden ? 8 : 'calc(var(--w-right) + 8px)',
+    bottom: 8,
+    top: 'auto',
+    width: 'auto',
+    height: dockedH,
+  };
 
   return (
     <div
       ref={rootRef}
-      className={`gambit${docked ? ' gambit--docked' : ''}`}
+      className="gambit gambit--docked"
       style={dockStyle}
       onMouseDown={(e) => e.stopPropagation() /* don't let global focus enforcer steal focus back to xterm */}
       // Block native WebView context menu across the whole Gambit panel.
       // The textarea's onContextMenu opens our custom cut/copy/paste menu;
-      // other areas (header, resize handle, sides) just get no menu.
+      // other areas (dock-resize strip, padding) just get no menu.
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Top-edge handle for vertical resize in docked mode. Hidden in
-          floating mode (the bottom-right corner handle covers that case). */}
-      {docked && <div className="gambit-dock-resize" onMouseDown={onDockResizeStart} />}
-      <div className="gambit-header" onMouseDown={onDragStart}>
-        {/* Dock toggle (left). Icon: rectangle with a thick bottom edge —
-            mirrors the VS Code "toggle bottom panel" affordance so users
-            recognize the metaphor immediately. Click toggles docked state;
-            switching INTO docked also un-collapses if currently collapsed. */}
-        <button
-          className={`gambit-dock-toggle${docked ? ' gambit-dock-toggle--active' : ''}`}
-          onClick={() => {
-            if (!docked && collapsed) setCollapsed(false);
-            setDocked(d => !d);
-          }}
-          onMouseDown={(e) => e.stopPropagation() /* don't start drag when toggling dock */}
-          aria-pressed={docked}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-            <rect x="2" y="3" width="12" height="10" rx="1.2" />
-            <rect x="2" y="10" width="12" height="3" rx="0.6" fill="currentColor" stroke="none" />
-          </svg>
-        </button>
-        <span className="gambit-title">{t('gambit.title')}</span>
-        {/* Collapse-to-ball is meaningless when docked (the ball is a
-            floating positional concept). Hide in dock mode. */}
-        {!docked && (
-          <button
-            className="gambit-collapse"
-            onClick={collapseAtDot}
-            onMouseDown={(e) => e.stopPropagation() /* don't start drag when collapsing */}
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20">
-              <circle cx="10" cy="10" r="7" fill="currentColor" />
-            </svg>
-          </button>
-        )}
-      </div>
+      {/* Top-edge handle for vertical height resize (VS Code bottom-panel style). */}
+      <div className="gambit-dock-resize" onMouseDown={onDockResizeStart} />
 
       {/* Input box: skill pills are an absolute overlay on the textarea's
           first line; the textarea's first-line text-indent reserves their
@@ -1063,8 +824,6 @@ function GambitImpl({
         </button>
       </div>
 
-      {!docked && <div className="gambit-resize-handle" onMouseDown={onResizeStart} />}
-
       {/* Full-size preview overlay. Renders into document.body to escape
           .gambit's transform containing block (otherwise position:fixed
           anchors to the transformed ancestor and clips to overflow:hidden). */}
@@ -1131,9 +890,9 @@ function GambitImpl({
 // React.memo is CRITICAL here — TierTerminal (our parent) is intentionally
 // not memoized (an earlier regression), so it re-renders on every app-wide
 // state change: agent-status events, terminal focus shifts, etc. Without
-// this memo wrapper, every parent re-render during drag would reset the
-// inline `transform` style from React, clobbering the direct DOM writes we
-// use for smooth dragging and making the element visibly snap back.
+// this memo wrapper, every parent re-render during a dock-resize drag would
+// reset the inline height from React, clobbering the direct DOM writes we
+// use for smooth resizing and making the panel visibly snap back.
 export const Gambit = memo(GambitImpl);
 
 function fileToBase64(file: File): Promise<string> {
