@@ -904,7 +904,7 @@ html.is-macos #root {
 
 /* ─── Custom Titlebar ────────────────────────────────── */
 .titlebar {
-    height: 32px;
+    height: 40px;
     /* Same surface as the side panels (--bg-panel), so the titlebar + left rail
        + right rail read as one continuous "brighter frame" around the darker
        terminal centre. The active tab (--bg-terminal, darker) then sits as a
@@ -922,7 +922,10 @@ html.is-macos #root {
        so tab clicks / pointer-reorder win. Do NOT add `-webkit-app-region:
        drag` here; it races Tauri's drag and stalls paint on direction
        reversal. */
-    align-items: stretch;
+    /* Tabs bottom-aligned so a reserve strip sits ABOVE them (like Chrome / the
+       OS terminals) — a grab-handle over the tabs and a less cramped bar. The
+       right-side button clusters opt out with align-self: center. */
+    align-items: flex-end;
     user-select: none;
     flex-shrink: 0;
 }
@@ -954,7 +957,9 @@ html.is-macos .titlebar-left-slot.is-collapsed {
 
 .titlebar-tabs {
     display: flex;
-    align-items: stretch;
+    /* Bottom-align the portaled strip so the tabs hug the bar's bottom edge
+       (flush with the content below) while the reserve sits above them. */
+    align-items: flex-end;
     min-width: 0;
     height: 100%;
 }
@@ -973,13 +978,13 @@ html.is-macos .titlebar-left-slot.is-collapsed {
 .titlebar-layout-toggles {
     display: flex;
     align-items: center;
-    height: 100%;
+    align-self: center; /* stay compact + vertically centred as the bar grows taller */
     flex-shrink: 0; /* never shrink the right cluster — tabs + spacer absorb it */
 }
 
 .titlebar-btn--layout {
     width: 36px;
-    height: 100%;
+    height: 32px; /* fixed — icon size + button stay put, centred, not stretched by the taller bar */
 }
 
 .titlebar-btn--layout svg {
@@ -996,7 +1001,8 @@ html.is-macos .titlebar-left-slot.is-collapsed {
 }
 .titlebar-controls {
     display: flex;
-    height: 100%;
+    align-items: center;
+    align-self: center; /* min/max/close stay compact + vertically centred as the bar grows */
     flex-shrink: 0; /* window controls must never be clipped by a full tab row */
 }
 
@@ -1005,7 +1011,7 @@ html.is-macos .titlebar-left-slot.is-collapsed {
     justify-content: center;
     align-items: center;
     width: 46px;
-    height: 100%;
+    height: 32px; /* fixed — see .titlebar-btn--layout; icons unchanged, centred in the taller bar */
     background: transparent;
     border: none;
     color: var(--text-2);
