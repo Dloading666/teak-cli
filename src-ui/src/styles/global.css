@@ -299,7 +299,6 @@ textarea,
        triplet keeps the shadow readable while still feeling on-palette. */
     --shadow-rgb: 196, 149, 106;
 
-    --bg-titlebar: rgba(0, 0, 0, 0.1);
     --bg-terminal: #1a1917; /* Match bg-app — unified surface rule across themes */
 }
 
@@ -343,7 +342,6 @@ textarea,
        coloured shadow that the dark themes use. */
     --shadow-rgb: 0, 0, 0;
 
-    --bg-titlebar: rgba(0, 0, 0, 0.03);
     --bg-terminal: #eeebe2; /* Soft cream — slightly darker than ivory body
                                so terminal reads as a recessed workspace
                                between the two brighter side panels. */
@@ -380,7 +378,6 @@ textarea,
     --shadow-rgb: 160, 160, 160;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.35);
     --bg-terminal: #1a1a1a; /* Match bg-app */
 }
 
@@ -415,7 +412,6 @@ textarea,
     --shadow-rgb: 248, 180, 200;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.15);
     --bg-terminal: #1a1520; /* Match bg-app */
 }
 
@@ -450,7 +446,6 @@ textarea,
     --shadow-rgb: 200, 182, 255;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.15);
     --bg-terminal: #1a1826; /* Match bg-app */
 }
 
@@ -485,7 +480,6 @@ textarea,
     --shadow-rgb: 122, 232, 200;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.15);
     --bg-terminal: #0f1e1c; /* Match bg-app */
 }
 
@@ -523,7 +517,6 @@ textarea,
     --shadow-rgb: 160, 160, 160;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.4);
     --bg-terminal: #0a0a0a; /* Match bg-app */
 }
 
@@ -561,7 +554,6 @@ textarea,
     --shadow-rgb: 90, 133, 184;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.28);
     --bg-terminal: #0a1020; /* Match bg-app */
 }
 
@@ -599,7 +591,6 @@ textarea,
     --shadow-rgb: 106, 152, 120;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.24);
     --bg-terminal: #0b1612; /* Match bg-app */
 }
 
@@ -645,7 +636,6 @@ textarea,
     --shadow-rgb: 226, 59, 66;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.2);
     --bg-terminal: #2a0d10; /* Match bg-app */
 }
 
@@ -680,7 +670,6 @@ textarea,
     --shadow-rgb: 245, 128, 59;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.18);
     --bg-terminal: #241408; /* Match bg-app */
 }
 
@@ -715,7 +704,6 @@ textarea,
     --shadow-rgb: 232, 167, 44;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.18);
     --bg-terminal: #20180a; /* Match bg-app */
 }
 
@@ -750,7 +738,6 @@ textarea,
     --shadow-rgb: 36, 194, 129;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.22);
     --bg-terminal: #0a1c12; /* Match bg-app */
 }
 
@@ -785,7 +772,6 @@ textarea,
     --shadow-rgb: 43, 196, 196;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.22);
     --bg-terminal: #0a2125; /* Match bg-app */
 }
 
@@ -820,7 +806,6 @@ textarea,
     --shadow-rgb: 97, 114, 240;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.22);
     --bg-terminal: #12142e; /* Match bg-app */
 }
 
@@ -855,7 +840,6 @@ textarea,
     --shadow-rgb: 217, 74, 160;
     --glass-blur: blur(24px);
 
-    --bg-titlebar: rgba(0, 0, 0, 0.2);
     --bg-terminal: #210f1d; /* Match bg-app */
 }
 
@@ -921,20 +905,64 @@ html.is-macos #root {
 /* ─── Custom Titlebar ────────────────────────────────── */
 .titlebar {
     height: 32px;
-    background: var(--bg-titlebar);
+    /* Same surface as the side panels (--bg-panel), so the titlebar + left rail
+       + right rail read as one continuous "brighter frame" around the darker
+       terminal centre. The active tab (--bg-terminal, darker) then sits as a
+       recessed notch that seams into the content below. Ties to --bg-panel so
+       every theme aligns automatically; the old per-theme --bg-titlebar token
+       is now unused. */
+    background: var(--bg-panel);
     display: flex;
-    /* Layout toggles + window controls group to the right; the whole
-       left side stays draggable. Matches VS Code / JetBrains: chrome
-       clusters on one side, the rest is grab-handle.
+    /* Tool tabs (left) → flexible drag spacer → layout toggles + window
+       controls (right). The spacer is the grab-handle between the tabs and
+       the controls.
 
        Drag mechanism: see TitleBar.tsx — single JS `onMouseDown` ->
-       `startDragging()` path. Do NOT add `-webkit-app-region: drag`
-       here; it races Tauri's drag and stalls paint on direction
+       `startDragging()` path, which bails on <button> AND .chrome-tabs-header
+       so tab clicks / pointer-reorder win. Do NOT add `-webkit-app-region:
+       drag` here; it races Tauri's drag and stalls paint on direction
        reversal. */
-    justify-content: flex-end;
-    align-items: center;
+    align-items: stretch;
     user-select: none;
     flex-shrink: 0;
+}
+
+/* Tool-tab strip slot — CenterPanel portals its .chrome-tabs-header in here so
+   the tabs live on the drag bar (Windows-Terminal style), not a row below it. */
+/* Left slot — mirrors .panel-left's width (same --w-left var + 250ms curve) so
+   the tab strip starts at the top of the CENTER column, not the window edge.
+   That far-left strip is the left sidebar's domain / the macOS traffic lights.
+   Empty and draggable. */
+.titlebar-left-slot {
+    width: var(--w-left);
+    flex-shrink: 0;
+    height: 100%;
+    transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.titlebar-left-slot.is-collapsed {
+    width: 0;
+}
+/* macOS EDGE CASE: when the left panel is hidden this slot would collapse to 0
+   and the tabs would slide under the native traffic lights (top-left). Keep a
+   fixed inset so the tabs stay pushed right of them. The lights start at
+   trafficLightPosition x:14 (tauri.macos.conf.json) and span ~52px → end ~66px;
+   80px leaves a comfortable gap. (Panel SHOWN needs no special case — the slot
+   is then --w-left ≥ 320px, well clear of the lights.) Real-Mac verify pending. */
+html.is-macos .titlebar-left-slot.is-collapsed {
+    width: 80px;
+}
+
+.titlebar-tabs {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    height: 100%;
+}
+/* Flexible grab-handle filling the gap between the tabs and the right cluster. */
+.titlebar-drag-spacer {
+    flex: 1 1 auto;
+    min-width: 32px;
+    height: 100%;
 }
 
 /* Layout toggles sit flush against the window controls — same visual
@@ -946,6 +974,7 @@ html.is-macos #root {
     display: flex;
     align-items: center;
     height: 100%;
+    flex-shrink: 0; /* never shrink the right cluster — tabs + spacer absorb it */
 }
 
 .titlebar-btn--layout {
@@ -968,6 +997,7 @@ html.is-macos #root {
 .titlebar-controls {
     display: flex;
     height: 100%;
+    flex-shrink: 0; /* window controls must never be clipped by a full tab row */
 }
 
 .titlebar-btn {
@@ -1591,6 +1621,16 @@ body.gambit-docked .chat-reader-container {
     color: var(--text-1);
 }
 
+/* Chrome-tabs moved into the titlebar — OUTSIDE the `.panel-*` nuclear rule
+   (above) that used to strip their background in the transparent shapes. So
+   re-strip here: every tab (active + hover included) stays fully transparent
+   and shows the body's single --glass-tint / carbon mesh, instead of stacking
+   an opaque --bg-terminal fill. The active tab is distinguished by brighter
+   text (rule above / --text-1), not a fill — the glass "no local layer" rule. */
+:is([data-shape="glass"], [data-shape="carbon"]) .chrome-tab {
+    background: transparent !important;
+}
+
 /* Library segmented toggle (Agents / Skills above the launchpad
    grid). Container becomes a faint glass pill; the active segment
    inside reads as "lit-up brighter glass" instead of the source-
@@ -1794,7 +1834,6 @@ body.gambit-docked .chat-reader-container {
     --bg-card: var(--bg-app);
     --bg-input: var(--bg-app);
     --bg-input-focus: var(--bg-app);
-    --bg-titlebar: var(--bg-app);
     --bg-terminal: var(--bg-app);
     /* Brighter border so dividers actually read on a same-color field;
        otherwise the default --border (~4% alpha) vanishes. */
@@ -1854,32 +1893,20 @@ body.gambit-docked .chat-reader-container {
     color: var(--text-1);
 }
 
-/* ─── Center pane chrome-tabs + main-content as one drawn box ───
-   Active tab: 3-side outline (top, left, right) — bottom merges
-   into the content area below by overlapping the header divider.
-   Content area: left/right/bottom borders form the rest of the
-   enclosure; the chrome-tabs-header's border-bottom is the top. */
-[data-shape="panel"] .chrome-tabs-header {
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 0;
-}
+/* ─── Panel shape: chrome-tabs now live in the titlebar ───
+   The titlebar's own border-bottom (see `[data-shape="panel"] .titlebar` above)
+   is the single divider / top edge of the content box. The ACTIVE tab breaks
+   through it (−1px bottom) so its --bg-app fill seams into main-content below —
+   the "terminal-tube" merge — with a 3-side outline (top/left/right) framing
+   it; inactive tabs just sit in the bar.
 
-/* All tabs (active + inactive) get the same -1px bottom margin in panel
-   mode. Two reasons:
-   1. The active tab's bg covers the chrome-tabs-header's border-bottom
-      directly under it — the "tab merges into content" terminal-tube look.
-   2. With ALL tabs (not just active) sharing the same margin-box height,
-      the chrome-tabs-header's intrinsic flex cross-size stays stable at
-      37px regardless of which tab is active or how many tabs exist.
-      Otherwise the container would grow 1px when going from 1-tab to
-      2-tabs (max child margin-box: 37 → 38), pushing main-content down
-      1px and visibly misaligning the active tab's top edge with the
-      Explorer panel header on the left. */
-[data-shape="panel"] .chrome-tab {
-    margin-bottom: -1px;
-}
-
+   Previously .chrome-tabs-header carried its OWN border-bottom and EVERY tab a
+   −1px margin, because the strip sat directly above main-content in the center
+   column. Both are gone now: with the strip in the titlebar, the header border
+   stacked under the titlebar border as one chunky 2px line, and its border-box
+   ate 1px off the tab height (the "line too thick / top −1px" report). */
 [data-shape="panel"] .chrome-tab.active {
+    margin-bottom: -1px;
     background: var(--bg-app);
     box-shadow:
         inset 0 1px 0 0 var(--border),     /* top */

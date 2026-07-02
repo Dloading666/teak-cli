@@ -851,6 +851,15 @@ export function CenterPanel() {
   // to count as an activation if the tab moved).
   const tabDragSuppressClickRef = useRef(false);
 
+  // The chrome tab strip renders into the titlebar (Windows-Terminal style),
+  // not a separate row inside the content — the tabs sit on the drag bar like
+  // Chrome / the OS terminals. We keep ALL the tab logic/state here (the tabs
+  // ARE the center's terminals) and just portal the rendered strip up into
+  // TitleBar's #titlebar-tab-slot. Slot resolves after first mount; the strip
+  // renders one frame later, which is imperceptible.
+  const [tabSlot, setTabSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => { setTabSlot(document.getElementById('titlebar-tab-slot')); }, []);
+
   const onTabPointerDown = (e: React.PointerEvent<HTMLDivElement>, sessionId: string) => {
     // Ignore non-primary buttons + clicks on close button / status indicator
     if (e.button !== 0) return;
@@ -1177,6 +1186,7 @@ export function CenterPanel() {
         </div>,
         document.body
       )}
+      {tabSlot && createPortal(
       <div ref={tabsHeaderRef} className="chrome-tabs-header" data-count={terminals.filter(s => !s.isHidden || s.id === activeTerminalId).length}>
         {(() => {
           // Pre-compute visible-strip index for each session so the inner
@@ -1280,7 +1290,8 @@ export function CenterPanel() {
         <button className="chrome-tab-new" onClick={handleAddTab}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </button>
-      </div>
+      </div>,
+      tabSlot)}
       <div className="main-content">
 
         {terminals.map(t => t.tool !== null ? (

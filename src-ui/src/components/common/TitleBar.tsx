@@ -48,6 +48,9 @@ export function TitleBar() {
   const onDragMouseDown = async (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('button')) return;
+    // Tool tabs now live in the bar — a press on the tab strip must reach the
+    // tab's own click / pointer-reorder handlers, not start a window drag.
+    if ((e.target as HTMLElement).closest('.chrome-tabs-header')) return;
     e.preventDefault();
     if (!isTauri) return;
     try {
@@ -57,11 +60,24 @@ export function TitleBar() {
   };
   const onDragDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('button')) return;
+    if ((e.target as HTMLElement).closest('.chrome-tabs-header')) return;
     maximize();
   };
 
   return (
     <div className="titlebar" onMouseDown={onDragMouseDown} onDoubleClick={onDragDoubleClick}>
+      {/* Left slot mirrors the left panel's width so the tab strip begins at
+          the TOP OF THE CENTER COLUMN, not the window's left edge — that
+          far-left strip belongs to the left sidebar (and hosts the macOS
+          traffic lights). Collapses in lockstep with the panel via the shared
+          --w-left var + the same 250ms curve. */}
+      <div className={`titlebar-left-slot${state.leftPanelHidden ? ' is-collapsed' : ''}`} />
+      {/* Tool tabs (Windows-Terminal style) render here — CenterPanel portals
+          its .chrome-tabs-header into this slot so the tabs sit on the drag bar
+          above the center column, with the layout toggles + window controls to
+          their right. The flexible spacer between them stays a draggable handle. */}
+      <div className="titlebar-tabs" id="titlebar-tab-slot" />
+      <div className="titlebar-drag-spacer" />
       {/* Icons come straight from Lucide (lucide.dev, ISC license). No
           runtime dependency — just the d-paths copied inline so we
           don't pay a 200KB+ import for four glyphs.

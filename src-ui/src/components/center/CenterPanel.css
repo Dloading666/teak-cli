@@ -9,14 +9,19 @@
   border-radius: 0; /* Fully flush, edge to edge */
 }
 
+/* Tool-tab strip. Portaled into the titlebar (#titlebar-tab-slot) so the tabs
+   sit on the drag bar like Windows Terminal / Chrome instead of a separate row
+   inside the content. Fills the bar height; tabs are vertically-centered pills. */
 .chrome-tabs-header {
   display: flex;
-  align-items: flex-end;
-  padding: 8px 12px 0 12px;
+  align-items: stretch;
+  height: 100%;
+  padding: 0 2px 0 8px;
   border-bottom: none;
   position: relative;
   z-index: 10;
   gap: 2px;
+  min-width: 0;
 }
 
 .chrome-tab {
@@ -24,17 +29,23 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 38px;
-  padding: 0 16px;
+  height: 100%;
+  padding: 0 12px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-2);
   background: transparent;
+  /* --shape-radius-tab is ALREADY a top-only radius (e.g. `10px 10px 0 0`, or 0
+     in sharp/slab) — so the tab is rounded on top, square at the bottom. It
+     fills the bar to its bottom edge, and the active tab's fill meets the
+     content directly below (Windows-Terminal seam). Do NOT re-wrap this in
+     `var() var() 0 0` — that expands to 10 values and the browser drops it. */
   border-radius: var(--shape-radius-tab);
   cursor: pointer;
   user-select: none;
   flex: 0 1 auto;
-  max-width: 220px;
+  max-width: 200px;
+  min-width: 0;
   /* `transform` is part of the transition so siblings ease into their
    * shifted positions when another tab is being dragged past them
    * (browser-style slide-aside). The dragged tab itself overrides
@@ -75,26 +86,10 @@
   transition: none;
 }
 
-/* Chrome 'flare' pseudo-elements bridging the tab to the terminal background */
-.chrome-tab.active::before,
-.chrome-tab.active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  width: 12px;
-  height: 12px;
-  pointer-events: none;
-}
-
-.chrome-tab.active::before {
-  left: -12px;
-  background: radial-gradient(circle at top left, transparent 12px, var(--bg-terminal) 12.5px);
-}
-
-.chrome-tab.active::after {
-  right: -12px;
-  background: radial-gradient(circle at top right, transparent 12px, var(--bg-terminal) 12.5px);
-}
+/* The Chrome "flare" pseudo-elements that seamed the active tab into the
+   terminal directly below it were removed when the strip moved up into the
+   titlebar — there's no adjacent terminal to bridge into up here. The active
+   tab now reads via its --bg-terminal fill alone (WT-style flat tab). */
 
 .chrome-tab-new {
   width: 28px;
@@ -107,8 +102,9 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  margin-left: 6px;
-  margin-bottom: 5px;
+  margin-left: 4px;
+  align-self: center;
+  flex-shrink: 0;
   transition: background 0.15s, color 0.15s;
 }
 
