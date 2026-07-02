@@ -35,6 +35,8 @@ import { ErrorBoundary } from '../common/ErrorBoundary';
 import { commands } from '../../tauri';
 import { setFocusedPane } from '../../lib/pane-focus';
 import { getToolDisplayName } from '../../lib/tool-info';
+import { getPinnedPaneToolKeys } from '../../lib/pinned-tools';
+import { useT } from '../../i18n/useT';
 import './MultiAgentGrid.css';
 
 interface Props {
@@ -50,9 +52,9 @@ interface Props {
   paneCount?: 2 | 3 | 4;
 }
 
-const PANE_CLI_OPTIONS: Array<{ value: ToolType; label: string }> = (
-  ['claude', 'codex', 'antigravity', 'opencode', 'openclaw', 'hermes'] as const
-).map((value) => ({ value, label: getToolDisplayName(value) }));
+// Pane picker options are no longer hardcoded — they come from the user's
+// pinned AI-CLIs (getPinnedPaneToolKeys), the same set shown on the launchpad
+// "选择工具" page. Built at render time in EmptyPanePicker.
 
 // OpenClaw (persona forge) is directory-agnostic — its primary workflow
 // is global persona/skill management, not a project folder. Skip the
@@ -251,10 +253,20 @@ interface EmptyPanePickerProps {
 }
 
 function EmptyPanePicker({ paneIdx: _paneIdx, onSelect, toolsInstalled }: EmptyPanePickerProps) {
+  const t = useT();
+  // The user's pinned AI-CLIs (their launchpad "选择工具" selection), read fresh
+  // so a pin change on the launchpad shows up the next time an empty pane opens.
+  // 'terminal' is a pseudo-tool absent from the Rust registry, so
+  // getToolDisplayName falls back to the raw id ("terminal"); use its i18n
+  // label instead (localized + properly cased, matching the launchpad card).
+  const paneOptions = getPinnedPaneToolKeys().map((value) => ({
+    value,
+    label: value === 'terminal' ? t('tool.terminal') : getToolDisplayName(value),
+  }));
   return (
     <div className="empty-pane-picker">
       <div className="empty-pane-options">
-        {PANE_CLI_OPTIONS.map((opt) => {
+        {paneOptions.map((opt) => {
           // Default to installed when the detection result hasn't landed
           // yet (keys missing) to avoid a false-negative flash on mount.
           const installed = toolsInstalled[String(opt.value)] !== false;
