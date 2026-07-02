@@ -1,49 +1,49 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-- 「妙手」输入面板现在**永久停靠在中间区底部**,更稳更简单——不再浮动、不再缩成小球,也去掉了那两套「到处拖」的操作;顶边照样能上下拖来调整高度。
-- 「妙手」按钮移到了**标题栏右侧**,始终可见(即使收起左侧栏也在);键盘图标,打开时按钮底色高亮。
-- 标题栏:logo + Coffee CLI 上移到顶部的拖拽条;左右两侧栏的标签上边线对齐了。
-- 标题栏两侧的窗口/布局按钮,悬停高亮现在填满整条栏,不再「浮」在中间。
+- **一排快捷键、一只手掌控三大区**:左侧栏 / 妙手 / 右侧栏 的开关现在绑在相邻三键上(默认 `Alt + Q / W / E`),顶栏三个按钮直接显示各自的快捷键,一眼记住。设置 → 妙手 里可四选一:Alt+QWE、Ctrl+QWE、Alt+123、Ctrl+123。
+- **便签一键复制**:便签模式下每张卡多了复制按钮,点一下就在下方生成一张一模一样的——长便签当模板复用,不用重打。
+- **修复**:收起再展开右侧栏后,便签高度被撑满的问题。
+- **修复(Windows)**:某些启动方式下继承到不完整的 PATH,导致找不到用 npm/pnpm/bun/cargo 装的 CLI(如 opencode)的问题。
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-- 「妙手」輸入面板現在**永久停靠在中間區底部**,更穩更簡單——不再浮動、不再縮成小球,也拿掉了那兩套「到處拖」的操作;頂邊照樣能上下拖來調整高度。
-- 「妙手」按鈕移到了**標題列右側**,始終可見(即使收起左側欄也在);鍵盤圖示,開啟時按鈕底色高亮。
-- 標題列:logo + Coffee CLI 上移到頂部的拖曳條;左右兩側欄的分頁上緣對齊了。
-- 標題列兩側的視窗/版面按鈕,滑鼠停留的高亮現在填滿整條列,不再「浮」在中間。
+- **一排快捷鍵、一隻手掌控三大區**:左側欄 / 妙手 / 右側欄 的開關現在綁在相鄰三鍵上(預設 `Alt + Q / W / E`),標題列三個按鈕直接顯示各自的快捷鍵,一眼記住。設定 → 妙手 裡可四選一:Alt+QWE、Ctrl+QWE、Alt+123、Ctrl+123。
+- **便籤一鍵複製**:便籤模式下每張卡多了複製按鈕,點一下就在下方生成一張一模一樣的——長便籤當範本重用,不用重打。
+- **修復**:收合再展開右側欄後,便籤高度被撐滿的問題。
+- **修復(Windows)**:某些啟動方式下繼承到不完整的 PATH,導致找不到用 npm/pnpm/bun/cargo 安裝的 CLI(如 opencode)的問題。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-- The **Gambit** compose panel is now **permanently docked** at the bottom of the center area — steadier and simpler: no more floating or shrinking to a ball, and the two "drag-it-anywhere" gestures are gone. You can still drag its top edge up/down to resize the height.
-- The **Gambit** button moved to the **right side of the titlebar**, always visible (even when the left panel is collapsed); it's a keyboard glyph that highlights when open.
-- Titlebar: the logo + "Coffee CLI" moved up onto the top drag strip; the left and right sidebar tabs now line up along their top edge.
-- The window/layout buttons on both ends of the titlebar now fill the full bar height on hover, instead of floating in the middle.
+- **One key row, one hand for all three panes**: the left panel, Gambit (妙手), and right panel toggles now live on three adjacent keys (default `Alt + Q / W / E`), and each titlebar button shows its own shortcut so it's easy to remember. Pick one of four schemes in Settings → 妙手: Alt+QWE, Ctrl+QWE, Alt+123, Ctrl+123.
+- **One-click duplicate for sticky notes**: each note card in note view gets a copy button — click it and an identical note appears right below, so a long note can be reused as a template without retyping.
+- **Fixed**: sticky notes blowing up to full height after collapsing and re-expanding the right panel.
+- **Fixed (Windows)**: CLIs installed via npm/pnpm/bun/cargo (e.g. opencode) not being found when the app was launched with a trimmed PATH.
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-- 「Gambit」入力パネルが中央エリアの下部に**常時ドッキング**するようになりました。よりシンプルで安定——浮遊やボール化はなくなり、「どこへでもドラッグ」する2つの操作も廃止。上端を上下にドラッグして高さを調整することは引き続き可能です。
-- 「Gambit」ボタンを**タイトルバー右側**へ移動し、常に表示(左パネルを畳んでも表示)。キーボードのアイコンで、開いているときは背景がハイライトされます。
-- タイトルバー:ロゴ +「Coffee CLI」を上部のドラッグ帯へ移動。左右サイドバーのタブが上端で揃うようになりました。
-- タイトルバー両端のウィンドウ/レイアウトボタンのホバー時ハイライトが、中央に浮かず、バー全体の高さいっぱいに広がるようになりました。
+- **キー1列、片手で3ペインを操作**:左パネル・Gambit(妙手)・右パネルの開閉が隣り合う3キーに割り当てられ(既定 `Alt + Q / W / E`)、タイトルバーの各ボタンに自分のショートカットが表示されて覚えやすくなりました。設定 → 妙手 で4種類から選択:Alt+QWE、Ctrl+QWE、Alt+123、Ctrl+123。
+- **付箋のワンクリック複製**:ノート表示の各カードにコピーボタンが付き、押すと同じ付箋がすぐ下に現れます。長い付箋をテンプレートとして再利用でき、打ち直し不要です。
+- **修正**:右パネルを畳んで再展開した後、付箋の高さが最大まで広がる問題。
+- **修正(Windows)**:PATH が不完全な状態で起動された場合に、npm/pnpm/bun/cargo で入れた CLI(opencode など)が見つからない問題。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-- 「Gambit」입력 패널이 이제 가운데 영역 하단에 **영구적으로 고정**됩니다. 더 단순하고 안정적입니다 — 떠다니거나 공 모양으로 줄어드는 동작, 그리고 "아무 데나 끌어다 놓는" 두 가지 제스처가 사라졌습니다. 위쪽 가장자리를 위아래로 끌어 높이를 조절하는 것은 그대로 가능합니다.
-- 「Gambit」버튼을 **타이틀바 오른쪽**으로 옮겨 항상 보이도록 했습니다(왼쪽 패널을 접어도 표시). 키보드 아이콘이며, 열려 있을 때 배경이 강조됩니다.
-- 타이틀바: 로고 + "Coffee CLI"를 상단 드래그 영역으로 올렸고, 좌우 사이드바 탭의 위쪽 선이 정렬되었습니다.
-- 타이틀바 양쪽 끝의 창/레이아웃 버튼이 호버 시 가운데에 뜨지 않고 바 전체 높이를 채웁니다.
+- **한 줄의 키, 한 손으로 세 패널 제어**: 왼쪽 패널 · Gambit(妙手) · 오른쪽 패널 토글이 인접한 세 키에 배치되고(기본 `Alt + Q / W / E`), 타이틀바의 각 버튼에 해당 단축키가 표시되어 기억하기 쉽습니다. 설정 → 妙手 에서 네 가지 중 선택: Alt+QWE, Ctrl+QWE, Alt+123, Ctrl+123.
+- **스티키 노트 원클릭 복제**: 노트 보기의 각 카드에 복사 버튼이 생겨, 누르면 동일한 노트가 바로 아래에 나타납니다. 긴 노트를 다시 입력하지 않고 템플릿으로 재사용할 수 있습니다.
+- **수정**: 오른쪽 패널을 접었다 다시 펼친 후 스티키 노트 높이가 가득 늘어나는 문제.
+- **수정(Windows)**: PATH가 잘린 상태로 앱이 실행됐을 때 npm/pnpm/bun/cargo로 설치한 CLI(opencode 등)를 찾지 못하는 문제.
 
 </details>

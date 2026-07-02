@@ -1018,6 +1018,30 @@ html.is-macos .titlebar-left-slot.is-collapsed {
     background: var(--bg-hover);
     color: var(--text-1);
 }
+
+/* Gambit compose button carries its configured hotkey as a persistent hint
+   beside the keyboard glyph — a deliberate memory hook for the product's
+   signature feature. Auto-width (icon + label) instead of the 36px icon-only
+   slot; the double-class selector outranks the .titlebar-btn--layout width. */
+.titlebar-btn--layout.titlebar-btn--hinted {
+    width: auto;
+    gap: 6px;
+    padding: 0 11px 0 8px;
+}
+.titlebar-hotkey-hint {
+    /* Same Inter face + clean medium weight as the launchpad tool-card names
+       (var(--font)/body default) — the earlier 600 weight + letter-spacing
+       read as heavy and spread. Kept at 13px for legibility; color inherits
+       the button so the label stays unified with the keyboard icon. */
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: normal;
+    color: inherit;
+    white-space: nowrap;
+    pointer-events: none; /* clicks fall through to the button (toggle Gambit) */
+}
 .titlebar-controls {
     display: flex;
     height: 100%; /* full bar height so min/max/close hover (incl the close-red) fills the bar */

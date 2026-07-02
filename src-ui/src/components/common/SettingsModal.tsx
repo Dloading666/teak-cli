@@ -13,7 +13,7 @@
 // is unchanged; only the presentation moved.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { useAppState, useAppDispatch, GAMBIT_HOTKEYS, type GambitHotkey, type ThemeColor, type ThemeShape, type IconTheme } from '../../store/app-state';
+import { useAppState, useAppDispatch, HOTKEY_SCHEMES, type HotkeyScheme, type ThemeColor, type ThemeShape, type IconTheme } from '../../store/app-state';
 import { useT } from '../../i18n/useT';
 import { IS_MACOS } from '../../lib/platform';
 import { TERM_COLOR_SCHEMES } from '../center/TierTerminal';
@@ -182,9 +182,9 @@ export function SettingsModal() {
     dispatch({ type: 'SET_GAMBIT_ENTER_TO_SEND', value });
     try { localStorage.setItem('cc-gambit-enter-send', String(value)); } catch {}
   };
-  const setGambitHotkey = (value: GambitHotkey) => {
-    dispatch({ type: 'SET_GAMBIT_HOTKEY', value });
-    try { localStorage.setItem('cc-gambit-hotkey', value); } catch {}
+  const setHotkeyScheme = (value: HotkeyScheme) => {
+    dispatch({ type: 'SET_HOTKEY_SCHEME', value });
+    try { localStorage.setItem('cc-hotkey-scheme', value); } catch {}
   };
 
   const hasBg = state.bgType !== 'none' && state.bgPath !== '';
@@ -386,16 +386,18 @@ export function SettingsModal() {
 
                 <div className="settings-section-label">{t('settings.gambit.hotkey' as any)}</div>
                 <div className="settings-key-row settings-key-row--keys">
-                  {GAMBIT_HOTKEYS.map(h => {
-                    const active = state.gambitHotkey === h.code;
+                  {HOTKEY_SCHEMES.map(s => {
+                    const active = state.hotkeyScheme === s.code;
                     return (
                       <button
-                        key={h.code}
+                        key={s.code}
                         className={`settings-key-card${active ? ' active' : ''}`}
-                        onClick={() => setGambitHotkey(h.code)}
+                        onClick={() => setHotkeyScheme(s.code)}
                         aria-pressed={active}
                       >
-                        <span className="settings-key-combo"><kbd>{h.mod}</kbd><span className="settings-key-plus">+</span><kbd>{h.key}</kbd></span>
+                        {/* Modifier + the three keys (left · Gambit · right, in
+                            that L→R order). Titlebar hints show which is which. */}
+                        <span className="settings-key-combo"><kbd>{s.mod}</kbd><span className="settings-key-plus">+</span><kbd>{s.keys.left.key}</kbd><kbd>{s.keys.gambit.key}</kbd><kbd>{s.keys.right.key}</kbd></span>
                       </button>
                     );
                   })}

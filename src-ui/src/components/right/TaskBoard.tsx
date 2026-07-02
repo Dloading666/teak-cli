@@ -231,6 +231,24 @@ export function TaskBoard() {
     }, 50);
   }, [t]);
 
+  // Duplicate a note — spawns an identical sticky right AFTER the original
+  // (same title/description/status/height, fresh id) so a long note can be
+  // reused as a template without retyping. Deliberately does NOT set addingId:
+  // that drives the note's autoFocus + select-all, which is right for a blank
+  // new note (the user will type into it) but wrong for a duplicate — clicking
+  // "copy" is a SAVE-EFFORT gesture, not an edit. The copy just appears in place.
+  const duplicateTask = useCallback((id: string) => {
+    const newId = crypto.randomUUID();
+    setTasks(prev => {
+      const idx = prev.findIndex(t => t.id === id);
+      if (idx < 0) return prev;
+      const copy: TaskItem = { ...prev[idx], id: newId, createdAt: Date.now() };
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
+  }, []);
+
   // Send a task to the active tab's agent. Composes `title + description`
   // (description appended on its own line block only when non-empty), pastes
   // it into the active xterm via tab-actions, and auto-promotes the task to
@@ -600,6 +618,7 @@ export function TaskBoard() {
               onUpdateTitle={updateTitle}
               onSetHeight={setHeight}
               onRemove={handleRemove}
+              onDuplicate={duplicateTask}
               onSend={sendToAgent}
               onReorder={setTasks}
               onShowGuide={handleShowGuide}

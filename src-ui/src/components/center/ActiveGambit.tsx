@@ -17,7 +17,7 @@
 // text can't be misdirected to the wrong terminal.
 
 import { useCallback, useEffect } from 'react';
-import { useAppState, isSplitTool, paneSessionId, matchesGambitHotkey } from '../../store/app-state';
+import { useAppState, isSplitTool, paneSessionId, matchHotkeyScheme } from '../../store/app-state';
 import { getTabActions } from '../../lib/tab-actions';
 import { getFocusedPane } from '../../lib/pane-focus';
 import { Gambit } from './Gambit';
@@ -77,28 +77,34 @@ export function ActiveGambit() {
   // Global open/close hotkey (settings → 妙手). Registered in the CAPTURE
   // phase on document so it fires BEFORE the focused xterm's own keydown —
   // preventDefault then stops the combo (e.g. Ctrl+~) from leaking a control
-  // byte into the terminal. NOT gated on gambitOpen: ActiveGambit stays
-  // mounted app-wide even while the panel is closed, so the same key both
-  // opens and closes. Auto-repeat events are still suppressed (preventDefault)
-  // but don't re-toggle, so holding the key neither flickers nor leaks a byte.
-  const hotkey = state.gambitHotkey;
+  // byte into the terminal. NOT gated on gambitOpen: ActiveGambit stays mounted
+  // app-wide even while the panel is closed, so this ONE listener drives all
+  // three chrome toggles (left panel / Gambit / right panel) under the active
+  // scheme. Auto-repeat events are still suppressed (preventDefault) but don't
+  // re-toggle, so holding a key neither flickers nor leaks a byte.
+  const scheme = state.hotkeyScheme;
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       // IME composition in progress — let the IME keep the key (same guard
       // every other keydown handler in this app uses, e.g. Gambit.tsx).
       if (e.isComposing) return;
-      if (!matchesGambitHotkey(e, hotkey)) return;
+      const action = matchHotkeyScheme(e, scheme);
+      if (!action) return;
       // Suppress the combo for EVERY matching event — including auto-repeat —
       // so a held key never leaks a byte into the xterm during the ~1 frame
-      // before Gambit grabs focus. Only the initial (non-repeat) press toggles.
+      // before the toggle lands. Only the initial (non-repeat) press acts.
       e.preventDefault();
       e.stopPropagation();
       if (e.repeat) return;
-      dispatch({ type: 'TOGGLE_GAMBIT' });
+      dispatch({
+        type: action === 'left' ? 'TOGGLE_LEFT_PANEL'
+            : action === 'right' ? 'TOGGLE_RIGHT_PANEL'
+            : 'TOGGLE_GAMBIT',
+      });
     };
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [hotkey, dispatch]);
+  }, [scheme, dispatch]);
 
   if (!gambitOpen || !activeId) return null;
 

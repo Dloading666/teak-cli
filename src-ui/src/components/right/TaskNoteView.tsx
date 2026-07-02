@@ -3,7 +3,7 @@
 // view just renders each task as a roomy note card:
 //
 //   ┌─────────────────────────────────────────────┐
-//   │ ● ● ●            2026.6.28  21:48   🗑  ▶     │   ← traffic-light status
+//   │ ● ● ●          2026.6.28  21:48  ⧉  🗑  ▶    │   ← traffic-light status
 //   │                                               │     dots + timestamp
 //   │  (big editable note body — write freely)      │
 //   └─────────────────────────────────────────────┘
@@ -62,6 +62,7 @@ interface TaskNoteViewProps {
   // Persists a bottom-edge-resized body height (called once on drop).
   onSetHeight: (id: string, height: number) => void;
   onRemove: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onSend: (task: TaskItem) => void;
   // Functional updater (the parent's setTasks) so a reorder computed at drop
   // time still composes against the freshest array — guards against a
@@ -72,7 +73,7 @@ interface TaskNoteViewProps {
 }
 
 export function TaskNoteView({
-  tasks, addingId, removingId, canSend, onSetStatus, onUpdateTitle, onSetHeight, onRemove, onSend, onReorder, onShowGuide,
+  tasks, addingId, removingId, canSend, onSetStatus, onUpdateTitle, onSetHeight, onRemove, onDuplicate, onSend, onReorder, onShowGuide,
 }: TaskNoteViewProps) {
   const t = useT();
 
@@ -276,6 +277,19 @@ export function TaskNoteView({
               <div className="task-note-actions">
                 <button
                   type="button"
+                  className="task-note-btn task-note-copy"
+                  onClick={() => onDuplicate(task.id)}
+                  disabled={!task.title.trim()}
+                >
+                  {/* Duplicate this note — spawns an identical sticky right after
+                      it; the new card animating in is the feedback. */}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
                   className="task-note-btn task-note-delete"
                   onClick={() => onRemove(task.id)}
                 >
@@ -343,9 +357,30 @@ function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyP
     // content. So text is never clipped behind a scrollbar (which is globally
     // hidden anyway) — drag bigger for room, drag smaller and it stops at the
     // text.
-    el.style.height = 'auto';
-    const floor = height ?? DEFAULT_NOTE_HEIGHT;
-    el.style.height = `${Math.max(floor, el.scrollHeight)}px`;
+    //
+    // scrollHeight depends on the textarea's WIDTH (narrower ⇒ more wrapping ⇒
+    // taller). The right panel mounts COLLAPSED (width 0) and animates open
+    // (App.tsx useSlidingPanel), so a measure taken at mount reflects width≈0
+    // and would blow every note up to full height — and it'd stick, since this
+    // effect's deps don't track width. Guard against zero-width measures, and
+    // re-fit via a ResizeObserver once the real width arrives (panel finishes
+    // expanding) or later changes (panel resized).
+    let lastW = -1;
+    const fit = () => {
+      if (el.offsetWidth === 0) return; // collapsed / not laid out — wait for width
+      el.style.height = 'auto';
+      const floor = height ?? DEFAULT_NOTE_HEIGHT;
+      el.style.height = `${Math.max(floor, el.scrollHeight)}px`;
+      lastW = el.offsetWidth;
+    };
+    fit();
+    // Only re-fit on an actual WIDTH change — our own height writes don't
+    // change width, so they can't loop this observer.
+    const ro = new ResizeObserver(() => {
+      if (el.offsetWidth !== 0 && el.offsetWidth !== lastW) fit();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [value, height]);
 
   useEffect(() => {

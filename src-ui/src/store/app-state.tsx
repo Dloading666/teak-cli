@@ -37,36 +37,55 @@ export type IconTheme =
   | 'outline' | 'material' | 'vscode-icons' | 'catppuccin-mocha'
   | 'devicon' | 'fluent' | 'symbols' | 'coffee';
 
-// Gambit (妙手) open/close hotkey presets, each a single-modifier combo.
-// Default `ctrl-backquote` borrows VS Code's "toggle terminal panel" muscle
-// memory and is the safest pick: no CJK IME claim, no macOS dead-key/typed-
-// glyph side effect, and the host terminal rarely needs a bare Ctrl+`. The
-// `alt-*` entries are opt-in alternatives — a hosted CLI (Claude/Codex) may
-// itself bind Alt chords inside the PTY, so when the user picks one the global
-// listener will intercept it app-wide (acceptable because they chose it). We
-// show literal `Ctrl`/`Alt` (not ⌃/⌥) for the mass-market audience, and match
-// on `e.code` (physical key) because Alt on macOS rewrites `e.key` into the
-// typed glyph (å/œ) — only the code is stable.
-export const GAMBIT_HOTKEYS = [
-  { code: 'ctrl-backquote', mod: 'Ctrl', key: '~', eventCode: 'Backquote', modifier: 'ctrl' },
-  { code: 'alt-backquote',  mod: 'Alt',  key: '~', eventCode: 'Backquote', modifier: 'alt' },
-  { code: 'alt-a',          mod: 'Alt',  key: 'A', eventCode: 'KeyA',      modifier: 'alt' },
-  { code: 'alt-q',          mod: 'Alt',  key: 'Q', eventCode: 'KeyQ',      modifier: 'alt' },
+// Unified one-hand hotkey SCHEME for the three chrome toggles — left panel,
+// Gambit (妙手), right panel — on three adjacent keys. The user picks one of
+// four presets in Settings → 妙手; default Alt+QWE. Each scheme is a single
+// modifier + three keys mapped left/gambit/right, so a whole hand rests on the
+// row. We match on `e.code` (physical key) because Alt on macOS rewrites
+// `e.key` into the typed glyph (œ/∑/´) — only the code is stable — and every
+// handler preventDefaults to cancel that glyph AND stop the combo reaching a
+// focused terminal. Ctrl+QWE is offered but collides with core terminal editing
+// (Ctrl+W/E/Q); it's opt-in, same "you chose it" contract as the old alt-*.
+// Literal `Ctrl`/`Alt` (not ⌃/⌥) for the mass-market audience.
+export const HOTKEY_SCHEMES = [
+  { code: 'alt-qwe',  mod: 'Alt',  modifier: 'alt',
+    keys: { left: { key: 'Q', eventCode: 'KeyQ' }, gambit: { key: 'W', eventCode: 'KeyW' }, right: { key: 'E', eventCode: 'KeyE' } } },
+  { code: 'ctrl-qwe', mod: 'Ctrl', modifier: 'ctrl',
+    keys: { left: { key: 'Q', eventCode: 'KeyQ' }, gambit: { key: 'W', eventCode: 'KeyW' }, right: { key: 'E', eventCode: 'KeyE' } } },
+  { code: 'alt-123',  mod: 'Alt',  modifier: 'alt',
+    keys: { left: { key: '1', eventCode: 'Digit1' }, gambit: { key: '2', eventCode: 'Digit2' }, right: { key: '3', eventCode: 'Digit3' } } },
+  { code: 'ctrl-123', mod: 'Ctrl', modifier: 'ctrl',
+    keys: { left: { key: '1', eventCode: 'Digit1' }, gambit: { key: '2', eventCode: 'Digit2' }, right: { key: '3', eventCode: 'Digit3' } } },
 ] as const;
 
-export type GambitHotkey = typeof GAMBIT_HOTKEYS[number]['code'];
+export type HotkeyScheme = typeof HOTKEY_SCHEMES[number]['code'];
+export type HotkeyAction = 'left' | 'gambit' | 'right';
 
-// True when a keydown matches the configured hotkey. The caller MUST then call
-// BOTH preventDefault (cancels the byte/glyph — this is what stops Alt+A from
-// typing `å` on macOS) AND stopPropagation (keeps the combo from reaching
-// xterm's own keydown). metaKey is always rejected: on macOS Cmd+` is the
-// system "cycle windows" shortcut, so the Ctrl preset stays Control everywhere.
-export function matchesGambitHotkey(e: KeyboardEvent, hotkey: GambitHotkey): boolean {
-  const def = GAMBIT_HOTKEYS.find(h => h.code === hotkey) ?? GAMBIT_HOTKEYS[0];
-  if (e.metaKey || e.code !== def.eventCode) return false;
-  return def.modifier === 'ctrl'
-    ? e.ctrlKey && !e.altKey
-    : e.altKey && !e.ctrlKey;
+// Which chrome toggle a keydown maps to under the active scheme, or null. The
+// caller MUST then preventDefault (cancels the macOS Alt-glyph + the control
+// byte) AND stopPropagation (keeps the combo out of xterm's own keydown).
+// metaKey is always rejected (macOS Cmd stays a system key); the modifier must
+// match EXACTLY (an Alt-scheme ignores Ctrl-held combos and vice-versa) so the
+// other modifier's shortcuts pass through untouched.
+export function matchHotkeyScheme(e: KeyboardEvent, scheme: HotkeyScheme): HotkeyAction | null {
+  const s = HOTKEY_SCHEMES.find(h => h.code === scheme) ?? HOTKEY_SCHEMES[0];
+  if (e.metaKey) return null;
+  const modOk = s.modifier === 'ctrl' ? (e.ctrlKey && !e.altKey) : (e.altKey && !e.ctrlKey);
+  if (!modOk) return null;
+  if (e.code === s.keys.left.eventCode) return 'left';
+  if (e.code === s.keys.gambit.eventCode) return 'gambit';
+  if (e.code === s.keys.right.eventCode) return 'right';
+  return null;
+}
+
+// The three display combos for a scheme, e.g. { left: 'Alt + Q', gambit: 'Alt + W', right: 'Alt + E' }.
+export function schemeLabels(scheme: HotkeyScheme): Record<HotkeyAction, string> {
+  const s = HOTKEY_SCHEMES.find(h => h.code === scheme) ?? HOTKEY_SCHEMES[0];
+  return {
+    left: `${s.mod} + ${s.keys.left.key}`,
+    gambit: `${s.mod} + ${s.keys.gambit.key}`,
+    right: `${s.mod} + ${s.keys.right.key}`,
+  };
 }
 
 /// One pane inside a multi-agent Tab. `paneIdx` is 1-indexed (1..4)
@@ -162,9 +181,10 @@ export interface AppState {
   // settings modal because the muscle-memory split is per-user / per-OS.
   gambitEnterToSend: boolean;
 
-  // Gambit open/close hotkey preset (settings → 妙手). One of GAMBIT_HOTKEYS;
-  // a global capture-phase listener in ActiveGambit toggles on a match.
-  gambitHotkey: GambitHotkey;
+  // Unified hotkey scheme (settings → 妙手): one of HOTKEY_SCHEMES, driving the
+  // three chrome toggles — left panel / Gambit / right panel — via a global
+  // capture-phase listener in ActiveGambit.
+  hotkeyScheme: HotkeyScheme;
 
   // IDE-style layout toggles driven from titlebar controls.
   // Default both panels visible — matches first-time user expectation.
@@ -248,7 +268,7 @@ type Action =
   | { type: 'TOGGLE_SETTINGS' }
   | { type: 'SET_SETTINGS_OPEN'; open: boolean }
   | { type: 'SET_GAMBIT_ENTER_TO_SEND'; value: boolean }
-  | { type: 'SET_GAMBIT_HOTKEY'; value: GambitHotkey }
+  | { type: 'SET_HOTKEY_SCHEME'; value: HotkeyScheme }
   | { type: 'SET_GAMBIT_DRAFT'; id: string; draft: string }
   | { type: 'SET_PANE_TOOL'; tabId: string; paneIdx: number; tool: ToolType; toolData?: string; folderPath?: string | null }
   | { type: 'SET_PANE_SENTINEL'; tabId: string; paneIdx: number; enabled: boolean }
@@ -394,8 +414,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, settingsOpen: action.open };
     case 'SET_GAMBIT_ENTER_TO_SEND':
       return { ...state, gambitEnterToSend: action.value };
-    case 'SET_GAMBIT_HOTKEY':
-      return { ...state, gambitHotkey: action.value };
+    case 'SET_HOTKEY_SCHEME':
+      return { ...state, hotkeyScheme: action.value };
     case 'SET_GAMBIT_DRAFT':
       return {
         ...state,
@@ -554,9 +574,12 @@ function getInitialState(): AppState {
   let wallpaperOpacity = 70;
   // Default Enter-to-send; only opt-out if the user explicitly stored 'false'.
   let gambitEnterToSend = true;
-  // Default Gambit hotkey = Ctrl+~ (VS Code terminal-toggle muscle memory,
-  // no macOS dead-key clash). Overridden only by a stored valid preset.
-  let gambitHotkey: GambitHotkey = 'ctrl-backquote';
+  // Default hotkey scheme = Alt+QWE (left=Q / Gambit=W / right=E) — one-hand
+  // ergonomics + a memorable, purpose-built feel. matchHotkeyScheme + each
+  // handler's preventDefault cancel the macOS Alt dead-key glyphs (œ/∑/´). The
+  // Ctrl+QWE preset is opt-in despite clashing with terminal Ctrl+W/E/Q.
+  // Overridden only by a stored valid scheme.
+  let hotkeyScheme: HotkeyScheme = 'alt-qwe';
   try {
     const storedPath = localStorage.getItem('cc-bg-path');
     const storedType = localStorage.getItem('cc-bg-type') as 'image' | 'video' | 'none' | null;
@@ -580,9 +603,9 @@ function getInitialState(): AppState {
     termColorScheme = localStorage.getItem('cc-term-scheme') || '';
     termFont = localStorage.getItem('cc-term-font') || '';
     gambitEnterToSend = localStorage.getItem('cc-gambit-enter-send') !== 'false';
-    const storedHotkey = localStorage.getItem('cc-gambit-hotkey');
-    if (storedHotkey && GAMBIT_HOTKEYS.some(h => h.code === storedHotkey)) {
-      gambitHotkey = storedHotkey as GambitHotkey;
+    const storedScheme = localStorage.getItem('cc-hotkey-scheme');
+    if (storedScheme && HOTKEY_SCHEMES.some(h => h.code === storedScheme)) {
+      hotkeyScheme = storedScheme as HotkeyScheme;
     }
     // New key (post-refactor): wallpaper opacity, 0-100, larger = more
     // visible. Old key was `cc-wallpaper-dim` (0-80, larger = darker
@@ -635,7 +658,7 @@ function getInitialState(): AppState {
     gambitOpen: false,
     settingsOpen: false,
     gambitEnterToSend,
-    gambitHotkey,
+    hotkeyScheme,
     leftPanelHidden,
     rightPanelHidden,
     multiAgentLayout,

@@ -277,14 +277,14 @@
 
 /* ── Keyboard: send-key cards ──────────────────────────────────────────── */
 .settings-key-row { display: flex; gap: 10px; flex-wrap: wrap; }
-/* Hotkey picker (妙手 toggle): 4 equal presets as an auto-fit grid so they
-   fill evenly (4-up when wide, fewer when narrow) instead of wrapping to a
-   ragged 3+1 the way a plain flex row does. min-width:0 lets the cards shrink
-   to the column — the shared .settings-key-card keeps min-width:160px for the
-   2-up send row above. */
+/* Hotkey picker (妙手 toggle): 4 scheme presets in a fixed 2×2 grid. Each card
+   is now a modifier + THREE keys (Alt + Q W E), too wide to sit 4-up without
+   overflowing, so two rows of two reads cleanly. min-width:0 lets the cards
+   shrink to the column — the shared .settings-key-card keeps min-width:160px
+   for the 2-up send row above. */
 .settings-key-row--keys {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
 }
 .settings-key-row--keys .settings-key-card { min-width: 0; }
 .settings-key-card {

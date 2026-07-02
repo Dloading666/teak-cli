@@ -10,13 +10,18 @@
 //      multi-agent quadrant. Two modes: grid (2×2) and columns (1×4).
 
 import { commands, isTauri } from '../../tauri';
-import { useAppState, useAppDispatch } from '../../store/app-state';
+import { useAppState, useAppDispatch, schemeLabels } from '../../store/app-state';
 import { IS_MACOS } from '../../lib/platform';
 import './TitleBar.css';
 
 export function TitleBar() {
   const { state } = useAppState();
   const dispatch = useAppDispatch();
+
+  // The active scheme's three combos, shown as persistent hints on the left /
+  // Gambit / right buttons — a deliberate memory hook for the product's
+  // signature one-hand shortcuts (left=Q · Gambit=W · right=E by default).
+  const hk = schemeLabels(state.hotkeyScheme);
 
   const minimize = () => isTauri && commands.windowMinimize().catch(() => {});
   const maximize = () => isTauri && commands.windowMaximize().catch(() => {});
@@ -98,17 +103,31 @@ export function TitleBar() {
           "crossed-lines" look the user flagged. Active signal still travels
           via .is-active background only. */}
       <div className="titlebar-layout-toggles">
-        {/* Gambit compose — moved here from the left panel so it stays visible
-            even when the left panel is hidden. Leftmost in the right cluster. */}
+        {/* Left panel · Gambit · right panel — the three hinted chrome toggles,
+            adjacent with Gambit in the MIDDLE so the row mirrors the screen
+            (left panel on the left, right on the right) and the default Alt+QWE
+            keys read left-to-right. */}
         <button
-          className={`titlebar-btn titlebar-btn--layout${state.gambitOpen ? ' is-active' : ''}`}
+          className={`titlebar-btn titlebar-btn--layout titlebar-btn--hinted${state.leftPanelHidden ? '' : ' is-active'}`}
+          onClick={toggleLeft}
+          aria-label={`Toggle left panel (${hk.left})`}
+          aria-pressed={!state.leftPanelHidden}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="square" strokeLinejoin="miter">
+            <rect x="3" y="3" width="18" height="18" />
+            <line x1="9" y1="4" x2="9" y2="20" />
+          </svg>
+          <span className="titlebar-hotkey-hint">{hk.left}</span>
+        </button>
+        {/* Gambit compose (middle) — always visible even when the left panel is
+            hidden. Keyboard glyph; open state reads from the .is-active bg, so
+            no need to swap the icon to an X. */}
+        <button
+          className={`titlebar-btn titlebar-btn--layout titlebar-btn--hinted${state.gambitOpen ? ' is-active' : ''}`}
           onClick={() => dispatch({ type: 'TOGGLE_GAMBIT' })}
-          aria-label="Gambit compose"
+          aria-label={`Gambit compose (${hk.gambit})`}
           aria-pressed={state.gambitOpen}
         >
-          {/* Always the keyboard glyph — the open state reads from the
-              .is-active background highlight, so there's no need to swap
-              the icon to an X. */}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="4" width="20" height="16" rx="2" />
             <path d="M6 8h.001" />
@@ -120,7 +139,22 @@ export function TitleBar() {
             <path d="M16 12h.001" />
             <path d="M7 16h10" />
           </svg>
+          <span className="titlebar-hotkey-hint">{hk.gambit}</span>
         </button>
+        <button
+          className={`titlebar-btn titlebar-btn--layout titlebar-btn--hinted${state.rightPanelHidden ? '' : ' is-active'}`}
+          onClick={toggleRight}
+          aria-label={`Toggle right panel (${hk.right})`}
+          aria-pressed={!state.rightPanelHidden}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="square" strokeLinejoin="miter">
+            <rect x="3" y="3" width="18" height="18" />
+            <line x1="15" y1="4" x2="15" y2="20" />
+          </svg>
+          <span className="titlebar-hotkey-hint">{hk.right}</span>
+        </button>
+        {/* Multi-agent layout mode — only when the active tab is a quadrant.
+            After the panel trio so the trio stays anchored when it toggles. */}
         {showMaLayout && (
           <>
             <button
@@ -149,29 +183,6 @@ export function TitleBar() {
             </button>
           </>
         )}
-
-        <button
-          className={`titlebar-btn titlebar-btn--layout${state.leftPanelHidden ? '' : ' is-active'}`}
-          onClick={toggleLeft}
-          aria-label="Toggle left panel"
-          aria-pressed={!state.leftPanelHidden}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="square" strokeLinejoin="miter">
-            <rect x="3" y="3" width="18" height="18" />
-            <line x1="9" y1="4" x2="9" y2="20" />
-          </svg>
-        </button>
-        <button
-          className={`titlebar-btn titlebar-btn--layout${state.rightPanelHidden ? '' : ' is-active'}`}
-          onClick={toggleRight}
-          aria-label="Toggle right panel"
-          aria-pressed={!state.rightPanelHidden}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="square" strokeLinejoin="miter">
-            <rect x="3" y="3" width="18" height="18" />
-            <line x1="15" y1="4" x2="15" y2="20" />
-          </svg>
-        </button>
 
         {/* Personalization settings — gear opens the consolidated modal that
             replaced the old left-panel theme/language popovers. */}
