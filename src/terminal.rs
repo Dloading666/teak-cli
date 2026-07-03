@@ -444,6 +444,7 @@ pub struct TerminalSession {
     /// and the MCP `read_pane` tool (also archived). Currently referenced
     /// only by the dormant `mcp_server` module; kept alive here so that
     /// module still compiles and can be revived without re-plumbing.
+    #[allow(dead_code)] // intentionally unread in the active build (see above)
     pub output_buffer: Arc<Mutex<Vec<String>>>,
 }
 

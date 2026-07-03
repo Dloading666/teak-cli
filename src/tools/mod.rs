@@ -161,6 +161,7 @@ pub struct ToolDescriptor {
     /// instead of `home.join(skill_dir_relative)` so platform-
     /// specific home overrides (Hermes Agent on Windows uses
     /// `%LOCALAPPDATA%\hermes` instead of `~/.hermes`) are honored.
+    #[allow(dead_code)] // read only by skill_dir() below, which isn't wired to a call site yet
     pub skill_dir_relative: Option<&'static str>,
 
     /// `true` if Coffee CLI installs a status-indicator hook for
@@ -199,6 +200,7 @@ impl ToolDescriptor {
     /// Always prefer this over `home.join(t.skill_dir_relative?)`
     /// at call sites — that pattern silently breaks on Windows for
     /// Hermes.
+    #[allow(dead_code)] // documented ToolDescriptor API; not wired to a call site yet
     pub fn skill_dir(&self, home: &Path) -> Option<PathBuf> {
         let rel = self.skill_dir_relative?;
         if self.id == hermes::DESCRIPTOR.id {
