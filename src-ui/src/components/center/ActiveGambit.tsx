@@ -85,9 +85,14 @@ export function ActiveGambit() {
   const scheme = state.hotkeyScheme;
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // IME composition in progress — let the IME keep the key (same guard
-      // every other keydown handler in this app uses, e.g. Gambit.tsx).
-      if (e.isComposing) return;
+      // Match FIRST — do NOT gate on `e.isComposing` up here. A matched combo
+      // always holds Alt or Ctrl, which a Chinese/Japanese IME composition never
+      // does, so a match is unambiguously a deliberate hotkey; and non-matching
+      // keys fall straight through untouched, so IME input is unaffected either
+      // way. An `if (e.isComposing) return` ahead of the match would silently
+      // drop macOS DEAD keys — Option+E (accent ´, the default Alt+QWE "right
+      // panel" key) can report isComposing=true on its keydown in WebKit, which
+      // would swallow the toggle on Mac.
       const action = matchHotkeyScheme(e, scheme);
       if (!action) return;
       // Suppress the combo for EVERY matching event — including auto-repeat —
