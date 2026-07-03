@@ -1942,12 +1942,18 @@ fn find_drizzle_sessions_sqlite(
         Err(_) => return,
     };
 
-    // Query sessions with message count, skip archived ones
+    // Skip archived sessions AND sub-agent children (parent_id != NULL).
+    // OpenCode writes one row per spawned sub-agent; its own desktop excludes
+    // them from the root list (WHERE parent_id IS NULL) and loads them
+    // on-demand from the parent's timeline. Surfacing them here flat-clutters
+    // the Sessions board with un-resumable child conversations. MiMo Code
+    // shares this Drizzle schema/scanner, so the same filter applies.
     let query = "SELECT s.id, s.title, s.directory, s.time_updated, \
                  COUNT(m.id) as msg_count \
                  FROM session s \
                  LEFT JOIN message m ON m.session_id = s.id \
                  WHERE s.time_archived IS NULL \
+                   AND s.parent_id IS NULL \
                  GROUP BY s.id \
                  ORDER BY s.time_updated DESC \
                  LIMIT 30";
@@ -3460,5 +3466,74 @@ mod resume_cwd_tests {
 
         assert!(map.is_empty());
         let _ = std::fs::remove_dir_all(&home);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a temp Drizzle-schema SQLite db (the `session` + `message` shape
+    /// `find_drizzle_sessions_sqlite` reads), seeded with one parent session,
+    /// two sub-agent children (parent_id set), and one archived session. Only
+    /// the columns the scanner touches are created.
+    fn seed_drizzle_db() -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "coffee-cli-drizzle-test-{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let conn = rusqlite::Connection::open(&path).expect("open temp db");
+        conn.execute_batch(
+            "CREATE TABLE session (
+                id            TEXT PRIMARY KEY,
+                title         TEXT,
+                directory     TEXT,
+                time_updated  INTEGER,
+                time_archived INTEGER,
+                parent_id     TEXT
+             );
+             CREATE TABLE message (
+                id         TEXT PRIMARY KEY,
+                session_id TEXT
+             );
+             INSERT INTO session (id, title, directory, time_updated, time_archived, parent_id) VALUES
+                ('ses_parent',   'Main task',                      '/proj', 3000, NULL, NULL),
+                ('ses_child_a',  'Find files (@explore subagent)', '/proj', 3010, NULL, 'ses_parent'),
+                ('ses_child_b',  'Refactor (@general subagent)',   '/proj', 3020, NULL, 'ses_parent'),
+                ('ses_archived', 'Old session',                    '/proj', 1000, 999,  NULL);
+             INSERT INTO message (id, session_id) VALUES
+                ('m1', 'ses_parent'),
+                ('m2', 'ses_parent'),
+                ('m3', 'ses_child_a'),
+                ('m4', 'ses_archived');",
+        )
+        .expect("seed db");
+        drop(conn);
+        path
+    }
+
+    /// Sub-agent sessions carry a non-null `parent_id` (OpenCode writes one
+    /// row per spawned sub-agent). The scanner must surface only root
+    /// sessions — matching OpenCode's own desktop, whose root list query is
+    /// `WHERE parent_id IS NULL`. Without this filter every sub-agent
+    /// clutters the Sessions board as a top-level card.
+    #[test]
+    fn drizzle_scanner_excludes_subagent_and_archived_sessions() {
+        let db = seed_drizzle_db();
+        let mut result: Vec<SavedSession> = Vec::new();
+        find_drizzle_sessions_sqlite(&db, "opencode", "OpenCode Session", &mut result);
+        let _ = std::fs::remove_file(&db);
+
+        let ids: Vec<&str> = result
+            .iter()
+            .map(|s| s.session_token.as_deref().unwrap_or(""))
+            .collect();
+        assert_eq!(
+            result.len(),
+            1,
+            "expected only the root parent session, got {ids:?}"
+        );
+        assert_eq!(result[0].session_token.as_deref(), Some("ses_parent"));
     }
 }
