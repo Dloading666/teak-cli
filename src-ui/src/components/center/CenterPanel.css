@@ -493,6 +493,27 @@
 }
 .folder-menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
 .folder-menu-open .folder-menu-name { font-weight: 500; color: var(--text-2); }
+/* Per-row delete affordance: hidden at rest, muted on row hover, red on its own hover. */
+.folder-menu-del {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--text-3, var(--text-2));
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.folder-menu-item:hover .folder-menu-del { opacity: 0.55; }
+.folder-menu-item:hover .folder-menu-del:hover {
+  opacity: 1;
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+}
+.folder-menu-item .folder-menu-del svg { opacity: 1; color: inherit; }
 
 .launchpad-folder-btn svg {
   width: 28px;

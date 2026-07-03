@@ -16,12 +16,13 @@ import { useAppState, type ToolType } from '../../store/app-state';
 // Clicking a recent launches THIS card's tool in that folder; the card body
 // click is unchanged (old flow). Portal-rendered with outside-click / Esc to
 // close — same pattern as the terminal context menu.
-function RecentFolderMenu({ x, y, recent, openLabel, onPick, onOpenNew, onClose }: {
+function RecentFolderMenu({ x, y, recent, openLabel, onPick, onRemove, onOpenNew, onClose }: {
   x: number;
   y: number;
   recent: string[];
   openLabel: string;
   onPick: (folder: string) => void;
+  onRemove: (folder: string) => void;
   onOpenNew: () => void;
   onClose: () => void;
 }) {
@@ -53,6 +54,19 @@ function RecentFolderMenu({ x, y, recent, openLabel, onPick, onOpenNew, onClose 
       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
     </svg>
   );
+  const XGlyph = (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  );
+  // Same folder body as FolderGlyph + a plus, so "open new" reads as the same
+  // family as the recents above it, just clearly the "add another" action.
+  const FolderPlusGlyph = (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      <path d="M12 11v6M9 14h6" />
+    </svg>
+  );
 
   return createPortal(
     <div ref={ref} className="folder-menu" style={{ left, top }}>
@@ -63,12 +77,20 @@ function RecentFolderMenu({ x, y, recent, openLabel, onPick, onOpenNew, onClose 
             {FolderGlyph}
             <span className="folder-menu-name">{name}</span>
             {parent && <span className="folder-menu-path">{parent}</span>}
+            <span
+              className="folder-menu-del"
+              role="button"
+              aria-label={`Remove ${name}`}
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(f); }}
+            >
+              {XGlyph}
+            </span>
           </button>
         );
       })}
       {recent.length > 0 && <div className="folder-menu-sep" />}
       <button className="folder-menu-item folder-menu-open" onMouseDown={(e) => { e.preventDefault(); onOpenNew(); }}>
-        {FolderGlyph}
+        {FolderPlusGlyph}
         <span className="folder-menu-name">{openLabel}</span>
       </button>
     </div>,
@@ -660,6 +682,13 @@ export function CenterPanel() {
   const pushRecentFolder = (folder: string) => {
     setRecentFolders(prev => {
       const next = [folder, ...prev.filter(f => f !== folder)].slice(0, 8);
+      try { localStorage.setItem('coffee:recent-folders', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+  const removeRecentFolder = (folder: string) => {
+    setRecentFolders(prev => {
+      const next = prev.filter(f => f !== folder);
       try { localStorage.setItem('coffee:recent-folders', JSON.stringify(next)); } catch {}
       return next;
     });
@@ -1809,6 +1838,7 @@ export function CenterPanel() {
           recent={recentFolders}
           openLabel={t('launchpad.open_folder' as any) || 'Open folder…'}
           onPick={(f) => { selectTool(folderMenu.tool, undefined, f); setFolderMenu(null); }}
+          onRemove={(f) => removeRecentFolder(f)}
           onOpenNew={() => { const tk = folderMenu.tool; setFolderMenu(null); handlePickFolder(tk); }}
           onClose={() => setFolderMenu(null)}
         />
