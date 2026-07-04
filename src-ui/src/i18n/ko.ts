@@ -80,7 +80,6 @@ export const ko = {
 
   // Actions
   'action.resume_terminal': '이 세션 계속하기',
-  'history.resume_failed': '세션 재개 실패: ',
 
   // Time
   'time.just_now': '방금',

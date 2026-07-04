@@ -82,7 +82,6 @@ export const en = {
 
   // Actions
   'action.resume_terminal': 'Continue this session',
-  'history.resume_failed': 'Resume failed: ',
 
   // Time
   'time.just_now': 'Just now',

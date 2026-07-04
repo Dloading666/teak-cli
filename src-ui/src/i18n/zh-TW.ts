@@ -80,7 +80,6 @@ export const zhTW = {
 
   // Actions
   'action.resume_terminal': '繼續此次對話',
-  'history.resume_failed': '恢復對話失敗：',
 
   // Time
   'time.just_now': '剛剛',

@@ -131,6 +131,11 @@ export interface TerminalSession {
   toolData?: string;  // Extra context for the tool (e.g. SSH connection JSON for remote)
   folderPath: string | null;
   restartKey?: number;
+  /// When set, this tab was opened from a history "Continue this session"
+  /// action. TierTerminal's mount effect passes it to tierTerminalStart,
+  /// which spawns the tool with its `--resume <token>` flag instead of a
+  /// fresh launch. Cleared on any subsequent SET_TERMINAL_TOOL.
+  resumeToken?: string;
   isHidden?: boolean;
   agentStatus?: AgentStatus;
   gambitDraft?: string;    // Unsent textarea content, preserved across tab switches
@@ -253,7 +258,7 @@ type Action =
   | { type: 'REMOVE_TERMINAL'; id: string }
   | { type: 'REORDER_TERMINAL'; sessionId: string; beforeId: string | null }
   | { type: 'SET_ACTIVE_TERMINAL'; id: string | null }
-  | { type: 'SET_TERMINAL_TOOL'; id: string; tool: ToolType; toolData?: string }
+  | { type: 'SET_TERMINAL_TOOL'; id: string; tool: ToolType; toolData?: string; resumeToken?: string }
   | { type: 'SET_TERMINAL_HIDDEN'; id: string; isHidden: boolean }
   | { type: 'RESTART_TERMINAL'; id: string; newId: string }
   | { type: 'OPEN_HISTORY_TAB'; sessionData: string; folderPath: string }
@@ -352,7 +357,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_TERMINAL_TOOL':
       return {
         ...state,
-        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData } : t)
+        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken } : t)
       };
     case 'SET_TERMINAL_HIDDEN':
       return {

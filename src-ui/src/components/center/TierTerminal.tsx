@@ -349,6 +349,10 @@ interface TierTerminalProps {
   isActive: boolean;
   toolData?: string;
   folderPath?: string | null;
+  /** Resume token for "Continue this session" — when set, the mount
+   *  effect passes it to tierTerminalStart, which spawns the tool with
+   *  `--resume <token>` instead of a fresh launch. */
+  resumeToken?: string;
   hasBg?: boolean;
   bgUrl?: string;
   bgType?: 'image' | 'video' | 'none';
@@ -366,7 +370,7 @@ interface TierTerminalProps {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 function TierTerminalImpl({
-  sessionId, tool, toolName, theme, lang, isActive, toolData, folderPath, hasBg, bgUrl, bgType, termColorScheme, termFont,
+  sessionId, tool, toolName, theme, lang, isActive, toolData, folderPath, resumeToken, hasBg, bgUrl, bgType, termColorScheme, termFont,
 }: TierTerminalProps) {
   // Dispatch-only subscription. Never re-renders this component.
   const dispatch = useAppDispatch();
@@ -936,7 +940,17 @@ function TierTerminalImpl({
       const initialCols = term.cols || 80;
       const initialRows = term.rows || 24;
 
-        await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined);
+        try {
+          await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined, resumeToken);
+        } catch (err) {
+          // Resume / launch validation failures (missing cwd, bad token
+          // format, binary not on PATH) land here. The upstream CLI's own
+          // startup errors come through the PTY stream, not this path.
+          console.error('[TierTerminal] tierTerminalStart failed', err);
+          if (mounted) {
+            term.write(`\r\n\x1b[31m${String(err)}\x1b[0m\r\n`);
+          }
+        }
 
         // Continuously report on-screen visibility to the backend so its
         // emitter can widen its coalesce window for a tab that's open but not

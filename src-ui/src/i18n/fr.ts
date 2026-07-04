@@ -80,7 +80,6 @@ export const fr = {
 
   // Actions
   'action.resume_terminal': 'Reprendre cette session',
-  'history.resume_failed': 'Échec de la reprise de la session : ',
 
   // Time
   'time.just_now': 'À l\u2019instant',

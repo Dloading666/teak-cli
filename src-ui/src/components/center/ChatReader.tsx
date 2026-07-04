@@ -18,10 +18,9 @@ interface ChatMessage {
 
 interface ChatReaderProps {
   sessionId: string;
-  showToast: (msg: string) => void;
 }
 
-export function ChatReader({ sessionId, showToast }: ChatReaderProps) {
+export function ChatReader({ sessionId }: ChatReaderProps) {
   const t = useT();
   const { state, dispatch } = useAppState();
 
@@ -277,7 +276,15 @@ export function ChatReader({ sessionId, showToast }: ChatReaderProps) {
 
   const handleResume = () => {
     if (!currentSession?.session_token) return;
+    const token = currentSession.session_token;
 
+    // Resume is unified into tierTerminalStart: we only stage the tab with a
+    // resumeToken — TierTerminal's mount effect then calls tierTerminalStart,
+    // whose Rust side spawns `claude --resume <token>` (or the tool's
+    // equivalent). The previous design fired tierTerminalResume here AND let
+    // the mount effect fire tierTerminalStart: two spawns racing for the same
+    // session id, where tier_terminal_start's "kill existing session then
+    // spawn" logic murdered the --resume process and left a fresh chat.
     let targetId = state.activeTerminalId;
     const currentTerminal = state.terminals.find(t => t.id === targetId);
 
@@ -285,21 +292,12 @@ export function ChatReader({ sessionId, showToast }: ChatReaderProps) {
       targetId = crypto.randomUUID();
       dispatch({
         type: 'ADD_TERMINAL',
-        session: { id: targetId, tool: currentSession.tool as any, folderPath: currentSession.cwd }
+        session: { id: targetId, tool: currentSession.tool as any, folderPath: currentSession.cwd, resumeToken: token }
       });
     } else if (targetId) {
-      dispatch({ type: 'SET_TERMINAL_TOOL', id: targetId, tool: currentSession.tool as any });
+      dispatch({ type: 'SET_TERMINAL_TOOL', id: targetId, tool: currentSession.tool as any, resumeToken: token });
       dispatch({ type: 'SET_FOLDER', path: currentSession.cwd });
     }
-
-    if (!targetId) return;
-
-    commands.tierTerminalResume(
-      currentSession.id, targetId, currentSession.tool, currentSession.session_token, 80, 24, currentSession.cwd
-    ).catch((err) => {
-      console.error(err);
-      showToast(`${t('history.resume_failed' as any)}${String(err)}`);
-    });
   };
 
   return (

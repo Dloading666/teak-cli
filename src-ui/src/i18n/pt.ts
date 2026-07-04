@@ -81,7 +81,6 @@ export const pt = {
 
   // Actions
   'action.resume_terminal': 'Continuar esta sessão',
-  'history.resume_failed': 'Falha ao retomar a sessão: ',
 
   // Time
   'time.just_now': 'Agora mesmo',

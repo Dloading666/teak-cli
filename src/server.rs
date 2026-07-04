@@ -444,6 +444,7 @@ async fn tier_terminal_start(
     theme_mode: Option<String>,
     locale: Option<String>,
     cwd: Option<String>,
+    resume_token: Option<String>,
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -457,7 +458,7 @@ async fn tier_terminal_start(
     tauri::async_runtime::spawn_blocking(move || {
         tier_terminal_start_blocking(
             session_id, tool, tool_data, cols, rows,
-            theme_mode, locale, cwd, app, terminal_session,
+            theme_mode, locale, cwd, resume_token, app, terminal_session,
         )
     })
     .await
@@ -473,6 +474,7 @@ fn tier_terminal_start_blocking(
     theme_mode: Option<String>,
     locale: Option<String>,
     cwd: Option<String>,
+    resume_token: Option<String>,
     app: tauri::AppHandle,
     terminal_session: terminal::SharedSession,
 ) -> Result<(), String> {
@@ -486,7 +488,7 @@ fn tier_terminal_start_blocking(
     // tool_config.default_cwd is the always-on fallback for users who don't
     // want to pick each time (or whose launchpad-side path can't address the
     // tool's actual workspace, e.g. WSL).
-    let frontend_cwd = cwd.unwrap_or_default();
+    let frontend_cwd = cwd.clone().unwrap_or_default();
     let dir = if !frontend_cwd.is_empty() {
         std::path::PathBuf::from(frontend_cwd)
     } else if let Some(name) = tool.as_deref() {
@@ -622,6 +624,50 @@ fn tier_terminal_start_blocking(
             }
             (shell, args)
         }
+    };
+
+    // ── Resume override ─────────────────────────────────────────────────────
+    // When resume_token is present, this tab was opened from a history
+    // "Continue this session" action. Override the fresh-launch cmd/args
+    // built above with the tool's resume flags (e.g. `claude --resume <uuid>`,
+    // `codex resume <id>`). The match above still ran (harmless — tool is
+    // always set in the resume path, so it hit the registry branch and
+    // produced a throwaway `(binary_name, [])`); we discard that and rebuild
+    // from the agent preset. Validation mirrors the deleted tier_terminal_resume:
+    // cwd existence (don't silently resume into the wrong project) + token-
+    // format anti-injection.
+    let (cmd, args): (String, Vec<String>) = if let Some(token) = resume_token.as_deref().filter(|t| !t.is_empty()) {
+        let tool_name = tool.as_deref()
+            .ok_or_else(|| "Resume requires a tool, but none was set".to_string())?;
+        let preset = terminal::find_preset(tool_name)
+            .ok_or_else(|| format!("Unknown tool for resume: {}", tool_name))?;
+        let resume_program = preset.resume_program
+            .ok_or_else(|| format!("Tool '{}' does not support resume", tool_name))?;
+
+        let resume_dir = cwd.as_deref().unwrap_or("").trim();
+        if !std::path::Path::new(resume_dir).is_dir() {
+            return Err(if resume_dir.is_empty() {
+                "Could not determine this session's project folder — refusing to resume into the wrong directory".to_string()
+            } else {
+                format!("This session's project folder no longer exists ({resume_dir}) — refusing to resume into the wrong directory")
+            });
+        }
+        if let Some(fmt) = preset.token_format {
+            let re = regex::Regex::new(fmt)
+                .map_err(|e| format!("Invalid token format pattern: {e}"))?;
+            if !re.is_match(token) {
+                return Err(format!("Invalid session token format for tool '{}'", tool_name));
+            }
+        }
+
+        // Token is a separate vec element — never string-interpolated into a
+        // command line that gets whitespace-split.
+        let mut resume_args: Vec<String> = preset.resume_args_before.iter().map(|s| s.to_string()).collect();
+        resume_args.push(token.to_string());
+        resume_args.extend(preset.resume_args_after.iter().map(|s| s.to_string()));
+        (resume_program.to_string(), resume_args)
+    } else {
+        (cmd, args)
     };
 
     // ── User-configurable launch overrides ─────────────────────────────────
@@ -855,14 +901,6 @@ struct SavedSession {
     saved_at: String,
     file_path: Option<String>,
     turn_count: Option<u32>,
-}
-
-fn sessions_file_path() -> PathBuf {
-    let dir = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".coffee-cli");
-    let _ = std::fs::create_dir_all(&dir);
-    dir.join("sessions.json")
 }
 
 /// XML-style tags injected into the user message stream by Claude /
@@ -2675,107 +2713,6 @@ fn count_hermes_messages(path: &std::path::Path) -> u32 {
     count
 }
 
-#[tauri::command]
-fn tier_terminal_resume(
-    session_id: String,
-    saved_session_id: String, // The UUID of the new terminal tab
-    tool: String,
-    session_token: String,
-    cols: u16,
-    rows: u16,
-    cwd: String,
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-
-    let preset = terminal::find_preset(&tool)
-        .ok_or_else(|| format!("Unknown tool: {}", tool))?;
-    let resume_program = preset.resume_program
-        .ok_or_else(|| format!("Tool '{}' does not support resume", tool))?;
-
-    // A resume must land in the session's real project directory. If we can't —
-    // the cwd is empty (never recorded, e.g. legacy Hermes JSON, or an
-    // unresolved Claude session), OR it points at a folder that no longer
-    // exists (project moved/deleted, disconnected network drive) — then
-    // spawning anyway would silently inherit Coffee CLI's OWN process directory,
-    // because terminal::spawn drops a non-existent cwd via its `path.exists()`
-    // guard. That is the "it just resumes into a random folder" failure with no
-    // indication why. Refuse loudly instead (tool-agnostic: every tool's
-    // `--resume <token>` finds the session by id regardless of cwd, so the user
-    // can still resume manually from the right place once told which folder is
-    // missing). Checking existence, not just emptiness, closes the case where a
-    // worktree cwd was collapsed to a project root that has since been removed.
-    let resume_dir = cwd.trim();
-    if !std::path::Path::new(resume_dir).is_dir() {
-        return Err(if resume_dir.is_empty() {
-            "Could not determine this session's project folder — refusing to resume into the wrong directory".to_string()
-        } else {
-            format!("This session's project folder no longer exists ({resume_dir}) — refusing to resume into the wrong directory")
-        });
-    }
-
-    // Validate session_token against the tool's token_format.
-    // Prevents flag injection: "uuid --dangerously-skip-permissions" would fail this check.
-    if let Some(fmt) = preset.token_format {
-        let re = regex::Regex::new(fmt)
-            .map_err(|e| format!("Invalid token format pattern: {e}"))?;
-        if !re.is_match(&session_token) {
-            return Err(format!("Invalid session token format for tool '{}'", tool));
-        }
-    }
-
-    // Build args without string interpolation: token is always a separate element,
-    // never concatenated into a command string that gets split by whitespace.
-    let program = resume_program.to_string();
-    let mut args: Vec<String> = preset.resume_args_before.iter().map(|s| s.to_string()).collect();
-    args.push(session_token.clone());
-    args.extend(preset.resume_args_after.iter().map(|s| s.to_string()));
-
-    let actual_cwd = cwd.clone();
-    let emit_session_id = saved_session_id.clone();
-
-    terminal::spawn(
-        app.clone(),
-        saved_session_id,
-        state.terminal_session.clone(),
-        program,
-        args,
-        Some(cwd),
-        "en".to_string(),
-        cols,
-        rows,
-        Some(tool),
-        None, // theme_mode: resume sessions use default detection
-        None, // locale: resume sessions use env detection
-        Vec::new(), // extra_env: single-terminal resume — no per-pane MCP wiring
-    ).map_err(|e| format!("Failed to resume: {}", e))?;
-
-    // Emit CWD so the left panel maps the resumed session's directory
-    if !actual_cwd.is_empty() {
-        #[derive(serde::Serialize, Clone)]
-        struct CwdPayload { id: String, cwd: String }
-        let _ = app.emit("tier-terminal-cwd", CwdPayload {
-            id: emit_session_id,
-            cwd: actual_cwd,
-        });
-    }
-
-    // Remove from saved sessions file
-    let path = sessions_file_path();
-    if path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if let Ok(mut saved) = serde_json::from_str::<Vec<SavedSession>>(&content) {
-                saved.retain(|s| s.id != session_id);
-                let _ = std::fs::write(&path, serde_json::to_string_pretty(&saved).unwrap_or_default());
-            }
-        }
-    }
-
-    Ok(())
-}
-
-
-
 // ─── Task Board Persistence ──────────────────────────────────────────────────
 
 fn tasks_file_path() -> PathBuf {
@@ -3114,7 +3051,6 @@ pub fn start_ui() -> anyhow::Result<()> {
             tier_terminal_resize,
             set_background_mode,
             set_session_active,
-            tier_terminal_resume,
             get_native_history,
             get_message_heatmap,
             read_native_session,
