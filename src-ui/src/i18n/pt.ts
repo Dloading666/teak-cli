@@ -45,7 +45,6 @@ export const pt = {
   'remote.connect_failed': 'Falha na conexão',
 
   'tab.new': 'Selecionar ferramenta',
-  'chat.no_records': 'Nenhum registro de conversa legível encontrado.',
 
 
 
@@ -80,7 +79,6 @@ export const pt = {
   'task.messages': '{count} mensagens',
 
   // Actions
-  'action.resume_terminal': 'Continuar esta sessão',
 
   // Time
   'time.just_now': 'Agora mesmo',

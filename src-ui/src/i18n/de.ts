@@ -45,7 +45,6 @@ export const de = {
   'remote.connect_failed': 'Verbindung fehlgeschlagen',
 
   'tab.new': 'Werkzeug wählen',
-  'chat.no_records': 'Keine lesbaren Gesprächsaufzeichnungen gefunden.',
 
 
 
@@ -80,7 +79,6 @@ export const de = {
   'task.messages': '{count} Nachrichten',
 
   // Actions
-  'action.resume_terminal': 'Diese Sitzung fortsetzen',
 
   // Time
   'time.just_now': 'Gerade eben',

@@ -115,11 +115,22 @@ export function HistoryBoard() {
   }, [hasMore]);
 
   const handleViewHistory = (saved: SavedSession) => {
-    dispatch({ 
-      type: 'OPEN_HISTORY_TAB', 
-      sessionData: JSON.stringify(saved),
-      folderPath: saved.cwd 
+    // Click = resume directly. The old flow opened a ChatReader tab (read-
+    // only bubble view) and made the user click "Continue this session"
+    // inside it; that intermediate step was slower than just resuming —
+    // claude --resume loads its own TUI history faster than the bubble
+    // view renders, and the extra tab was one more concept to navigate.
+    // Now a click stages a real terminal tab with resumeToken;
+    // TierTerminal's mount effect spawns `<tool> --resume <token>` in
+    // saved.cwd. Sessions without a token (legacy / unresolved cwd) are
+    // silently skipped — nothing to resume.
+    if (!saved.session_token) return;
+    const targetId = crypto.randomUUID();
+    dispatch({
+      type: 'ADD_TERMINAL',
+      session: { id: targetId, tool: saved.tool as any, folderPath: saved.cwd, resumeToken: saved.session_token }
     });
+    dispatch({ type: 'SET_ACTIVE_TERMINAL', id: targetId });
   };
 
   return (

@@ -45,7 +45,6 @@ export const zhTW = {
   'remote.connect_failed': '連線失敗',
 
   'tab.new': '選擇工具',
-  'chat.no_records': '沒有可讀的對話記錄。',
 
 
   // Task Board
@@ -79,7 +78,6 @@ export const zhTW = {
   'task.messages': '{count} 則訊息',
 
   // Actions
-  'action.resume_terminal': '繼續此次對話',
 
   // Time
   'time.just_now': '剛剛',

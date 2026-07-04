@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type ToolType = 'claude' | 'qwen' | 'installer' | 'hermes' | 'opencode' | 'mimocode' | 'openclaw' | 'codex' | 'antigravity' | 'pi' | 'crush' | 'aider' | 'kimicode' | 'goose' | 'copilot' | 'terminal' | 'remote' | 'history' | 'two-split' | 'three-split' | 'four-split' | null;
+export type ToolType = 'claude' | 'qwen' | 'installer' | 'hermes' | 'opencode' | 'mimocode' | 'openclaw' | 'codex' | 'antigravity' | 'pi' | 'crush' | 'aider' | 'kimicode' | 'goose' | 'copilot' | 'terminal' | 'remote' | 'two-split' | 'three-split' | 'four-split' | null;
 
 /**
  * Tab status shown as an animated 9-dot glyph. Three states only —
@@ -261,7 +261,6 @@ type Action =
   | { type: 'SET_TERMINAL_TOOL'; id: string; tool: ToolType; toolData?: string; resumeToken?: string }
   | { type: 'SET_TERMINAL_HIDDEN'; id: string; isHidden: boolean }
   | { type: 'RESTART_TERMINAL'; id: string; newId: string }
-  | { type: 'OPEN_HISTORY_TAB'; sessionData: string; folderPath: string }
   | { type: 'OPEN_HYPER_AGENT_TAB' }
   | { type: 'SET_AGENT_STATUS'; id: string; status: AgentStatus }
   | { type: 'SET_BG'; path: string; bgType: 'image' | 'video' }
@@ -372,30 +371,6 @@ function reducer(state: AppState, action: Action): AppState {
         ),
         activeTerminalId: state.activeTerminalId === action.id ? action.newId : state.activeTerminalId
       };
-    case 'OPEN_HISTORY_TAB': {
-      const existingHistoryTab = state.terminals.find(t => t.tool === 'history');
-      if (existingHistoryTab) {
-        return {
-          ...state,
-          terminals: state.terminals.map(t =>
-            t.id === existingHistoryTab.id ? { ...t, toolData: action.sessionData, folderPath: action.folderPath } : t
-          ),
-          activeTerminalId: existingHistoryTab.id
-        };
-      } else {
-        const newId = crypto.randomUUID();
-        return {
-          ...state,
-          terminals: [...state.terminals, {
-            id: newId,
-            tool: 'history',
-            toolData: action.sessionData,
-            folderPath: action.folderPath,
-          }],
-          activeTerminalId: newId
-        };
-      }
-    }
     case 'SET_AGENT_STATUS':
       return {
         ...state,

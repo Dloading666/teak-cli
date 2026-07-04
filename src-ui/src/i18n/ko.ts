@@ -45,7 +45,6 @@ export const ko = {
   'remote.connect_failed': '연결 실패',
 
   'tab.new': '도구 선택',
-  'chat.no_records': '읽을 수 있는 대화 기록이 없습니다.',
 
 
   // Task Board
@@ -79,7 +78,6 @@ export const ko = {
   'task.messages': '메시지 {count}개',
 
   // Actions
-  'action.resume_terminal': '이 세션 계속하기',
 
   // Time
   'time.just_now': '방금',

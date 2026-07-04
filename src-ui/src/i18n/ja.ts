@@ -45,7 +45,6 @@ export const ja = {
   'remote.connect_failed': '接続に失敗しました',
 
   'tab.new': 'ツールを選択',
-  'chat.no_records': '読み取り可能な会話履歴が見つかりません。',
 
 
   // Task Board
@@ -79,7 +78,6 @@ export const ja = {
   'task.messages': 'メッセージ {count} 件',
 
   // Actions
-  'action.resume_terminal': 'このセッションを続ける',
 
   // Time
   'time.just_now': 'たった今',

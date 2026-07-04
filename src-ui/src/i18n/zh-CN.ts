@@ -45,7 +45,6 @@ export const zhCN = {
   'remote.connect_failed': '连接失败',
 
   'tab.new': '选择工具',
-  'chat.no_records': '没有可读的对话记录。',
 
 
   // Task Board
@@ -79,7 +78,6 @@ export const zhCN = {
   'task.messages': '{count} 条消息',
 
   // Actions
-  'action.resume_terminal': '继续本轮对话',
 
   // Time
   'time.just_now': '刚刚',

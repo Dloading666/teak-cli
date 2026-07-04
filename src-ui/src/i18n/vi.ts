@@ -47,7 +47,6 @@ export const vi = {
 
   // Tab
   'tab.new': 'Chọn công cụ',
-  'chat.no_records': 'Không tìm thấy bản ghi cuộc trò chuyện có thể đọc.',
 
 
 
@@ -82,7 +81,6 @@ export const vi = {
   'task.messages': '{count} tin nhắn',
 
   // Actions
-  'action.resume_terminal': 'Tiếp tục phiên này',
 
   // Time
   'time.just_now': 'Vừa xong',

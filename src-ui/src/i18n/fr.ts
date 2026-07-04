@@ -45,7 +45,6 @@ export const fr = {
   'remote.connect_failed': 'Échec de connexion',
 
   'tab.new': 'Choisir un outil',
-  'chat.no_records': 'Aucun enregistrement de conversation lisible trouvé.',
 
 
   // Task Board
@@ -79,7 +78,6 @@ export const fr = {
   'task.messages': '{count} messages',
 
   // Actions
-  'action.resume_terminal': 'Reprendre cette session',
 
   // Time
   'time.just_now': 'À l\u2019instant',

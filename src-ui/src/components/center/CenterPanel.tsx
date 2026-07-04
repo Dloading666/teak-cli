@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { focusTerminal } from '../../lib/focus-registry';
 import { onWindowForeground } from '../../lib/window-focus-filter';
 import { TierTerminal } from './TierTerminal';
-import { ChatReader } from './ChatReader';
 import { SkillsPanel } from './SkillsPanel';
 import { FourSplitGrid } from './FourSplitGrid';
 import { ToolConfigModal } from './ToolConfigModal';
@@ -1144,20 +1143,6 @@ export function CenterPanel() {
       case 'two-split': return { icon: <SvgTwoSplit />, title: cwd ?? t('tool.two_split' as any), tooltip: pathTip };
       case 'three-split': return { icon: <SvgThreeSplit />, title: cwd ?? t('tool.three_split' as any), tooltip: pathTip };
       case 'four-split': return { icon: <SvgFourSplit />, title: cwd ?? t('tool.four_split' as any), tooltip: pathTip };
-      case 'history': {
-        let titleParam = 'History';
-        if (session.toolData) {
-          try {
-            const parsed = JSON.parse(session.toolData);
-            if (parsed.name) titleParam = parsed.name; // Use the session name instead for the tab
-          } catch (e) {}
-        }
-        return {
-          icon: <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 8v4l3 3"></path><circle cx="12" cy="12" r="10"></circle></svg>,
-          title: titleParam,
-          tooltip: undefined
-        };
-      }
       default: return { icon: <SvgPlus active={isActive} />, title: t('tab.new'), tooltip: undefined };
     }
   };
@@ -1335,9 +1320,7 @@ export function CenterPanel() {
               position: 'relative'
             }}
           >
-            {t.tool === 'history' ? (
-              <ChatReader sessionId={t.id} />
-            ) : t.tool === 'two-split' ? (
+            {t.tool === 'two-split' ? (
               <FourSplitGrid
                 tab={t}
                 hasBg={hasBg}

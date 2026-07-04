@@ -47,7 +47,6 @@ export const en = {
 
   // Tab
   'tab.new': 'Select Tool',
-  'chat.no_records': 'No readable conversation records found.',
 
 
   // Task Board
@@ -81,7 +80,6 @@ export const en = {
   'task.messages': '{count} messages',
 
   // Actions
-  'action.resume_terminal': 'Continue this session',
 
   // Time
   'time.just_now': 'Just now',
