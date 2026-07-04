@@ -46,6 +46,22 @@ const getToolIcon = (tool: string) => {
 
 const getToolName = (tool: string, _lang: string) => getToolDisplayName(tool);
 
+// Project folder basename (e.g. "EchoBird" from "E:\EchoBird", "coffee"
+// from "~/projects/coffee") — the icon already conveys the tool, so the
+// text line earns its keep by showing which project the session belongs
+// to. Falls back to the tool name only when cwd wasn't recorded (rare:
+// legacy sessions that predate cwd capture, or whose ~/.claude.json
+// project entry is gone).
+const projectName = (cwd: string, tool: string) => {
+  if (cwd) {
+    const trimmed = cwd.replace(/[\\/]+$/, '');
+    const idx = Math.max(trimmed.lastIndexOf('\\'), trimmed.lastIndexOf('/'));
+    if (idx >= 0) return trimmed.slice(idx + 1);
+    if (trimmed) return trimmed;
+  }
+  return getToolName(tool, '');
+};
+
 export function HistoryBoard() {
   const t = useT();
   const { state, dispatch } = useAppState();
@@ -173,7 +189,7 @@ export function HistoryBoard() {
               <div className="history-card-meta">
                 <span className="history-card-tool-wrap">
                   {getToolIcon(session.tool)}
-                  <span>{getToolName(session.tool, state.currentLang)} &middot; {dateStr} {session.turn_count ? ` \u00B7 ${(t('task.messages' as any) || '{count} messages').replace('{count}', session.turn_count.toString())}` : ''}</span>
+                  <span>{projectName(session.cwd, session.tool)} &middot; {dateStr} {session.turn_count ? ` \u00B7 ${(t('task.messages' as any) || '{count} messages').replace('{count}', session.turn_count.toString())}` : ''}</span>
                 </span>
               </div>
             </div>
