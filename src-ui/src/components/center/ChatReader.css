@@ -67,7 +67,12 @@
   transition: background 0.15s ease, color 0.15s ease;
   border: none;
   font-family: var(--font, system-ui);
-  background: var(--accent-bg);
+  /* Solid accent tint over the opaque --bg-terminal surface. The
+   * previous var(--accent-bg) is rgba(accent, ~0.12) — chat text
+   * scrolling behind the floating buttons bled through and made them
+   * unreadable. Mixing accent over --bg-terminal keeps the same tint
+   * strength but guarantees full opacity. */
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-terminal));
   color: var(--accent);
 }
 
@@ -88,7 +93,7 @@
 
 .chat-reader-resume:hover,
 .chat-reader-copy-path:hover {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-terminal));
 }
 
 /* Brief "copied" affirmation — icon already swapped to the check
@@ -96,7 +101,7 @@
  * so the morph reads as a state change, not just an icon switcheroo.
  * Reverts after 2s when React clears data-copied. */
 .chat-reader-copy-path[data-copied] {
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 28%, var(--bg-terminal));
 }
 
 .chat-reader-body {
