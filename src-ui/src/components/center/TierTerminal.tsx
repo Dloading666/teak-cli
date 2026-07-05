@@ -753,15 +753,18 @@ function TierTerminalImpl({
       }
     });
 
-    // Clickable links: URLs (http/https/file) + absolute file paths.
+    // Clickable links: URLs only (http/https/file). Bare file/dir paths are
+    // intentionally NOT matched — unquoted paths with spaces (e.g. Windows
+    // "Coffee CLI_3.0.3...exe") can't be reliably bounded by a regex (would
+    // truncate → open a missing path → OS error dialog, or over-match → open
+    // the wrong file). Users select+copy paths instead. URLs are unambiguous
+    // — clear scheme prefix, no spaces.
     // Underlines matched tokens on hover; click opens via Tauri's open_url
-    // command (delegates to the OS shell — system browser for URLs, default
-    // handler for local files like report.html).
+    // command (OS default browser).
     // URLs are ASCII per RFC 3986; the -￿ guard stops the match at
     // any non-ASCII char so trailing CJK punctuation/text (e.g. "https://x，看到…")
-    // doesn't get swallowed into the link. File paths keep the looser set so
-    // Windows paths with Chinese folder names still match.
-    const LINK_RE = /(https?:\/\/[^\s<>()"'-￿]+|file:\/\/\/[^\s<>()"'-￿]+|[A-Za-z]:[/\\][^\s<>()"']+)/g;
+    // doesn't get swallowed into the link.
+    const LINK_RE = /(https?:\/\/[^\s<>()"'-￿]+|file:\/\/\/[^\s<>()"'-￿]+)/g;
     term.registerLinkProvider({
       provideLinks(bufferLineNumber, callback) {
         const line = term.buffer.active.getLine(bufferLineNumber - 1);
@@ -799,10 +802,7 @@ function TierTerminalImpl({
             },
             text: raw,
             activate: () => {
-              const url = /^[A-Za-z]:[/\\]/.test(raw)
-                ? 'file:///' + raw.replace(/\\/g, '/')
-                : raw;
-              commands.openUrl(url).catch(() => {});
+              commands.openUrl(raw).catch(() => {});
             },
           });
         }
