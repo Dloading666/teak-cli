@@ -8,13 +8,14 @@
 // unrelated global state changes (agent status, other tabs' folder changes,
 // etc.) don't cascade into this component.
 
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { clipboardRead, clipboardWrite } from '../../lib/clipboard';
 import { subscribeTerminalEvents } from '../../lib/pty-event-bus';
+import * as outputScheduler from '../../lib/terminal-output-scheduler';
 import { registerTerminalFocus } from '../../lib/focus-registry';
 import { registerTabActions, getTabActions } from '../../lib/tab-actions';
 import { registerFileDropTarget, formatPathsForInsert } from '../../lib/file-drop';
@@ -305,29 +306,51 @@ function probeWebglOnce(): boolean {
   return gpuIsHardware;
 }
 
+// Max context-loss recoveries per terminal before we conclude WebGL is
+// unstable for this process and latch to the DOM renderer process-wide.
+// Mirrors Tabby's MAX_WEBGL_RECOVERY_ATTEMPTS = 3. A single loss (typically
+// Chromium reclaiming one of its ~16 active contexts) is recoverable — we
+// dispose + re-attach on next visibility. Only repeated loss on the SAME
+// terminal trips the process-wide latch.
+const MAX_WEBGL_RECOVERY_ATTEMPTS = 3;
+
 // Attach the WebGL renderer to `term`, respecting the shared context budget.
 // Idempotent per terminal (guards on `webglRef`); a no-op once the latch is
-// tripped or on a software GPU. Safe to call on first reveal, so a tab that is
-// never shown never spends a context. DOM fallback loses customGlyphs /
-// rescaleOverlappingGlyphs, so box-drawing may misalign on degraded terminals.
+// tripped or on a software GPU. Safe to call on first reveal AND on tab
+// re-activation — a tab that is never shown never spends a context, and a
+// backgrounded tab releases its context (see detachWebglRenderer) so the ~16
+// active-context slots stay free for visible tabs. DOM fallback loses
+// customGlyphs / rescaleOverlappingGlyphs, so box-drawing may misalign on
+// degraded terminals.
 function attachWebglRenderer(
   term: Terminal,
   webglRef: { current: WebglAddon | null },
+  attemptsRef: { current: number },
 ): void {
   if (webglDisabled || webglRef.current) return;
   if (!probeWebglOnce()) return; // software GPU → DOM renderer is cheaper
   try {
     const webgl = new WebglAddon();
     webgl.onContextLoss(() => {
-      // Browser force-loses a context when the ~16 cap is hit or the GPU driver
-      // resets. Drop THIS terminal's renderer and latch the budget so no FUTURE
-      // terminal competes for a slot that isn't coming back. Terminals that
-      // already hold a live context (attached before this loss) are left
-      // alone — revoking a still-working context would be more destructive
-      // than the problem this is solving.
-      webglDisabled = true;
+      // Browser force-loses a context when the ~16 active-context cap is hit
+      // or the GPU driver resets. Drop THIS terminal's renderer. Don't latch
+      // process-wide on a single loss — re-attach is attempted on next
+      // visibility (the tab is usually backgrounded when this fires, so the
+      // re-attach lands on the next switch-back). Only after
+      // MAX_WEBGL_RECOVERY_ATTEMPTS losses on the SAME terminal do we conclude
+      // WebGL is unstable for this process and latch globally. Terminals that
+      // already hold a live context (attached before this loss) are left alone
+      // — revoking a still-working context would be more destructive than the
+      // problem this is solving.
       try { webgl.dispose(); } catch { /* already gone */ }
       webglRef.current = null;
+      attemptsRef.current += 1;
+      if (attemptsRef.current >= MAX_WEBGL_RECOVERY_ATTEMPTS) {
+        webglDisabled = true;
+        console.warn(
+          `[TierTerminal] WebGL context lost ${attemptsRef.current}× on one terminal → latching DOM renderer process-wide`,
+        );
+      }
     });
     term.loadAddon(webgl);
     webglRef.current = webgl;
@@ -336,6 +359,20 @@ function attachWebglRenderer(
     webglDisabled = true;
     console.error('[TierTerminal] WebGL attach failed → DOM renderer', err);
   }
+}
+
+// Release this terminal's WebGL context WITHOUT tripping the recovery budget
+// or the process-wide latch — this is the intentional lifecycle dispose when
+// a tab is backgrounded (Orca's suspendRendering pattern). Frees one of the
+// ~16 active-context slots so new tabs don't get force-degraded to DOM. xterm
+// falls back to its DOM renderer; buffer state is preserved, so re-attach on
+// next visibility picks up where it left off. No-op when already detached.
+function detachWebglRenderer(
+  webglRef: { current: WebglAddon | null },
+): void {
+  if (!webglRef.current) return;
+  try { webglRef.current.dispose(); } catch { /* already gone */ }
+  webglRef.current = null;
 }
 
 interface TierTerminalProps {
@@ -388,6 +425,11 @@ function TierTerminalImpl({
   const xtermRef = useRef<Terminal | null>(null);
   const fitRef   = useRef<FitAddon | null>(null);
   const webglRef = useRef<WebglAddon | null>(null);
+  // Per-terminal WebGL context-loss counter — drives the recovery budget in
+  // attachWebglRenderer (see MAX_WEBGL_RECOVERY_ATTEMPTS). We latch to DOM
+  // only after N losses on the same terminal instance, the signal that WebGL
+  // is unstable here. Not reset on successful re-attach.
+  const contextLossAttemptsRef = useRef(0);
 
   // ── Startup splash state ─────────────────────────────────────────────────
   const [showSplash, setShowSplash] = useState(true);
@@ -558,7 +600,7 @@ function TierTerminalImpl({
       // Already on-screen — the common case: a freshly-opened active tab.
       // Attach synchronously so the tab you're looking at never shows a
       // one-frame DOM→WebGL swap.
-      attachWebglRenderer(term, webglRef);
+      attachWebglRenderer(term, webglRef, contextLossAttemptsRef);
     } else {
       // Created while hidden (background/restored tab, or a split pane whose
       // tab isn't shown). Attach on first reveal. Element-level visibility is
@@ -569,7 +611,7 @@ function TierTerminalImpl({
         // effect cleanup would loadAddon() onto a disposed terminal, and the
         // catch inside attachWebglRenderer would wrongly trip the latch to DOM.
         if (mounted && entries.some((e) => e.isIntersecting)) {
-          attachWebglRenderer(term, webglRef);
+          attachWebglRenderer(term, webglRef, contextLossAttemptsRef);
           webglIO.disconnect();
         }
       });
@@ -770,6 +812,11 @@ function TierTerminalImpl({
 
     xtermRef.current = term;
     fitRef.current   = fit;
+    // Register with the output scheduler before any PTY output can arrive —
+    // onOutput (subscribed below in startPty) routes through
+    // outputScheduler.enqueue instead of term.write directly, so the session
+    // must exist first to avoid a dropped-first-chunk race.
+    outputScheduler.registerSession(sessionId, term);
 
     // Auto-focus so keyboard input works immediately
     term.focus();
@@ -795,7 +842,7 @@ function TierTerminalImpl({
           hasOutputRef.current = true;
           outputBytesRef.current += data.length;
           lastOutputAtRef.current = Date.now();
-          xtermRef.current?.write(data);
+          outputScheduler.enqueue(sessionId, data);
 
           // Handle SSH Auto-login via Password injection
           if (tool === 'remote' && remoteConfig.protocol === 'ssh' && remoteConfig.password && !hasInjectedPassword) {
@@ -973,6 +1020,23 @@ function TierTerminalImpl({
             if (!mounted) return;
             const visible = entries.some((e) => e.isIntersecting);
             commands.setSessionActive(sessionId, visible).catch(() => {});
+            outputScheduler.setActive(sessionId, visible);
+            // WebGL lifecycle (Orca suspendRendering pattern): release this
+            // tab's GL context when hidden so it doesn't hold one of the ~16
+            // active-context slots, and re-attach on reveal. The canvasHidden
+            // mask (useLayoutEffect above) covers the re-attach transition —
+            // it masks the canvas until xterm's first post-attach render fires
+            // onRender → reveal. attachWebglRenderer is idempotent (no-op if
+            // already attached or process latched); detachWebglRenderer is a
+            // no-op when already detached. Element-level intersection is
+            // correct for both whole-tab display:none toggles AND split panes,
+            // so non-active panes in a split tab (still visible) keep their
+            // contexts.
+            if (visible) {
+              attachWebglRenderer(term, webglRef, contextLossAttemptsRef);
+            } else {
+              detachWebglRenderer(webglRef);
+            }
           });
           visibilityIO.observe(termRef.current);
           unlisteners.push(() => visibilityIO.disconnect());
@@ -1030,6 +1094,7 @@ function TierTerminalImpl({
       unregisterFocus();
       ro.disconnect();
       term.dispose();
+      outputScheduler.unregisterSession(sessionId);
       xtermRef.current = null;
       webglRef.current = null;
       unlisteners.forEach(u => u());
@@ -1488,8 +1553,15 @@ function TierTerminalImpl({
   );
 }
 
-// Temporarily exported without memo wrapper while investigating a
-// regression where CLI tools wouldn't launch. All other perf wins (split
-// contexts, useAppDispatch, focus registry, pty-event-bus, tab-switch rAF,
-// dead menu scanner removal) are still active.
-export const TierTerminal = TierTerminalImpl;
+// React.memo restored 2026-07-05. Was temporarily removed in 68664a4
+// (2026-04-14) while investigating a launch regression ("splash shows but
+// PTY never produces output") that was never confirmed to be caused by memo —
+// it has been "temporary" for ~3 months and launches work fine, so the
+// regression was almost certainly fixed by a later commit and memo was a false
+// attribution. Using no-arg memo (shallow-compares ALL props) instead of the
+// original custom comparator, which was incomplete — it only checked 7 props
+// and missed resumeToken/hasBg/bgUrl/bgType/termColorScheme/termFont/
+// sentinelEnabled, so those prop changes would have wrongly skipped a
+// re-render. If the launch regression recurs in dev (StrictMode double-invoke),
+// revert this; Phase 1-3 do not depend on memo.
+export const TierTerminal = memo(TierTerminalImpl);

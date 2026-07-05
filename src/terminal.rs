@@ -436,8 +436,12 @@ pub struct TerminalSession {
     /// IntersectionObserver on the terminal's DOM element. This is narrower
     /// than `BACKGROUND_MODE`: a tab can be backgrounded this way while the
     /// Coffee CLI window itself is still focused and foreground. Defaults
-    /// true so a session runs at full cadence until the frontend's first
-    /// visibility report lands.
+    /// FALSE so a freshly-spawned session throttles to the 200ms background
+    /// cadence until the frontend's first visibility report lands — prevents
+    /// a new tab (especially one opened in the background) from blasting
+    /// ~125 emits/sec at the 8ms foreground cadence before visibility is
+    /// confirmed. The observer fires within a frame or two for a genuinely
+    /// visible tab, so the visible-tab throttled window is tiny.
     pub is_tab_active: Arc<AtomicBool>,
     /// Ring buffer of recent base64-encoded output chunks. Originally
     /// populated for DetachedTerminal's history replay (retired 2026-04)
@@ -869,8 +873,15 @@ pub fn spawn(
     // emitter lock. Set to false exactly once, from the emitter cleanup path.
     let alive_flag: Arc<AtomicBool> = Arc::new(AtomicBool::new(true));
 
-    // See `TerminalSession::is_tab_active` doc comment — defaults active.
-    let is_tab_active: Arc<AtomicBool> = Arc::new(AtomicBool::new(true));
+    // Defaults INACTIVE: a freshly-spawned tab emits at the 200ms background
+    // cadence until the frontend's IntersectionObserver confirms it's visible
+    // (set_session_active(true)). Prevents a new tab from blasting ~125
+    // emits/sec at the 8ms foreground cadence before visibility is confirmed —
+    // the observer fires within a frame or two for a genuinely visible tab, so
+    // the visible-tab window is tiny, but a tab opened in the background stays
+    // safely throttled instead of defaulting into the fg cadence. See
+    // `TerminalSession::is_tab_active`.
+    let is_tab_active: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
     // Store session (with shared writer reference + master kept alive + activity)
     let output_buffer: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
