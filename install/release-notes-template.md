@@ -1,44 +1,39 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-- 修复:会话记录点"继续本轮对话"现在能正确恢复上次对话了——之前因为启动路径冲突,会变成全新会话。
-- 新增:会话记录列表直接显示项目名(如 EchoBird),而不是工具名,一眼看出是哪个项目的会话。
-- 优化:点会话记录列表项,现在直接进终端恢复对话,不再先开一个只读查看页——少一步,更快。
+- 优化:多开 tab 不再卡顿——之前开 3 个以上 tab(尤其带大量历史对话的工具)会明显卡顿甚至卡死,现在连开十几个 tab 切换都流畅。
+- 修复:终端里的文件/目录路径不再被误识别成可点击链接(带空格的 Windows 路径会截断报错);URL 照常可点,路径用选择+复制。
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-- 修復:工作階段記錄點「繼續本輪對話」現在能正確恢復上次對話了——之前因為啟動路徑衝突,會變成全新工作階段。
-- 新增:工作階段記錄清單直接顯示專案名(如 EchoBird),而非工具名,一眼看出是哪個專案的工作階段。
-- 優化:點工作階段記錄列表項,現在直接進終端恢復對話,不再先開一個唯讀檢視頁——少一步,更快。
+- 優化:多開分頁不再卡頓——之前開 3 個以上分頁(尤其帶大量歷史對話的工具)會明顯卡頓甚至卡死,現在連開十幾個分頁切換都流暢。
+- 修復:終端裡的檔案/目錄路徑不再被誤識別成可點擊連結(帶空格的 Windows 路徑會截斷報錯);URL 照常可點,路徑用選擇+複製。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-- Fixed: clicking "Continue this session" in the history list now correctly resumes the previous conversation — a launch-path race previously started a fresh session instead.
-- New: the history list now shows the project folder name (e.g. EchoBird) instead of the tool name, so you can tell which project a session belongs to at a glance.
-- Streamlined: clicking a history list item now resumes directly into the terminal — no more intermediate read-only viewer tab. One less step, faster.
+- Improved: opening many tabs no longer lags — 3+ tabs (especially tools with large conversation histories) used to slow to a crawl or freeze; now you can open a dozen tabs and switch smoothly.
+- Fixed: bare file/directory paths in the terminal are no longer mis-detected as clickable links (Windows paths with spaces would truncate and error on click). URLs still clickable; use select+copy for paths.
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-- 修正:履歴リストの「このセッションを続ける」で前回の会話を正しく再開できるようになりました。以前は起動パスの競合で新規セッションになっていました。
-- 新機能:履歴リストにツール名ではなくプロジェクト名(例: EchoBird)を表示し、どのプロジェクトのセッションか一目で分かるように。
-- 改善:履歴リスト項目のクリックで直接ターミナルのセッションを再開。読み取り専用の確認タブを廃止し、ステップを一つ減らしてより高速に。
+- 改善:タブを多数開いても重くならなくなりました——3つ以上のタブ(特に会話履歴が多いツール)を開くと著しく遅延・フリーズしていましたが、十数個のタブを開いて切り替えてもスムーズになりました。
+- 修正:ターミナル内のファイル/ディレクトリパスがクリック可能リンクとして誤検知されなくなりました(スペースを含む Windows パスが途中で切れてエラーになっていました)。URLは引き続きクリック可能、パスは選択+コピーで。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-- 수정: 기록 목록에서 "이 세션 계속하기" 클릭 시 이전 대화를 올바르게 이어갈 수 있습니다. 이전에는 시작 경로 충돌로 새 세션이 열렸습니다.
-- 신규: 기록 목록에 도구명 대신 프로젝트명(예: EchoBird)을 표시해 어떤 프로젝트의 세션인지 한눈에 알 수 있습니다.
-- 개선: 기록 목록 항목 클릭 시 직접 터미널에서 세션을 이어갑니다. 읽기 전용 보기 탭을 없애 단계를 하나 줄이고 더 빠르게.
+- 개선: 여러 탭을 열어도 더 이상 느려지지 않습니다 — 3개 이상의 탭(특히 대화 기록이 많은 도구)을 열면 현저히 느려지거나 멈추었지만, 이제 열두 개 남짓한 탭을 열고 전환해도 부드럽습니다.
+- 수정: 터미널의 파일/디렉토리 경로가 클릭 가능한 링크로 잘못 인식되지 않습니다(공백이 포함된 Windows 경로가 중간에 잘려 에러로 이어짐). URL은 여전히 클릭 가능, 경로는 선택+복사로.
 
 </details>
