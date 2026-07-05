@@ -124,6 +124,7 @@ export function enqueue(id: string, data: string): void {
       // where drops started, not out of order via a direct term.write. Small
       // (~150B) and one-time, so it doesn't meaningfully change the cap.
       q.chunks.push(DROP_WARNING);
+      q.bytes += DROP_WARNING.length;
     }
     // Drop this chunk (lossy). The agent's own JSONL preserves the full
     // conversation; only the terminal DISPLAY loses this slice.
@@ -185,6 +186,14 @@ function bgDrain(): void {
       }
     }
     if (q.chunks.length > 0) anyRemaining = true;
+    // Tick-wide cooperative yield: if this session already blew the budget,
+    // stop processing further bg sessions this tick (not just this one's
+    // inner loop) so a tick can't overrun ~2×(N-1) writes with N backlogged
+    // tabs. Remaining bg sessions are picked up by the next armed tick.
+    if (performance.now() - started > DRAIN_BUDGET_MS) {
+      anyRemaining = true;
+      break;
+    }
   }
 
   if (anyRemaining) scheduleBgDrain();
