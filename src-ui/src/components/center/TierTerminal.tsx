@@ -20,6 +20,7 @@ import { registerTerminalFocus } from '../../lib/focus-registry';
 import { registerTabActions, getTabActions } from '../../lib/tab-actions';
 import { registerFileDropTarget, formatPathsForInsert } from '../../lib/file-drop';
 import { notifyUserInputSubmitted } from '../../lib/agent-status-bus';
+import { onWindowForeground } from '../../lib/window-focus-filter';
 import { commands } from '../../tauri';
 import { useAppDispatch, useAppState, type ToolType, type ThemeColor } from '../../store/app-state';
 import { useT } from '../../i18n/useT';
@@ -354,6 +355,20 @@ function attachWebglRenderer(
     });
     term.loadAddon(webgl);
     webglRef.current = webgl;
+    // Force an initial paint of the freshly-attached GL canvas. xterm's
+    // setRenderer() already calls _fullRefresh(), but that render is
+    // rAF-deferred and — when the attach lands on a tab that's ALREADY
+    // visible (the switch-back path, where the IO/activation effect fires
+    // after fit()) — the deferred render can race the canvasHidden mask's
+    // onRender reveal, or land after the mask already fell back to its
+    // 150 ms timeout. The new GL canvas then shows blank/stale until a
+    // window resize forces ResizeObserver → fit() → re-render (issue #74,
+    // "切换窗口卡住，重新拖动界面才正常"). An explicit refresh() re-marks
+    // every row dirty and re-schedules, guaranteeing a painted GL frame
+    // shortly after attach regardless of when the caller runs it.
+    try {
+      if (term.rows > 0) term.refresh(0, term.rows - 1);
+    } catch { /* renderer not ready yet — first write surfaces it */ }
   } catch (err) {
     // No context available even now → give up on WebGL process-wide.
     webglDisabled = true;
@@ -1283,6 +1298,28 @@ function TierTerminalImpl({
     if (!isActive) return;
     if (xtermRef.current) setCanvasHidden(true);
 
+    // Synchronously re-attach WebGL if it was detached on hide. The visibility
+    // IntersectionObserver's attach is ASYNC and races this effect's rAF
+    // fit()+refresh(): when the IO attach lands AFTER that refresh, the new GL
+    // canvas never receives an initial render before the mask's onRender
+    // reveal (or its 150 ms fallback), so the switch-back shows a blank/stale
+    // canvas stuck until a resize forces fit() (issue #74). Attaching here —
+    // pre-rAF, pre-paint — makes the rAF refresh below render to the GL canvas,
+    // so the onRender reveal lands on a freshly-painted frame (issue #47).
+    // Idempotent: attachWebglRenderer no-ops if already attached or the
+    // process-wide DOM latch is tripped. offsetParent gates on real
+    // on-screen-ness (correct for both single tabs and split panes); the IO
+    // observer remains the attach trigger for panes whose isActive doesn't
+    // toggle. `xtermRef.current` gates out first mount, where initTerminal's
+    // own offsetParent/IO path owns the first attach and the splash covers
+    // any race.
+    if (
+      xtermRef.current && !webglRef.current &&
+      termRef.current && termRef.current.offsetParent !== null
+    ) {
+      attachWebglRenderer(xtermRef.current, webglRef, contextLossAttemptsRef);
+    }
+
     let f1 = 0, f2 = 0;
     let revealed = false;
     let renderSub: { dispose: () => void } | null = null;
@@ -1327,6 +1364,50 @@ function TierTerminalImpl({
       revealed = true;
     };
   }, [isActive, sessionId]);
+
+  // ── Stale-frame ghost on window foreground (issue #47 comment) ──────────
+  // While the OS window is backgrounded the browser throttles rAF to ~1 fps
+  // (or pauses it entirely), so xterm's WebGL canvas stops repainting even
+  // though the active agent keeps streaming into the buffer — the scheduler
+  // writes immediately for the foreground tab, so the buffer races ahead of
+  // the canvas. On alt-tab back, the compositor shows that now-stale canvas
+  // for 1-2 frames before rAF resumes and xterm catches up: the same "残影"
+  // as a tab switch, just triggered by the OS focus change rather than the
+  // tab bar. The tab-switch mask above doesn't catch it (isActive doesn't
+  // change), so reuse the canvasHidden mechanism here: mask pre-paint, force
+  // a refresh on the next frame, reveal on the first real render. Only the
+  // active terminal masks — background tabs already had their GL context
+  // detached by the visibility IO and re-attach via their own path.
+  // window-focus-filter absorbs the spurious blur+focus pair from
+  // start_dragging (Windows), so this only fires on real alt-tabs.
+  useEffect(() => {
+    const unsubscribe = onWindowForeground(() => {
+      if (!isActiveRef.current) return;
+      const term = xtermRef.current;
+      if (!term) return;
+      setCanvasHidden(true);
+      let revealed = false;
+      let renderSub: { dispose: () => void } | null = null;
+      let f1 = 0, fallback = 0;
+      const reveal = () => {
+        if (revealed) return;
+        revealed = true;
+        renderSub?.dispose();
+        renderSub = null;
+        cancelAnimationFrame(f1);
+        clearTimeout(fallback);
+        setCanvasHidden(false);
+      };
+      f1 = requestAnimationFrame(() => {
+        try { if (term.rows > 0) term.refresh(0, term.rows - 1); } catch {}
+        renderSub = term.onRender(() => reveal());
+      });
+      // Same safety-net rationale as the activation effect: never strand the
+      // canvas masked if onRender doesn't fire (idle terminal, no dirty rows).
+      fallback = setTimeout(reveal, 180);
+    });
+    return unsubscribe;
+  }, []);
 
   // ── Startup splash dismissal ────────────────────────────────────────────
   // Detect real TUI via alternate screen buffer entry (\x1b[?1049h).
