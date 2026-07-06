@@ -322,8 +322,17 @@ pub fn git_changes(folder: String) -> GitChanges {
         }
     }
 
-    // Compute last_commit BEFORE the struct literal moves `repo_root`.
-    let last_commit = last_commit(&repo_root);
+    // Only fetch the last commit when the working tree is clean — the frontend
+    // shows the "已提交" group only then, so computing it on every poll while an
+    // agent is editing (the common dirty case) would waste 2 git subprocesses
+    // (git log -1 + diff-tree --numstat) per 800ms tick for data never shown.
+    // None = "don't show committed group" on the frontend, identical to the
+    // dirty-case behavior. (Code-review 2026-07-06.)
+    let last_commit = if uncommitted.is_empty() && untracked.is_empty() {
+        last_commit(&repo_root)
+    } else {
+        None
+    };
     GitChanges::Ok {
         repo_root,
         branch,
