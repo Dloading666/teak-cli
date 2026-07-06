@@ -59,7 +59,7 @@ pub struct GitFileEntry {
 }
 
 /// Discriminated by `state` so the frontend can branch on no-git / not-a-repo
-/// without sentinel values. `Ok` carries the three change groups.
+/// without sentinel values. `Ok` carries the change groups.
 #[derive(serde::Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum GitChanges {
@@ -75,13 +75,38 @@ pub enum GitChanges {
         /// Current branch name, e.g. "main" / "feature/x". A detached HEAD
         /// reports as "(<short-sha>)" so the header still shows something.
         branch: String,
-        staged: Vec<GitFileEntry>,
-        unstaged: Vec<GitFileEntry>,
+        /// Tracked files with uncommitted changes (staged OR unstaged, merged —
+        /// numstat is HEAD↔worktree so the diff is "what changed since the last
+        /// commit"). The staged/unstaged split was collapsed 2026-07-06 because
+        /// Coffee CLI's audience doesn't manually `git add`; the 3-way split
+        /// was git jargon ("未暂存") that read as black-box. Status letter
+        /// prefers the staged state when both apply.
+        uncommitted: Vec<GitFileEntry>,
+        /// New files git isn't tracking yet.
         untracked: Vec<GitFileEntry>,
+        /// Most recent commit (HEAD) — shown as the "已提交" group when the
+        /// working tree is clean so the panel isn't empty after a commit.
+        /// `None` on a repo with no commits (fresh `git init`).
+        last_commit: Option<LastCommit>,
     },
 }
 
-/// added/deleted counts keyed by repo-relative path, from a `numstat` stream.
+/// Most-recent-commit summary for the "已提交" group (shown when the working
+/// tree is clean). `files` are the changes in HEAD vs its parent (or vs empty
+/// for the initial commit), so clicking one diffs `HEAD~1:rel` ↔ `HEAD:rel`.
+#[derive(serde::Serialize)]
+pub struct LastCommit {
+    /// Short hash (e.g. "abc1234").
+    pub hash: String,
+    /// Commit subject (first line).
+    pub message: String,
+    pub author: String,
+    /// Commit time, epoch seconds.
+    pub time: i64,
+    pub files: Vec<GitFileEntry>,
+}
+
+/// Parse a `git diff --numstat -z` stream into path → (added, deleted).
 ///
 /// MUST use `-z`: without it git applies `core.quotepath` and octal-escapes
 /// non-ASCII paths (e.g. a CJK filename becomes `"\344\270\255…"`), which then
@@ -90,17 +115,8 @@ pub enum GitChanges {
 /// separated records so the keys line up. Binary files report "-\t-" → 0/0;
 /// rename rows (path field empty under -z) simply don't match and degrade to a
 /// 0/0 badge. Counts are best-effort by design.
-fn numstat_map(repo_root: &str, cached: bool) -> HashMap<String, (u32, u32)> {
-    // --no-optional-locks: a read-only query must never take index.lock to
-    // refresh the stat cache — it just writes disk and contends with the
-    // user's own git/agent processes on a big repo (issue #40).
-    let args: &[&str] = if cached {
-        &["--no-optional-locks", "diff", "--numstat", "-z", "--cached"]
-    } else {
-        &["--no-optional-locks", "diff", "--numstat", "-z"]
-    };
+fn parse_numstat(out: String) -> HashMap<String, (u32, u32)> {
     let mut map = HashMap::new();
-    let Ok(out) = git_output(repo_root, args) else { return map; };
     for field in out.split('\0') {
         if field.is_empty() {
             continue;
@@ -116,6 +132,62 @@ fn numstat_map(repo_root: &str, cached: bool) -> HashMap<String, (u32, u32)> {
         );
     }
     map
+}
+
+/// Uncommitted changes (HEAD↔worktree) numstat: `git diff --numstat HEAD`
+/// compares the worktree to HEAD, which folds staged (index vs HEAD) + unstaged
+/// (worktree vs index) into the single "what changed since the last commit"
+/// delta the "未提交" group displays. Untracked files aren't tracked by git
+/// and never appear here — they're handled separately via porcelain.
+fn numstat_worktree_vs_head(repo_root: &str) -> HashMap<String, (u32, u32)> {
+    let out = git_output(repo_root, &["--no-optional-locks", "diff", "--numstat", "-z", "HEAD"])
+        .unwrap_or_default();
+    parse_numstat(out)
+}
+
+/// Most-recent-commit summary (HEAD) for the "已提交" group. `None` on a repo
+/// with no commits (fresh `git init`) — `git log -1` exits non-zero there.
+/// `files` come from `git diff-tree --numstat --root HEAD`, which compares HEAD
+/// to its parent (or to empty for the initial commit, so all files read as
+/// additions). `--no-renames` keeps parsing simple (rename → delete+add); the
+/// diff viewer doesn't need rename tracking.
+fn last_commit(repo_root: &str) -> Option<LastCommit> {
+    // %h short hash · %x1f unit-separator (won't appear in a commit subject)
+    // · %an author · %at committer-date epoch seconds · %s subject.
+    let log = git_output(repo_root, &["log", "-1", "--format=%h%x1f%an%x1f%at%x1f%s"]).ok()?;
+    let log = log.trim_end_matches(['\n', '\r']);
+    let mut parts = log.splitn(4, '\x1f');
+    let hash = parts.next()?.to_string();
+    let author = parts.next()?.to_string();
+    let time: i64 = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+    let message = parts.next().unwrap_or("").to_string();
+
+    let out = git_output(
+        repo_root,
+        &["diff-tree", "--no-commit-id", "-r", "--numstat", "-z", "--no-renames", "--root", "HEAD"],
+    )
+    .unwrap_or_default();
+    let counts = parse_numstat(out);
+
+    let mut files = Vec::new();
+    for (rel, (added, deleted)) in counts {
+        // Derive a display status from the numstat: add-only → A, del-only → D,
+        // else M. (A rename shows here as a D + an A under --no-renames, which
+        // is what we want for the "已提交" file list.)
+        let status = if added > 0 && deleted == 0 { 'A' }
+            else if deleted > 0 && added == 0 { 'D' }
+            else { 'M' };
+        files.push(GitFileEntry {
+            path: join_abs(repo_root, &rel),
+            rel,
+            status: status.to_string(),
+            added,
+            deleted,
+        });
+    }
+    // diff-tree gives no ordering guarantee; sort by path for a stable list.
+    files.sort_by(|a, b| a.rel.cmp(&b.rel));
+    Some(LastCommit { hash, message, author, time, files })
 }
 
 /// Absolute, forward-slashed key with an upper-cased Windows drive letter —
@@ -179,11 +251,12 @@ pub fn git_changes(folder: String) -> GitChanges {
     };
 
     let branch = git_branch(&repo_root);
-    let staged_counts = numstat_map(&repo_root, true);
-    let unstaged_counts = numstat_map(&repo_root, false);
+    // HEAD↔worktree numstat folds staged + unstaged into the single "未提交"
+    // delta (the staged/unstaged split was collapsed 2026-07-06 — the audience
+    // doesn't manually `git add`, and "未暂存" was git jargon).
+    let uncommitted_counts = numstat_worktree_vs_head(&repo_root);
 
-    let mut staged = Vec::new();
-    let mut unstaged = Vec::new();
+    let mut uncommitted = Vec::new();
     let mut untracked = Vec::new();
 
     // Porcelain v1, NUL-separated, every untracked file listed. Each record is
@@ -222,22 +295,17 @@ pub fn git_changes(folder: String) -> GitChanges {
             });
             continue;
         }
-        if x != ' ' && x != '?' {
-            let (a, d) = staged_counts.get(&rel).copied().unwrap_or((0, 0));
-            staged.push(GitFileEntry {
-                path: join_abs(&repo_root, &rel),
-                rel: rel.clone(),
-                status: x.to_string(),
-                added: a,
-                deleted: d,
-            });
-        }
-        if y != ' ' && y != '?' {
-            let (a, d) = unstaged_counts.get(&rel).copied().unwrap_or((0, 0));
-            unstaged.push(GitFileEntry {
+        // Uncommitted: staged (x) OR unstaged (y), excluding untracked. One
+        // row per file (porcelain gives a single XY record per path). Status
+        // letter prefers the staged state (x) when both apply — a file that's
+        // staged-added then modified again reads as 'A', not 'M'.
+        if (x != ' ' && x != '?') || (y != ' ' && y != '?') {
+            let (a, d) = uncommitted_counts.get(&rel).copied().unwrap_or((0, 0));
+            let status = if x != ' ' && x != '?' { x } else { y };
+            uncommitted.push(GitFileEntry {
                 path: join_abs(&repo_root, &rel),
                 rel,
-                status: y.to_string(),
+                status: status.to_string(),
                 added: a,
                 deleted: d,
             });
@@ -254,7 +322,15 @@ pub fn git_changes(folder: String) -> GitChanges {
         }
     }
 
-    GitChanges::Ok { repo_root, branch, staged, unstaged, untracked }
+    // Compute last_commit BEFORE the struct literal moves `repo_root`.
+    let last_commit = last_commit(&repo_root);
+    GitChanges::Ok {
+        repo_root,
+        branch,
+        uncommitted,
+        untracked,
+        last_commit,
+    }
 }
 
 /// Content of a file at a git revision, e.g. `git show HEAD:src/a.ts` or

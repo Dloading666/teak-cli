@@ -49,6 +49,16 @@ export interface GitFileEntry {
   added: number;
   deleted: number;
 }
+export interface LastCommit {
+  /** Short hash (e.g. "abc1234"). */
+  hash: string;
+  /** Commit subject (first line). */
+  message: string;
+  author: string;
+  /** Commit time, epoch seconds. */
+  time: number;
+  files: GitFileEntry[];
+}
 export type GitChanges =
   | { state: 'no_git' }
   | { state: 'not_repo' }
@@ -56,9 +66,14 @@ export type GitChanges =
       state: 'ok';
       repo_root: string;
       branch: string;
-      staged: GitFileEntry[];
-      unstaged: GitFileEntry[];
+      /** Tracked files with uncommitted changes (staged OR unstaged, merged —
+       *  numstat is HEAD↔worktree so the diff is "what changed since the last
+       *  commit"). The staged/unstaged split was collapsed 2026-07-06. */
+      uncommitted: GitFileEntry[];
       untracked: GitFileEntry[];
+      /** Most recent commit — shown as the "已提交" group when the working
+       *  tree is clean. null on a repo with no commits. */
+      last_commit: LastCommit | null;
     };
 
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -178,9 +193,10 @@ export const commands = {
 
   // ── Git-backed changes panel ──────────────────────────────────────
   // The right-side "修改记录" tab reads the active folder's git working
-  // tree. `gitChanges` returns no_git / not_repo / ok (with staged·
-  // unstaged·untracked groups); the DiffPanel pulls each side's blob via
-  // `gitShowFile` and feeds the existing jsdiff + Shiki pipeline.
+  // tree. `gitChanges` returns no_git / not_repo / ok (with uncommitted +
+  // untracked groups, plus last_commit shown as "已提交" when clean); the
+  // DiffPanel pulls each side's blob via `gitShowFile` and feeds the existing
+  // jsdiff + Shiki pipeline.
   gitChanges: (folder: string) => invoke<GitChanges>('git_changes', { folder }),
   // Content of `<spec>` — e.g. "HEAD:src/a.ts" (committed) or ":src/a.ts"
   // (staged/index blob). null when the path doesn't exist at that revision;

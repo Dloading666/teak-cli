@@ -218,6 +218,32 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* "已提交" group header — shown when the working tree is clean, in place of
+ * the empty "working tree clean" state. Reuses .changes-group-header's flex
+ * row, but carries the commit subject + short hash (not just a count). The
+ * subject is a sentence, so it MUST NOT inherit the header's text-transform:
+ * uppercase. */
+.changes-commit-subject {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-2);
+}
+.changes-commit-hash {
+  flex: 0 0 auto;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-3, var(--text-2));
+}
+
 /* Single-letter git status badge (M/A/D/R/C/U/?). Fixed width so file
  * names align in a column regardless of status letter. */
 .changes-status {

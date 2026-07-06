@@ -83,12 +83,11 @@ interface DiffPanelProps {
   repoRoot: string;
   /** Repo-relative path — the rel used in `HEAD:rel` / `:rel` specs. */
   rel: string;
-  /** True for a Staged-group row: diff index-vs-HEAD instead of
-   *  worktree-vs-index. */
-  staged: boolean;
-  /** True for an Untracked-group row: no git blob, render the whole working
-   *  file as additions. */
-  untracked: boolean;
+  /** Which group the row belongs to — picks the old/new git specs:
+   *  - 'uncommitted' → old `HEAD:rel`,   new = working file (HEAD↔worktree)
+   *  - 'untracked'   → old `""`,          new = working file (no git blob)
+   *  - 'committed'   → old `HEAD~1:rel`,  new = `HEAD:rel` (last commit's diff) */
+  kind: 'uncommitted' | 'untracked' | 'committed';
   onClose: () => void;
   expanded: boolean;
   onToggleExpanded: () => void;
@@ -103,7 +102,7 @@ interface DiffPanelProps {
   deleted?: number;
 }
 
-export function DiffPanel({ path, repoRoot, rel, staged, untracked, onClose, expanded, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
+export function DiffPanel({ path, repoRoot, rel, kind, onClose, expanded, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
   const t = useT();
   const dataTheme = useDataAttr('data-theme');
   const [result, setResult] = useState<DiffResult>({ state: 'loading' });
@@ -170,26 +169,28 @@ export function DiffPanel({ path, repoRoot, rel, staged, untracked, onClose, exp
     (async () => {
       try {
         // Fetch the two sides from git per group:
-        //   untracked → old "" / new = working file on disk (no git blob)
-        //   staged    → old = HEAD blob / new = index blob (`:rel`)
-        //   unstaged  → old = index blob (`:rel`) / new = working file
+        //   untracked   → old ""            / new = working file (no git blob)
+        //   uncommitted → old `HEAD:rel`   / new = working file (HEAD↔worktree)
+        //   committed   → old `HEAD~1:rel` / new = `HEAD:rel` (last commit's diff)
         // `gitShowFile` returns null when the path is absent at that revision
-        // (a newly-added file has no HEAD blob) → empty side → all-additions.
+        // (a newly-added file has no HEAD blob, an initial commit has no
+        // HEAD~1) → empty side → all-additions.
         let oldText: string;
         let newText: string;
-        if (untracked) {
+        if (kind === 'untracked') {
           oldText = '';
           newText = (await commands.readTextFile(path)) ?? '';
-        } else if (staged) {
+        } else if (kind === 'committed') {
           const [o, n] = await Promise.all([
+            commands.gitShowFile(repoRoot, `HEAD~1:${rel}`),
             commands.gitShowFile(repoRoot, `HEAD:${rel}`),
-            commands.gitShowFile(repoRoot, `:${rel}`),
           ]);
           oldText = o ?? '';
           newText = n ?? '';
         } else {
+          // uncommitted: HEAD blob vs working file on disk.
           const [o, n] = await Promise.all([
-            commands.gitShowFile(repoRoot, `:${rel}`),
+            commands.gitShowFile(repoRoot, `HEAD:${rel}`),
             commands.readTextFile(path),
           ]);
           oldText = o ?? '';
@@ -240,7 +241,7 @@ export function DiffPanel({ path, repoRoot, rel, staged, untracked, onClose, exp
     })();
 
     return () => { cancelled = true; };
-  }, [path, repoRoot, rel, staged, untracked, dataTheme]);
+  }, [path, repoRoot, rel, kind, dataTheme]);
 
   const basename = useMemo(() => path.replace(/\\/g, '/').split('/').pop() || path, [path]);
 
