@@ -259,8 +259,8 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
               return (
                 <div key={it.key} className="changes-group-header changes-commit-header">
                   <span className="changes-group-label">{t('changes.committed' as any) || 'Committed'}</span>
-                  <span className="changes-commit-subject" data-tip={c.message}>{c.message}</span>
                   <span className="changes-commit-hash">{c.hash}</span>
+                  <span className="changes-commit-subject" data-tip={c.message}>{c.message}</span>
                 </div>
               );
             }
