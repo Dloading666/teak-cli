@@ -5,6 +5,7 @@ import { useAppState, useAppDispatch } from './store/app-state';
 import { retryInvoke } from './tauri';
 import { subscribeAgentStatus } from './lib/agent-status-bus';
 import { routeFileDrop } from './lib/file-drop';
+import { initHistoryAutoRefresh } from './lib/history-cache';
 import { TitleBar } from './components/common/TitleBar';
 import { ResizeEdges } from './components/common/ResizeEdges';
 import { SettingsModal } from './components/common/SettingsModal';
@@ -211,6 +212,15 @@ export function App() {
     document.addEventListener('contextmenu', handler);
     return () => document.removeEventListener('contextmenu', handler);
   }, []);
+
+  // History list auto-refresh — install the window-foreground listener +
+  // 60s background poll that keep the session-history cache live so users
+  // no longer have to restart Coffee CLI to see newly-created sessions
+  // (issue: "会话记录列表始终是第一次打开软件时的,要重启才能看到新的").
+  // refreshHistory no-ops until the user first opens the History tab
+  // (prefetchHistory flips status to 'ready'), so users who never open it
+  // pay only the 60s setInterval tick (a function call that early-returns).
+  useEffect(() => initHistoryAutoRefresh(), []);
 
   return (
     <>

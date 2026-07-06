@@ -10,6 +10,7 @@ import { ScrollPanel } from '../common/ScrollPanel';
 import { clipboardWrite } from '../../lib/clipboard';
 import { beginExplorerDrag } from '../../lib/explorer-drag';
 import { useFileStats, useDirtyDirs } from '../../lib/git-status';
+import { refreshHistory } from '../../lib/history-cache';
 import { commands, onSelfUpdateProgress } from '../../tauri';
 import type { DirEntryInfo } from '../../tauri';
 import { HistoryBoard } from '../right/HistoryBoard';
@@ -838,7 +839,7 @@ export function Explorer() {
         </button>
         <button
           className={`explorer-tab ${activeTab === 'history' ? 'active' : ''}`}
-          onClick={() => setActiveTab('history')}
+          onClick={() => { setActiveTab('history'); refreshHistory(); }}
         >
           {t('explorer.tab.history' as any)}
         </button>
