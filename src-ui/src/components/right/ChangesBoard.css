@@ -219,12 +219,27 @@
 }
 
 /* "已提交" group header — shown when the working tree is clean, in place of
- * the empty "working tree clean" state. Reuses .changes-group-header's flex
- * row, but carries the commit subject + short hash (not just a count). The
- * subject is a sentence, so it MUST NOT inherit the header's text-transform:
- * uppercase. */
+ * the empty "working tree clean" state. Two-line layout so a long commit
+ * subject never crams/wraps against the hash (the original single-line row
+ * squeezed + wrapped badly on narrow panels): line 1 = 已提交 label (left) +
+ * short hash (right), line 2 = subject (full-width, truncated, themed tooltip
+ * on hover for the full text). The subject is a sentence, so it MUST NOT
+ * inherit the header's text-transform: uppercase. */
+.changes-commit-header {
+  flex-wrap: wrap;          /* subject wraps to its own line */
+}
+.changes-commit-hash {
+  margin-left: auto;        /* push to the right edge of line 1 */
+  flex: 0 0 auto;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-3, var(--text-2));
+}
 .changes-commit-subject {
-  flex: 1 1 auto;
+  flex: 0 0 100%;           /* full width → own line (line 2) */
+  position: relative;       /* anchor for the ::after tooltip */
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -233,15 +248,36 @@
   font-size: 12px;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--text-2);
+  color: var(--text-1);     /* brightest — the main info, not a muted label */
 }
-.changes-commit-hash {
-  flex: 0 0 auto;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 10px;
+/* Themed tooltip — replaces the native title= chrome (per the no-native-
+ * tooltips rule; matches the heatmap's data-tip pill). Shows the full commit
+ * subject (the header truncates it with ellipsis). white-space: normal so a
+ * long subject wraps inside the pill instead of overflowing the panel. The
+ * commit-header sits at the top of the scroll list, so the tooltip drops
+ * DOWN (top: 100%) into the file-list area — stays inside the scroll
+ * viewport, no clipping. */
+.changes-commit-subject[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  max-width: 260px;
+  padding: 6px 10px;
+  background: var(--bg-panel);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--text-3, var(--text-2));
+  white-space: normal;
+  word-break: break-word;
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20), 0 6px 20px rgba(0, 0, 0, 0.22);
+  z-index: 100;
 }
 
 /* Single-letter git status badge (M/A/D/R/C/U/?). Fixed width so file
