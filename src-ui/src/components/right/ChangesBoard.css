@@ -253,16 +253,22 @@
 /* Themed tooltip — replaces the native title= chrome (per the no-native-
  * tooltips rule; matches the heatmap's data-tip pill). Shows the full commit
  * subject (the header truncates it with ellipsis). white-space: normal so a
- * long subject wraps inside the pill instead of overflowing the panel. The
- * commit-header sits at the top of the scroll list, so the tooltip drops
- * DOWN (top: 100%) into the file-list area — stays inside the scroll
- * viewport, no clipping. */
+ * long subject wraps inside the pill instead of overflowing the panel.
+ *
+ * Clipping guard: unlike native title= (which floats in the OS layer above
+ * the webview), this is a DOM ::after — it's subject to the ScrollPanel's
+ * overflow. `max-width: min(260px, 100%)` caps the pill at 260px OR the
+ * subject's own width (whichever is smaller), so the tooltip's right edge
+ * can NEVER exceed the subject's right edge → no right-edge clipping even
+ * when the right panel is dragged narrow. (Vertical is fine: the commit-
+ * header sits at the top of the scroll list, so the tooltip drops DOWN into
+ * the file-list area, in-viewport.) */
 .changes-commit-subject[data-tip]:hover::after {
   content: attr(data-tip);
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  max-width: 260px;
+  max-width: min(260px, 100%);
   padding: 6px 10px;
   background: var(--bg-panel);
   color: var(--text-1);
