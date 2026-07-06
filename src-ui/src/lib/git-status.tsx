@@ -152,6 +152,15 @@ export function GitStatusProvider({ children }: { children: ReactNode }) {
 
     fetchChanges(); // immediate fetch when the panel opens (no debounce lag)
 
+    // Periodic poll — a `git commit` modifies `.git/` (refs/heads, index),
+    // which the fs-watcher classifies as Meaningful + should emit fs-refresh
+    // for, but in practice the panel wasn't reliably swapping 未提交 → 已提交
+    // after a commit while it stayed open (user had to re-open the tab to see
+    // the new commit). This 8s backstop catches any git-state change (commit,
+    // branch switch, reset) regardless of whether the fs-watcher chain
+    // delivered the event. Only runs while the panel is visible (poll gate).
+    const pollInterval = window.setInterval(schedule, 8_000);
+
     let unlistenTauri: (() => void) | null = null;
     let cancelled = false;
     (async () => {
@@ -167,6 +176,7 @@ export function GitStatusProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      window.clearInterval(pollInterval);
       window.removeEventListener('fs-refresh', onWindowRefresh);
       unlistenTauri?.();
       unsubStatus();
