@@ -66,6 +66,17 @@ pub enum HistoryShape {
     /// JSONL files. Walked by `find_opencode_sessions`, cannot be
     /// processed by the generic mtime-then-parse pipeline.
     OpenCodeMixed { root_under_home: &'static str },
+
+    /// Kimi Code (`kimi` binary): NOT a dir of JSONL files and NOT SQLite.
+    /// Sessions live under an index — `~/.kimi-code/session_index.jsonl`
+    /// (one line per main session: `sessionId`/`sessionDir`/`workDir`) —
+    /// with per-session metadata at `<sessionDir>/state.json` and the full
+    /// conversation at `<sessionDir>/agents/main/wire.jsonl`. Data root is
+    /// flat `~/.kimi-code/` on every OS (override `KIMI_CODE_HOME`); see
+    /// `kimi_root` in server.rs. Like `OpenCodeMixed`, this bypasses the
+    /// generic mtime-then-parse pipeline and is emitted by a bespoke
+    /// second pass (`find_kimi_sessions` + `collect_kimi_heatmap_entries`).
+    KimiIndex { root_under_home: &'static str },
 }
 
 impl HistoryShape {
@@ -79,7 +90,8 @@ impl HistoryShape {
             | HistoryShape::CodexRollout { root_under_home, .. }
             | HistoryShape::QwenProjects { root_under_home, .. }
             | HistoryShape::AntigravityTmp { root_under_home, .. }
-            | HistoryShape::OpenCodeMixed { root_under_home } => Some(root_under_home),
+            | HistoryShape::OpenCodeMixed { root_under_home }
+            | HistoryShape::KimiIndex { root_under_home } => Some(root_under_home),
             HistoryShape::HermesFlatJson => None,
         }
     }
@@ -104,14 +116,17 @@ impl HistoryShape {
 
     /// JSONL scan depth, when the shape uses the mtime-then-parse
     /// pipeline. `None` for shapes that bypass it (HermesFlatJson
-    /// uses a flat-dir collector; OpenCodeMixed uses SQLite).
+    /// uses a flat-dir collector; OpenCodeMixed uses SQLite; KimiIndex
+    /// uses a session-index second pass).
     pub fn jsonl_depth(&self) -> Option<u8> {
         match self {
             HistoryShape::GenericJsonl { depth, .. }
             | HistoryShape::CodexRollout { depth, .. }
             | HistoryShape::QwenProjects { depth, .. }
             | HistoryShape::AntigravityTmp { depth, .. } => Some(*depth),
-            HistoryShape::HermesFlatJson | HistoryShape::OpenCodeMixed { .. } => None,
+            HistoryShape::HermesFlatJson
+            | HistoryShape::OpenCodeMixed { .. }
+            | HistoryShape::KimiIndex { .. } => None,
         }
     }
 }

@@ -408,6 +408,41 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         token_format: None,
         prompt_markers: &["❯"],
     },
+    // Pi (earendil-works `pi` binary). Resume via `pi --session <id>` —
+    // also accepts a partial UUID / file path (pi.dev/docs sessions). Token
+    // is the session UUID (v7) from the JSONL header `id` field, sourced by
+    // parse_pi_session_jsonl (Pi doesn't echo the id to stdout on launch, so
+    // session_id_pattern is None). prompt_markers `❯` is a guess — Pi is
+    // hook-less, so the tab status dot is the static "fake island" green
+    // regardless; the settle-silence fallback covers a wrong marker.
+    AgentPreset {
+        tool_name: "pi",
+        resume_program: Some("pi"),
+        resume_args_before: &["--session"],
+        resume_args_after: &[],
+        session_id_pattern: None,
+        token_format: Some(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
+        prompt_markers: &["❯"],
+    },
+    // Kimi Code (Moonshot `kimi` binary). Resume via `kimi --session <id>`
+    // (canonical `-S, --session`, verified against `kimi --help`). Token is
+    // `session_<uuid>` from session_index.jsonl, sourced by find_kimi_sessions
+    // (Kimi doesn't echo the id to stdout, so session_id_pattern is None).
+    // prompt_markers `❯` is a guess — Kimi is hook-less (static fake-island
+    // green); settle-silence fallback covers a wrong marker.
+    AgentPreset {
+        tool_name: "kimicode",
+        resume_program: Some("kimi"),
+        resume_args_before: &["--session"],
+        resume_args_after: &[],
+        session_id_pattern: None,
+        // `session_` + UUID, verified against real session_index.jsonl entries.
+        // Permissive alnum/underscore/hyphen/dot band mirrors OpenCode's `ses_`
+        // band — leaves headroom if Kimi ever shifts the id shape, while still
+        // preventing whitespace/flag injection.
+        token_format: Some(r"^session_[A-Za-z0-9._-]+$"),
+        prompt_markers: &["❯"],
+    },
 ];
 
 pub fn find_preset(tool_name: &str) -> Option<&'static AgentPreset> {
@@ -1425,7 +1460,7 @@ mod tests {
 
     #[test]
     fn find_preset_known_tools() {
-        for tool in &["claude", "antigravity", "hermes"] {
+        for tool in &["claude", "antigravity", "hermes", "pi", "kimicode"] {
             assert!(find_preset(tool).is_some(), "preset not found for {tool}");
         }
     }

@@ -1168,6 +1168,95 @@ fn parse_agent_jsonl(
     })
 }
 
+/// Pi CLI sessions live at
+/// `~/.pi/agent/sessions/--<encoded-cwd>--/<ISO-ts>_<uuid>.jsonl` — same
+/// depth-2 layout as Claude Code, so the generic file-walker finds them.
+/// The per-line schema differs from Claude/Codex though: line 1 is a header
+/// `{type:"session", id, cwd, timestamp}` (id = the resume token, cwd lives
+/// here so no bucket-name decoding), and message rows are
+/// `{type:"message", message:{role, content:[{type:"text", text}]}}`.
+/// `pi --session <id>` resumes by (partial) UUID — see AGENT_PRESETS.
+fn parse_pi_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession> {
+    use std::io::BufRead;
+    let file = std::fs::File::open(file_path).ok()?;
+    let reader = std::io::BufReader::new(file);
+
+    // File stem is `<ISO-ts>_<uuid>` — fall back to the trailing UUID if the
+    // header row is missing/unparseable. `pi --session` accepts partial IDs,
+    // so even a stem-derived token resumes.
+    let stem = file_path.file_stem()?.to_string_lossy().to_string();
+    let stem_uuid = stem.rsplit_once('_').map(|(_, u)| u.to_string()).unwrap_or(stem.clone());
+    let mut session_id = stem_uuid;
+    let mut cwd = String::new();
+    let mut title = String::new();
+    let mut total_messages = 0;
+
+    for line in reader.lines().map_while(Result::ok) {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+        let row_type = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+        // Header: pull id (resume token) + cwd straight off line 1.
+        if row_type == "session" {
+            if let Some(id) = value.get("id").and_then(|v| v.as_str()) {
+                if !id.is_empty() { session_id = id.to_string(); }
+            }
+            if let Some(c) = value.get("cwd").and_then(|v| v.as_str()) {
+                if !c.is_empty() { cwd = c.to_string(); }
+            }
+            continue;
+        }
+
+        // Message rows: nested under `message.{role, content}`.
+        if row_type == "message" {
+            let Some(msg) = value.get("message").and_then(|v| v.as_object()) else { continue };
+            let role = msg.get("role").and_then(|v| v.as_str()).unwrap_or("");
+            if role == "user" || role == "assistant" {
+                total_messages += 1;
+            }
+            if !title.is_empty() || role != "user" { continue; }
+            let Some(content_arr) = msg.get("content").and_then(|v| v.as_array()) else { continue };
+            for block in content_arr {
+                let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                if block_type != "text" && block_type != "input_text" { continue; }
+                let Some(text) = block.get("text").and_then(|v| v.as_str()) else { continue };
+                if is_system_injected(text) { continue; }
+                let safe = text.replace('\n', " ");
+                let mut chars = safe.chars();
+                let chunk: String = chars.by_ref().take(40).collect();
+                title = if chars.next().is_some() { format!("{}...", chunk) } else { chunk };
+                break;
+            }
+        }
+    }
+
+    // Fallback date from file mtime (matches parse_agent_jsonl — file mtime
+    // reflects last append = last activity, more accurate than the header's
+    // creation timestamp for "recent sessions" sorting).
+    let mut updated_at = String::new();
+    if let Ok(meta) = std::fs::metadata(file_path) {
+        if let Ok(mod_time) = meta.modified() {
+            if let Ok(dur) = mod_time.duration_since(std::time::SystemTime::UNIX_EPOCH) {
+                updated_at = dur.as_millis().to_string();
+            }
+        }
+    }
+    if title.is_empty() {
+        title = "Pi Session".to_string();
+    }
+    let turn_count = if total_messages > 0 { std::cmp::max(1, (total_messages + 1) / 2) } else { 0 };
+
+    Some(SavedSession {
+        id: format!("pi_native_{}", session_id),
+        name: title,
+        tool: "pi".to_string(),
+        cwd,
+        session_token: Some(session_id),
+        saved_at: updated_at,
+        file_path: Some(file_path.to_string_lossy().into_owned()),
+        turn_count: Some(turn_count),
+    })
+}
+
 /// Codex CLI sessions live at
 /// `~/.codex/sessions/<YYYY>/<MM>/<DD>/rollout-<ts>-<uuid>.jsonl`.
 /// Schema:
@@ -1796,6 +1885,168 @@ fn read_mimocode_session(session_token: String) -> Result<String, String> {
     read_opencode_sqlite_session(&db, &session_token)
 }
 
+// ── Kimi Code (Moonshot `kimi`) — index-based second pass ──────────────
+// Sessions live under a flat `~/.kimi-code/` root (same path on every OS;
+// override `KIMI_CODE_HOME`) in an INDEX layout, not a dir of JSONL and not
+// SQLite: `session_index.jsonl` is the entry point (one line per main
+// session: sessionId/sessionDir/workDir), with per-session metadata at
+// `<sessionDir>/state.json` and the full conversation at
+// `<sessionDir>/agents/main/wire.jsonl`. Bypasses the generic mtime-then-
+// parse pipeline like OpenCode/MiMo — KimiIndex is skipped in
+// collect_registry_history_candidates and emitted here instead.
+
+/// Resolve Kimi Code's data root. `KIMI_CODE_HOME` env (Kimi's own override,
+/// per the data-locations doc) wins so a user who moved the data dir doesn't
+/// also need to configure our tools.json override; otherwise the registry-
+/// declared `~/.kimi-code/` (honoring any tools.json history-path override).
+/// Flat on every OS — no XDG / `%APPDATA%` split (verified).
+fn kimi_root(home: &std::path::Path) -> Option<std::path::PathBuf> {
+    if let Ok(env_home) = std::env::var("KIMI_CODE_HOME") {
+        if !env_home.is_empty() {
+            let p = std::path::PathBuf::from(env_home);
+            if p.is_dir() {
+                return Some(p);
+            }
+        }
+    }
+    let path = crate::tools::find("kimicode")
+        .and_then(|t| t.history_shape.as_ref())
+        .map(|s| crate::tool_config::history_path_for("kimicode", s.join_under(home)))?;
+    if path.is_dir() { Some(path) } else { None }
+}
+
+/// Kimi Code history second pass. Reads `session_index.jsonl`, stats each
+/// `state.json` for mtime to pre-select the newest 200 (mirrors the JSONL
+/// pipeline's stat-first/parse-top-N discipline), then reads each survivor's
+/// `state.json` for title / updatedAt. Sub-agents (`agents/agent-0/`) are
+/// nested under each main session's dir and never get their own index entry,
+/// so the index yields main sessions only — no parent_id filtering needed.
+fn find_kimi_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
+    let Some(root) = kimi_root(home) else { return };
+    let Ok(index) = std::fs::read_to_string(root.join("session_index.jsonl")) else { return };
+
+    // (state.json mtime, sessionDir, sessionId, workDir)
+    let mut candidates: Vec<(std::time::SystemTime, std::path::PathBuf, String, String)> = Vec::new();
+    for line in index.lines() {
+        let line = line.trim();
+        if line.is_empty() { continue; }
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+        let Some(session_id) = v.get("sessionId").and_then(|x| x.as_str()) else { continue };
+        let Some(session_dir) = v.get("sessionDir").and_then(|x| x.as_str()) else { continue };
+        let work_dir = v.get("workDir").and_then(|x| x.as_str()).unwrap_or("").to_string();
+        let state_path = std::path::Path::new(session_dir).join("state.json");
+        let mtime = std::fs::metadata(&state_path)
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        candidates.push((mtime, std::path::PathBuf::from(session_dir), session_id.to_string(), work_dir));
+    }
+    candidates.sort_by(|a, b| b.0.cmp(&a.0));
+    const KIMI_HISTORY_LIMIT: usize = 200;
+    candidates.truncate(KIMI_HISTORY_LIMIT);
+
+    for (_, session_dir, session_id, work_dir) in &candidates {
+        let Ok(state_bytes) = std::fs::read_to_string(session_dir.join("state.json")) else { continue };
+        let Ok(state) = serde_json::from_str::<serde_json::Value>(&state_bytes) else { continue };
+
+        let title = state
+            .get("title").and_then(|x| x.as_str()).filter(|s| !s.is_empty())
+            .or_else(|| state.get("lastPrompt").and_then(|x| x.as_str()))
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                let safe = s.replace('\n', " ");
+                let mut chars = safe.chars();
+                let chunk: String = chars.by_ref().take(40).collect();
+                if chars.next().is_some() { format!("{}...", chunk) } else { chunk }
+            })
+            .unwrap_or_else(|| "Kimi Code Session".to_string());
+
+        // state.json.updatedAt is ISO 8601 (e.g. "2026-07-05T17:56:30.904Z").
+        // Store the raw string — the frontend's Date.parse handles ISO, same
+        // as it already does for the epoch-ms/epoch-s numbers other tools emit.
+        // Fall back to createdAt, then state.json mtime, then empty.
+        let saved_at = state.get("updatedAt").or_else(|| state.get("createdAt"))
+            .and_then(|x| x.as_str()).map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                std::fs::metadata(session_dir.join("state.json"))
+                    .and_then(|m| m.modified()).ok()
+                    .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis().to_string())
+                    .unwrap_or_default()
+            });
+
+        result.push(SavedSession {
+            id: format!("kimicode_native_{}", session_id),
+            name: title,
+            tool: "kimicode".to_string(),
+            cwd: work_dir.clone(),
+            session_token: Some(session_id.clone()),
+            saved_at,
+            // sessionDir exposes the session's on-disk location (holds
+            // state.json + wire.jsonl). Mirrors OpenCode's file_path surface.
+            file_path: Some(session_dir.to_string_lossy().into_owned()),
+            // turn_count deferred — counting wire.jsonl is extra I/O per
+            // session and the History board renders fine without it.
+            turn_count: None,
+        });
+    }
+}
+
+/// Kimi Code heatmap second pass. For each session in the cutoff window,
+/// emits (ts=agents/main/wire.jsonl mtime, count=wire.jsonl line count).
+/// wire.jsonl mtime ≈ last activity (Kimi appends to it on every turn);
+/// counting only the MAIN agent's wire.jsonl (NOT `agents/agent-0/` sub-
+/// agents) avoids double-counting one conversation. Shares the file-based
+/// heatmap count cache (keyed by wire.jsonl path + mtime) so warm starts
+/// skip the re-count — same optimization as the JSONL pipeline.
+fn collect_kimi_heatmap_entries(
+    home: &std::path::Path,
+    cutoff_secs: i64,
+    out: &mut Vec<HeatmapEntry>,
+    count_cache: &mut std::collections::HashMap<String, CachedCount>,
+    cache_dirty: &mut bool,
+    keep_paths: &mut std::collections::HashSet<String>,
+) {
+    let Some(root) = kimi_root(home) else { return };
+    let Ok(index) = std::fs::read_to_string(root.join("session_index.jsonl")) else { return };
+
+    for line in index.lines() {
+        let line = line.trim();
+        if line.is_empty() { continue; }
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+        let Some(session_dir) = v.get("sessionDir").and_then(|x| x.as_str()) else { continue };
+        let wire_path = std::path::Path::new(session_dir)
+            .join("agents").join("main").join("wire.jsonl");
+        let Ok(meta) = std::fs::metadata(&wire_path) else { continue };
+        let Ok(mtime) = meta.modified() else { continue };
+        let ts = mtime
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        if ts < cutoff_secs { continue; }
+
+        let path_key = wire_path.to_string_lossy().into_owned();
+        keep_paths.insert(path_key.clone());
+        let count = if let Some(entry) = count_cache.get(&path_key) {
+            if entry.mtime == ts {
+                entry.count
+            } else {
+                let c = count_jsonl_message_lines(&wire_path);
+                count_cache.insert(path_key.clone(), CachedCount { mtime: ts, count: c });
+                *cache_dirty = true;
+                c
+            }
+        } else {
+            let c = count_jsonl_message_lines(&wire_path);
+            count_cache.insert(path_key.clone(), CachedCount { mtime: ts, count: c });
+            *cache_dirty = true;
+            c
+        };
+        if count > 0 {
+            out.push(HeatmapEntry { ts, count });
+        }
+    }
+}
+
 fn collect_jsonl_paths_with_mtime(
     dir: std::path::PathBuf,
     depth: u8,
@@ -2350,6 +2601,7 @@ fn load_native_history_blocking() -> Result<Vec<SavedSession>, String> {
         let parsed = match *tool {
             "hermes"      => parse_hermes_json(path),
             "codex"       => parse_codex_session_jsonl(path),
+            "pi"          => parse_pi_session_jsonl(path),
             "qwen"        => parse_qwen_session_jsonl(path),
             "antigravity" => parse_gemini_session_jsonl(path, &antigravity_project_map),
             other         => parse_agent_jsonl(path, other, &claude_project_map),
@@ -2386,6 +2638,14 @@ fn load_native_history_blocking() -> Result<Vec<SavedSession>, String> {
         if let Some(db) = mimocode_db(home) {
             find_drizzle_sessions_sqlite(&db, "mimocode", "MiMo Code Session", &mut result);
         }
+    }
+
+    // Kimi Code second pass — index-based store (session_index.jsonl + state.json,
+    // NOT a dir walk). find_kimi_sessions reads the index, stats state.json for
+    // mtime to pre-select the newest 200, then reads each survivor's state.json
+    // for title / updatedAt. Pushes finished SavedSessions directly.
+    if let Some(home) = home.as_ref() {
+        find_kimi_sessions(home, &mut result);
     }
 
     // Collapse any Claude-worktree cwd to its project root, for every tool's
@@ -2425,7 +2685,10 @@ fn collect_registry_history_candidates(
             crate::tools::HistoryShape::HermesFlatJson => {
                 collect_hermes_paths_with_mtime(scan_dir, out);
             }
-            crate::tools::HistoryShape::OpenCodeMixed { .. } => {}
+            // Index/DB-backed shapes bypass the file-walk pipeline — their
+            // bespoke second passes emit finished SavedSessions / HeatmapEntries.
+            crate::tools::HistoryShape::OpenCodeMixed { .. }
+            | crate::tools::HistoryShape::KimiIndex { .. } => {}
             _ => {
                 if let Some(depth) = shape.jsonl_depth() {
                     collect_jsonl_paths_with_mtime(scan_dir, depth, tool.id, out);
@@ -2560,6 +2823,23 @@ fn load_message_heatmap_blocking() -> Result<Vec<HeatmapEntry>, String> {
         if count > 0 {
             out.push(HeatmapEntry { ts, count });
         }
+    }
+
+    // Kimi Code heatmap second pass — runs BEFORE the cache prune/write below
+    // so its wire.jsonl paths join keep_paths (retained by the retain() below)
+    // and their counts land in count_cache (persisted by write_count_cache).
+    // Shares the file-based cache (keyed by wire.jsonl path + mtime) for
+    // warm-start re-count avoidance. wire.jsonl mtime = ts, line count =
+    // intensity (main agent only; sub-agent wire.jsonl is NOT counted, to
+    // avoid double-counting one conversation).
+    if let Some(home) = home.as_ref() {
+        let cutoff_secs = cutoff
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        collect_kimi_heatmap_entries(
+            home, cutoff_secs, &mut out, &mut count_cache, &mut cache_dirty, &mut keep_paths,
+        );
     }
 
     // Prune stale entries (files that disappeared from disk). Non-jsonl tools

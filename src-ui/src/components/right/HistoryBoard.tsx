@@ -15,6 +15,12 @@ import {
 // separate file copy on disk.
 import HERMES_DATA_URL from '../../icons-inline/hermes.png?inline';
 import OPENCODE_DATA_URL from '../../icons-inline/opencode.png?inline';
+// Pi (SVG) + Kimi Code (PNG squircle) — T2 history/resume/heatmap tools.
+// Same ?inline data-URI pipeline as hermes/opencode so the brand marks paint
+// synchronously on first render (no <img> async-decode flash — HistoryBoard
+// mounts once at app start, but inlining is still the consistent choice).
+import PI_DATA_URL from '../../icons-inline/pi.svg?inline';
+import KIMICODE_DATA_URL from '../../icons-inline/kimicode.png?inline';
 import './HistoryBoard.css';
 
 // Tool icons — claude/codex/qwen/antigravity load via <img src=public/...>
@@ -34,13 +40,17 @@ const TOOL_ICON_SRC: Record<string, string> = {
   antigravity: '/icons/tools/antigravity.svg',
   hermes:      HERMES_DATA_URL,
   opencode:    OPENCODE_DATA_URL,
+  pi:          PI_DATA_URL,
+  kimicode:    KIMICODE_DATA_URL,
   mimocode:    '/icons/tools/mimocode.svg',
 };
 
 const getToolIcon = (tool: string) => {
   const src = TOOL_ICON_SRC[tool];
   if (!src) return <div style={{ width: 14, height: 14, borderRadius: 'var(--radius-xs)', background: '#555' }}/>;
-  const extra = (tool === 'hermes' || tool === 'opencode') ? { borderRadius: 'var(--radius-xs)', objectFit: 'cover' as const } : {};
+  const extra = (tool === 'hermes' || tool === 'opencode') ? { borderRadius: 'var(--radius-xs)', objectFit: 'cover' as const }
+    : tool === 'kimicode' ? { borderRadius: 'var(--radius-xs)', objectFit: 'contain' as const }
+    : {};
   return <img src={src} alt="" style={{ width: '1em', height: '1em', flexShrink: 0, objectFit: 'contain', ...extra }}/>;
 };
 

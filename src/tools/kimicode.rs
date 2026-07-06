@@ -1,11 +1,31 @@
-//! Kimi Code — third-class (T3) integration: brand icon + one-click launch only.
+//! Kimi Code — second-class (T2) integration: brand icon + one-click
+//! launch + session-history scanning + auto-resume.
 //!
-//! No session-history scanning and no hook surface (so no Dynamic Island /
-//! live status dot — that stays Claude-only). Registered in `TOOLS` purely so
-//! the launchpad gets its display name (`list_tools`), its PATH "installed"
-//! probe, and the launch binary. `binary_name` is the command users run.
+//! Moonshot AI's `kimi` binary (npm `@moonshot-ai/kimi-code`). Sessions
+//! live under a flat `~/.kimi-code/` root (same path on every OS; override
+//! `KIMI_CODE_HOME`) in an INDEX-based layout — NOT a dir of JSONL files
+//! and NOT SQLite:
+//!   - `~/.kimi-code/session_index.jsonl` — one line per main session:
+//!     `{sessionId, sessionDir, workDir}`. Sub-agents (`agents/agent-0/`)
+//!     are nested under each main session's dir, never separate index
+//!     entries, so the index gives main sessions only — no dedup needed.
+//!   - `<sessionDir>/state.json` — `{createdAt, updatedAt, title, lastPrompt}`.
+//!   - `<sessionDir>/agents/main/wire.jsonl` — full main-agent conversation;
+//!     resume source (Kimi replays from it) + heatmap message count.
+//!
+//! Because the entry point is an index file (not a dir walk), this bypasses
+//! the generic mtime-then-parse pipeline — `KimiIndex` is skipped in
+//! `collect_registry_history_candidates` and emitted by a bespoke second
+//! pass (`find_kimi_sessions` + `collect_kimi_heatmap_entries` in server.rs).
+//!
+//! Resume: `kimi --session <sessionId>` (canonical `-S, --session` flag,
+//! verified against `kimi --help`). Token shape `session_<uuid>`.
+//!
+//! No hook surface (no live Dynamic Island — static "fake island" green).
+//! Registered in `TOOLS` for display name + PATH probe + launch binary +
+//! history. Launchpad tile is the frontend's hardcoded AGENT_CATALOG.
 
-use super::ToolDescriptor;
+use super::{HistoryShape, ToolDescriptor};
 
 pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "kimicode",
@@ -13,6 +33,11 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     binary_name: "kimi",
     skill_dir_relative: None,
     has_hook_surface: false,
-    history_shape: None,
+    // ~/.kimi-code/ — flat on all OS (override KIMI_CODE_HOME). Bypasses
+    // the file-walk pipeline; server.rs `kimi_root` + `find_kimi_sessions`
+    // read session_index.jsonl + state.json.
+    history_shape: Some(HistoryShape::KimiIndex {
+        root_under_home: ".kimi-code",
+    }),
     default_args: &[],
 };
