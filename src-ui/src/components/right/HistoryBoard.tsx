@@ -15,12 +15,13 @@ import {
 // separate file copy on disk.
 import HERMES_DATA_URL from '../../icons-inline/hermes.png?inline';
 import OPENCODE_DATA_URL from '../../icons-inline/opencode.png?inline';
-// Pi (SVG) + Kimi Code (PNG squircle) — T2 history/resume/heatmap tools.
-// Same ?inline data-URI pipeline as hermes/opencode so the brand marks paint
-// synchronously on first render (no <img> async-decode flash — HistoryBoard
-// mounts once at app start, but inlining is still the consistent choice).
-import PI_DATA_URL from '../../icons-inline/pi.svg?inline';
+// Kimi Code (PNG squircle) — fixed-color brand mark, ?inline data URI.
 import KIMICODE_DATA_URL from '../../icons-inline/kimicode.png?inline';
+// Pi is a MONOCHROME currentColor mark (its <style> sets fill: currentColor),
+// so it must render as an INLINE SVG (not an <img>) to inherit the surrounding
+// text color — otherwise currentColor resolves to black and the mark is
+// invisible on dark themes. CenterPanel does the same (?raw + inlineSvgIcon).
+import PI_SVG from '../../icons-inline/pi.svg?raw';
 import './HistoryBoard.css';
 
 // Tool icons — claude/codex/qwen/antigravity load via <img src=public/...>
@@ -40,12 +41,26 @@ const TOOL_ICON_SRC: Record<string, string> = {
   antigravity: '/icons/tools/antigravity.svg',
   hermes:      HERMES_DATA_URL,
   opencode:    OPENCODE_DATA_URL,
-  pi:          PI_DATA_URL,
   kimicode:    KIMICODE_DATA_URL,
   mimocode:    '/icons/tools/mimocode.svg',
 };
 
 const getToolIcon = (tool: string) => {
+  // Pi is a monochrome currentColor mark — render it as an INLINE SVG so it
+  // inherits the surrounding text color (theme-adaptive, matching the
+  // launchpad's inlineSvgIcon treatment). An <img> would isolate the SVG and
+  // resolve currentColor to black — invisible on dark themes (issue: "会话记录
+  // 列表 Pi 图标一直是黑色看不清"). The other tools are fixed-color brand
+  // marks (logo orange, codex gradient, kimi squircle…) and stay <img>.
+  if (tool === 'pi') {
+    return (
+      <span
+        aria-hidden
+        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '1em', height: '1em', flexShrink: 0 }}
+        dangerouslySetInnerHTML={{ __html: PI_SVG }}
+      />
+    );
+  }
   const src = TOOL_ICON_SRC[tool];
   if (!src) return <div style={{ width: 14, height: 14, borderRadius: 'var(--radius-xs)', background: '#555' }}/>;
   const extra = (tool === 'hermes' || tool === 'opencode') ? { borderRadius: 'var(--radius-xs)', objectFit: 'cover' as const }
