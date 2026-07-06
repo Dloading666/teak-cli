@@ -5,7 +5,7 @@
 <h1 align="center">Coffee CLI</h1>
 
 <p align="center">
-  <strong>Off the games and dating. Something more interesting…</strong>
+  <strong>Coffee and Claude time?</strong>
 </p>
 
 <p align="center">
