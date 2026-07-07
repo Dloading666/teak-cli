@@ -718,7 +718,7 @@ pub fn spawn(
     // env-var contract:
     //   COFFEE_CLI_TAB_ID    — which tab status events should route to
     //   COFFEE_CLI_HOOK_PORT — loopback port of the Rust hook server
-    //   COFFEE_CLI_TOOL      — "claude" | "codex" | "opencode" | "hermes"
+    //   COFFEE_CLI_TOOL      — "claude" | "codex" | "opencode" | "mimocode" | "hermes"
     // Forwarders:
     //   claude    — coffee-cli-hook.py (Claude Code stdin hook protocol)
     //   codex     — coffee-cli-codex-notify.py (Codex `notify` config, JSON
@@ -733,7 +733,7 @@ pub fn spawn(
     // Forwarders no-op if any of these env vars are missing — they're safe to
     // leave installed even when Coffee CLI isn't the launcher.
     if let Some(tname) = tool_name.as_deref() {
-        if matches!(tname, "claude" | "codex" | "opencode" | "hermes") {
+        if matches!(tname, "claude" | "codex" | "opencode" | "hermes" | "mimocode") {
             use tauri::Manager;
             let port = app
                 .state::<crate::server::AppState>()

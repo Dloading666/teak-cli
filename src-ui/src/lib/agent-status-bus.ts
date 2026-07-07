@@ -2,12 +2,23 @@
 //
 // Listens to the `agent-status` Tauri event emitted by the Rust hook server
 // (which in turn receives forwarded events from Claude Code / Qwen Code via
-// the Python hook script). Each payload carries a tab_id and a status that
-// is dispatched straight into AppState's agentStatus slot for that tab.
+// the Python hook script, and from OpenCode / MiMo via the JS plugin). Each
+// payload carries a tab_id and a status that is dispatched straight into
+// AppState's agentStatus slot for that tab.
 //
-// Permission-prompt detection: after PreToolUse fires, if no PostToolUse
-// arrives within WAIT_INPUT_DELAY_MS we assume a permission prompt is
-// showing and promote the tab to "wait_input" (blue ripple).
+// Blue (wait_input) is driven by DIRECT signals only — no timeout heuristic:
+//   Claude   — Notification hook subtype permission_prompt (forwarded by the
+//              Rust hook server as wait_input).
+//   OpenCode — permission.updated / question.asked bus events (JS plugin).
+//   MiMo     — same as OpenCode (OpenCode fork, same plugin).
+// Blue clears the moment the agent resumes (next PreToolUse/PostToolUse/Stop,
+// user input, or the 30s auto-idle fallback) — we don't track approve/deny,
+// just "waiting" vs "running again" (mirrors reference/open-vibe-island
+// SessionState.swift's direct-event model).
+//
+// Previously a 3500ms "PreToolUse → no PostToolUse → infer wait_input"
+// timeout lived here; it caused false blues during any tool call >3.5s (long
+// Bash, file reads). Removed — the direct signals above are authoritative.
 
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AgentStatus } from '../store/app-state';
@@ -19,21 +30,12 @@ interface AgentStatusPayload {
   event: string;
 }
 
-/** ms to wait after PreToolUse before assuming a permission prompt is shown.
- *  Was 1500 — Claude tool calls routinely run 2-3 s (grep / file read /
- *  mcp call), which made "still executing" flash blue as if waiting for
- *  permission. 3500 matches real-world tool-call latency more honestly. */
-const WAIT_INPUT_DELAY_MS = 3500;
-
 /** Fallback timer: any non-idle status that's gone this long without a
  *  follow-up event is assumed stale. Protects against hook drops and the
  *  "Claude finished but forgot to emit Stop" case that leaves the dot blue. */
 const AUTO_IDLE_MS = 30_000;
 
-/** Per-tab timer that fires wait_input when no PostToolUse arrives in time */
-const pendingTimers = new Map<string, number>();
-
-/** Per-tab auto-idle timers (one per non-idle status) */
+/** Per-tab auto-idle timers (one per non-idle status). */
 const idleTimers = new Map<string, number>();
 
 /** Most recent emit function from the active subscription. Lets
@@ -62,10 +64,6 @@ function armAutoIdle(tabId: string, tool: string) {
  *  states on local slash commands like /help, /mcp, /clear. */
 export function notifyUserInputSubmitted(tabId: string, tool: string) {
   if (!activeEmit) return;
-  // Cancel any pending wait_input — user just interacted, so whatever
-  // permission prompt was showing is presumably resolved.
-  const pt = pendingTimers.get(tabId);
-  if (pt) { clearTimeout(pt); pendingTimers.delete(tabId); }
   activeEmit({ tab_id: tabId, tool, status: 'working', event: 'UserSubmitted' });
   armAutoIdle(tabId, tool);
 }
@@ -79,14 +77,6 @@ export function subscribeAgentStatus(
 
   listen<AgentStatusPayload>('agent-status', (evt) => {
     const p = evt.payload;
-
-    // Cancel any pending wait_input timer for this tab
-    const existing = pendingTimers.get(p.tab_id);
-    if (existing) {
-      clearTimeout(existing);
-      pendingTimers.delete(p.tab_id);
-    }
-
     // Any real event resets the auto-idle clock; an `idle` status clears it.
     if (p.status === 'idle') {
       const it = idleTimers.get(p.tab_id);
@@ -94,27 +84,7 @@ export function subscribeAgentStatus(
     } else {
       armAutoIdle(p.tab_id, p.tool);
     }
-
-    // If the hook already resolved wait_input (PermissionRequest /
-    // Notification.permission_prompt actually fired), pass it straight through.
-    if (p.status === 'wait_input') {
-      onPayload(p);
-      return;
-    }
-
-    if (p.event === 'PreToolUse') {
-      // Pass "working" through immediately …
-      onPayload(p);
-      // … but start a timer: if PostToolUse doesn't arrive soon, the agent
-      // is probably blocked on a permission prompt → switch to wait_input.
-      const timer = window.setTimeout(() => {
-        pendingTimers.delete(p.tab_id);
-        onPayload({ ...p, status: 'wait_input', event: 'PermissionInferred' });
-      }, WAIT_INPUT_DELAY_MS);
-      pendingTimers.set(p.tab_id, timer);
-    } else {
-      onPayload(p);
-    }
+    onPayload(p);
   }).then((fn) => {
     if (cancelled) {
       fn();
@@ -126,13 +96,9 @@ export function subscribeAgentStatus(
   return () => {
     cancelled = true;
     activeEmit = null;
-    // Clean up every tab's timers on unsubscribe.
-    for (const timer of pendingTimers.values()) clearTimeout(timer);
-    pendingTimers.clear();
+    // Clean up every tab's auto-idle timer on unsubscribe.
     for (const timer of idleTimers.values()) clearTimeout(timer);
     idleTimers.clear();
     if (unlisten) unlisten();
   };
 }
-
-// Re-exposed so unit tests / future callers can pre-clear state.

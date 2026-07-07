@@ -134,13 +134,18 @@ fn dispatch_install(tool: &crate::tools::ToolDescriptor, home: &Path) {
         "claude" => install_claude(home),
         "codex" => install_codex(home),
         "opencode" => {
-            install_opencode(home);
+            install_opencode(home, "opencode");
             ensure_opencode_tui_theme_default(home, "opencode");
         }
         // MiMo Code (Xiaomi OpenCode fork) ships the same opaque #000 default
-        // canvas, so it needs the identical tui.json transparency override. It
-        // does NOT get the OpenCode island plugin — only the theme write.
-        "mimocode" => ensure_opencode_tui_theme_default(home, "mimocode"),
+        // canvas, so it needs the identical tui.json transparency override.
+        // Now also gets the OpenCode island plugin — MiMo is an OpenCode fork
+        // (same plugin API, config at ~/.config/mimocode), so the same JS plugin
+        // drives its tab status, including question.asked / permission.updated.
+        "mimocode" => {
+            install_opencode(home, "mimocode");
+            ensure_opencode_tui_theme_default(home, "mimocode");
+        }
         "hermes" => install_hermes(home),
         other => {
             eprintln!(
@@ -245,17 +250,19 @@ fn install_codex(home: &Path) {
     }
 }
 
-/// OpenCode plugin — written directly to ~/.config/opencode/plugins/ where
-/// OpenCode auto-discovers it on session start. No config file edits needed.
-/// We also keep a copy at ~/.coffee-cli/hooks/ so the source is co-located
-/// with the other forwarders and easy to find when debugging.
-fn install_opencode(home: &Path) {
+/// OpenCode-family plugin — written directly to ~/.config/<config_subdir>/plugins/
+/// where OpenCode (and its fork MiMo Code) auto-discovers it on session start.
+/// No config file edits needed. We also keep a copy at ~/.coffee-cli/hooks/ so
+/// the source is co-located with the other forwarders and easy to find when
+/// debugging. `config_subdir` is "opencode" or "mimocode" (MiMo is Xiaomi's
+/// OpenCode fork — same plugin API, separate config dir ~/.config/mimocode).
+fn install_opencode(home: &Path, config_subdir: &str) {
     if let Err(e) = write_aux_script(home, OPENCODE_PLUGIN_FILENAME, OPENCODE_PLUGIN_SCRIPT) {
-        eprintln!("[hook-installer] failed to write opencode plugin: {}", e);
+        eprintln!("[hook-installer] failed to write {} plugin: {}", config_subdir, e);
         return;
     }
 
-    let plugin_dir = home.join(".config").join("opencode").join("plugins");
+    let plugin_dir = home.join(".config").join(config_subdir).join("plugins");
     if let Err(e) = fs::create_dir_all(&plugin_dir) {
         eprintln!(
             "[hook-installer] failed to create {}: {}",

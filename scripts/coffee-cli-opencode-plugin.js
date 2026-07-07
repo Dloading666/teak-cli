@@ -11,9 +11,11 @@
 //
 //   working    — session.status with status.type === "busy" | "retry"
 //                permission.replied   (user just answered, agent resumes)
+//                question.replied / question.rejected (question answered)
 //   wait_input — permission.updated   (a permission record exists awaiting
 //                                      response — Permission has no status
 //                                      field, so the event itself signals it)
+//                question.asked        (OpenCode asking a structured question)
 //   idle       — session.idle / session.error
 //                session.status with status.type === "idle"
 //
@@ -28,10 +30,12 @@
 //   plugin Hooks interface, not bus events; the catch-all `event` handler
 //   never receives them.
 //
-// Env vars (injected by Coffee CLI when spawning opencode):
-//   COFFEE_CLI_TAB_ID, COFFEE_CLI_HOOK_PORT, COFFEE_CLI_TOOL=opencode
-// Plugin auto-loads for ALL OpenCode sessions, including those started
+// Env vars (injected by Coffee CLI when spawning opencode / mimo):
+//   COFFEE_CLI_TAB_ID, COFFEE_CLI_HOOK_PORT, COFFEE_CLI_TOOL=opencode|mimocode
+// Plugin auto-loads for ALL OpenCode / MiMo sessions, including those started
 // outside Coffee CLI — must no-op silently when env vars are missing.
+// (MiMo Code is Xiaomi's OpenCode fork — same plugin API, config at
+//  ~/.config/mimocode; Coffee CLI installs this same file there too.)
 
 import net from "node:net";
 import fs from "node:fs";
@@ -70,7 +74,7 @@ function send(payload) {
   const tab_id = process.env.COFFEE_CLI_TAB_ID;
   const port = process.env.COFFEE_CLI_HOOK_PORT;
   const tool = process.env.COFFEE_CLI_TOOL || "";
-  if (!tab_id || !port || tool !== "opencode") return;
+  if (!tab_id || !port || (tool !== "opencode" && tool !== "mimocode")) return;
 
   try {
     const s = net.createConnection({ host: "127.0.0.1", port: parseInt(port, 10) });
@@ -118,6 +122,17 @@ function mapEvent(evt) {
 
     case "permission.replied":
       // User answered — back to working until the next status flip.
+      return { status: "working", event: type };
+
+    case "question.asked":
+      // OpenCode is asking the user a structured question — needs input (blue),
+      // same surface as a permission prompt. Cleared by question.replied /
+      // question.rejected below or the next session.status / PreToolUse.
+      return { status: "wait_input", event: type };
+
+    case "question.replied":
+    case "question.rejected":
+      // User answered or rejected the question — agent resumes.
       return { status: "working", event: type };
 
     default:
