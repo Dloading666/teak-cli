@@ -480,7 +480,12 @@
     /* Pill var is 9999px in soft/glass (→ circle), 4px in slab, 0 in sharp/panel.
        So the send button is round on soft and square on hard-edged themes. */
     border-radius: var(--shape-radius-pill, 50%);
-    color: #fff;
+    /* Icon colour = the deep terminal-area background, so the glyph reads
+       as a piece of the workspace surface sitting on the accent fill.
+       Glass shape overrides this back to #fff + adds a specular inset
+       (see global.css) — translucent glass fills wash a deep glyph out
+       against variable wallpaper, so glass keeps white. */
+    color: var(--bg-terminal, #fff);
     cursor: pointer;
     transition: background 0.12s, transform 0.08s, opacity 0.12s, filter 0.12s;
 }

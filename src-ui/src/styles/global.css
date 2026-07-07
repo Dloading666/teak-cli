@@ -1854,6 +1854,37 @@ body.gambit-docked .chat-reader-container {
         0 12px 40px rgba(0, 0, 0, 0.40);
 }
 
+/* Primary action dots (Gambit send ↑ + TaskBoard add +).
+   Non-glass shapes paint the icon in --bg-terminal (component CSS) so the
+   glyph reads as a piece of the workspace surface on the accent fill.
+   Glass goes full Liquid-Glass: the accent at 45% alpha + backdrop-blur
+   turns the dot into a real frosted glass bead (wallpaper reads through),
+   framed by a white hairline + top specular + bottom shadow edge — same
+   language as the glass cards / segmented controls. The accent tint keeps
+   it from reading as a flat white circle; the white glyph sits on the tinted
+   frost. A 1px-highlight-only pass read as a plain opaque dot — no glass
+   texture — so the full frost treatment is required for the bead read.
+   rgb(from var(--accent) r g b / a) is relative-color syntax; engines that
+   don't support it drop the background declaration and fall back to the
+   base solid --accent (the safe non-glass look), never to broken. */
+[data-shape="glass"] .gambit-send,
+[data-shape="glass"] .task-fab-simple {
+    color: #fff;
+    background: rgb(from var(--accent, #c4956a) r g b / 0.45);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.35),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.10);
+}
+/* FAB hover: base .task-fab-simple:hover swaps in an opaque --accent-hover
+   fill at equal specificity, which would clobber the frost. Re-tint it so
+   hover stays glass (a touch more saturated), not a flat solid. */
+[data-shape="glass"] .task-fab-simple:hover {
+    background: rgb(from var(--accent-hover, var(--accent, #c4956a)) r g b / 0.62);
+}
+
 /* Chrome flare ::before/::after paint quarter-arc bridges in
    opaque var(--bg-terminal) from the active tab into the terminal
    bg below. In glass that bg is translucent --glass-tint, so the

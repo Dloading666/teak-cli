@@ -647,7 +647,9 @@
   height: 48px;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  color: #fff;
+  /* Icon colour = the deep terminal-area background (matches Gambit send).
+       Glass shape overrides to #fff + specular inset in global.css. */
+  color: var(--bg-terminal, #fff);
   border: none;
   display: flex;
   align-items: center;

@@ -165,9 +165,17 @@
   padding: 8px 14px;
   /* Faint lift so this reads as the repo "bar" anchored at the top, with the
    * Unstaged/Staged/Untracked group labels below it as lighter sub-headers —
-   * a clear two-level hierarchy instead of two competing header rows. */
+   * a clear two-level hierarchy instead of two competing header rows.
+   * No border-bottom: on themes whose --border is solid (cappuccino #333,
+   * light rgba(0,0,0,0.1)) the 1px line read as an abrupt extra separator
+   * stacked under this wash; the wash alone carries the hierarchy, and
+   * the enlarged branch name (below) makes the bar read without a hard rule. */
   background: rgba(255, 255, 255, 0.025);
-  border-bottom: 1px solid var(--border, rgba(255,255,255,0.06));
+  /* Follow the active shape at the element tier (one step below panel):
+   * soft/glass/carbon 8px, slab 3px, sharp/panel 0. Panel-radius (16px)
+   * was too much on this slim bar — it read as a pill; btn-radius keeps a
+   * gentle round without swallowing the short edges. */
+  border-radius: var(--shape-radius-btn, 6px);
   flex-shrink: 0;
 }
 .changes-branch {
@@ -176,7 +184,10 @@
   gap: 6px;
   min-width: 0;
   color: var(--text-1);
-  font-size: 12px;
+  /* Bigger than the 12px file rows below: this is the repo bar — short
+   * content (branch name + counts), so it can afford larger type to read
+   * as the top-level anchor without truncating like a long file path. */
+  font-size: 14px;
   font-weight: 600;
 }
 .changes-branch svg { flex-shrink: 0; opacity: 0.8; }
@@ -189,7 +200,9 @@
   display: inline-flex;
   gap: 6px;
   flex-shrink: 0;
-  font-size: 11px;
+  /* One step below the 14px branch name so the +/− counts read as supporting
+   * metadata, not a peer of the branch name itself. */
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 .changes-branch-stats .diff-add { color: #4ec76b; }
