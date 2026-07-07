@@ -307,11 +307,12 @@ function reducer(state: AppState, action: Action): AppState {
         terminals: state.terminals.map(t => t.id === state.activeTerminalId ? { ...t, folderPath: null } : t)
       };
     case 'SET_TAB_TITLE':
-      // OSC 0/2 title from the tool (xterm onTitleChange). Skip if unchanged
-      // to avoid redundant renders — onTitleChange can fire frequently.
-      return state.terminals.some(t => t.id === action.id && t.toolTitle === action.title)
-        ? state
-        : { ...state, terminals: state.terminals.map(t => t.id === action.id ? { ...t, toolTitle: action.title } : t) };
+      // OSC 0/2 title from the tool (xterm onTitleChange). Skip if the session
+      // is gone (late dispatch after dispose) or unchanged (onTitleChange can
+      // fire frequently) — both avoid a redundant CenterPanel re-render.
+      if (!state.terminals.some(t => t.id === action.id)) return state;
+      if (state.terminals.some(t => t.id === action.id && t.toolTitle === action.title)) return state;
+      return { ...state, terminals: state.terminals.map(t => t.id === action.id ? { ...t, toolTitle: action.title } : t) };
     case 'SET_THEME':
       return { ...state, currentTheme: action.theme };
     case 'SET_SHAPE':
@@ -378,7 +379,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         terminals: state.terminals.map(t =>
-          t.id === action.id ? { ...t, id: action.newId } : t
+          t.id === action.id ? { ...t, id: action.newId, toolTitle: undefined } : t
         ),
         activeTerminalId: state.activeTerminalId === action.id ? action.newId : state.activeTerminalId
       };
