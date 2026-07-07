@@ -522,11 +522,14 @@ const VALID_ICON_THEMES: IconTheme[] = [
 
 function getInitialState(): AppState {
   let theme: ThemeColor = 'dark';
-  // Default 'soft' (matches the index.html pre-paint script, which already
-  // defaults to soft) — its rounded corners show off the titlebar tabs best
-  // for new users. Previously 'carbon', which React re-applied after mount and
-  // overrode index.html's soft default.
-  let shape: ThemeShape = 'soft';
+  // Default 'carbon' — matches the index.html pre-paint script (also carbon)
+  // so there's no soft→carbon flash on mount. Carbon shares Soft's radii
+  // (16/8/9999), so the rounded + titlebar-tab showcase is preserved; it just
+  // layers the hex mesh + translucent chrome on top. Screenshots skew heavily
+  // to Carbon despite the old soft default = users actively choose it, so it's
+  // the right out-of-box. KEEP index.html's pre-paint default in sync with
+  // this value or first paint flashes.
+  let shape: ThemeShape = 'carbon';
   let iconTheme: IconTheme = 'devicon';
   let lang = 'zh-CN';
   let folderPath: string | null = null;
