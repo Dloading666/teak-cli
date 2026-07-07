@@ -15,6 +15,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { clipboardRead, clipboardWrite } from '../../lib/clipboard';
 import { subscribeTerminalEvents } from '../../lib/pty-event-bus';
+import { rig } from '../../lib/latency-rig';
 import * as outputScheduler from '../../lib/terminal-output-scheduler';
 import { registerTerminalFocus } from '../../lib/focus-registry';
 import { registerTabActions, getTabActions } from '../../lib/tab-actions';
@@ -679,6 +680,7 @@ function TierTerminalImpl({
     // Handle native Copy/Paste shortcuts
     term.attachCustomKeyEventHandler((e) => {
       if (e.type === 'keydown') {
+        rig.inputStart();
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
         const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
@@ -832,6 +834,10 @@ function TierTerminalImpl({
     // outputScheduler.enqueue instead of term.write directly, so the session
     // must exist first to avoid a dropped-first-chunk race.
     outputScheduler.registerSession(sessionId, term);
+    // Latency rig OUTPUT STOP: term.onRender is xterm's real render-done
+    // signal (better than rAF approximation). Fires on every render; the rig
+    // no-ops when no output armed this frame. Dev-only, zero prod cost.
+    term.onRender(() => rig.outputRenderEnd());
 
     // Auto-focus so keyboard input works immediately
     term.focus();
@@ -854,6 +860,7 @@ function TierTerminalImpl({
       const unsubEvents = await subscribeTerminalEvents(sessionId, {
         onOutput: (data) => {
           if (!mounted) return;
+          rig.outputStart();
           hasOutputRef.current = true;
           outputBytesRef.current += data.length;
           lastOutputAtRef.current = Date.now();
