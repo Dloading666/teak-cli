@@ -106,14 +106,19 @@ tauri-plugin-single-instance = "2"
 #   - System_JobObjects: bind every PTY child (claude/codex/etc.) to a
 #     kill-on-close job so orphan `claude.exe` / `node.exe` can't outlive
 #     a closed Coffee CLI and lock `~/.claude/` session files.
+#   - System_Registry: read the real PATH (HKCU+HKLM) so a GUI-launched
+#     process finds CLIs installed via scoop/volta/nvm/mise/native-
+#     installer etc. — replaces the old 5-dir hardcoded PATH repair
+#     (src/windows_path.rs).
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
     "Win32_Security",
     "Win32_System_Console",
-    "Win32_System_Threading",
     "Win32_System_JobObjects",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
 ] }
 
 # `libc::kill(pid, 0)` for process-liveness probe in cli::mcp_status.
