@@ -835,8 +835,9 @@ function TierTerminalImpl({
     // must exist first to avoid a dropped-first-chunk race.
     outputScheduler.registerSession(sessionId, term);
     // Latency rig OUTPUT STOP: term.onRender is xterm's real render-done
-    // signal (better than rAF approximation). Fires on every render; the rig
-    // no-ops when no output armed this frame. Dev-only, zero prod cost.
+    // signal (better than rAF approximation). Always-on (see latency-rig.ts
+    // header); near-zero cost — one performance.now() + bounded ring-buffer
+    // write per render, no-ops when no output armed this frame.
     term.onRender(() => rig.outputRenderEnd());
 
     // Auto-focus so keyboard input works immediately

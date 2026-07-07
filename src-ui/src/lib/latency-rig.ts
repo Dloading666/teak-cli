@@ -10,8 +10,8 @@
 // be measurable on any build — incl. a release installer on another
 // machine. Cost is near-zero: ~3 performance.now() calls + bounded
 // ring-buffer writes per terminal event (events arrive at most every ~8ms
-// due to Rust-side batching in src/terminal.rs), plus two 20k-sample
-// Float64 ring buffers (~320 KB). No telemetry — dumps are local only
+// due to Rust-side batching in src/terminal.rs), plus four 20k-sample
+// Float64 ring buffers (~640 KB). No telemetry — dumps are local only
 // (clipboard + console.log).
 //
 // Two paths, each Zed-shaped (latency distribution + per-frame coalesce):
@@ -136,8 +136,14 @@ class PathRig {
   /** Frame presented (rAF / onRender): record latency + coalesce, reset frame. */
   stop(tsMs: number): void {
     if (this.frame.firstAt !== null) {
-      this.latency.record(tsMs - this.frame.firstAt);
-      this.coalesce.record(this.frame.events);
+      const latency = tsMs - this.frame.firstAt;
+      // Discard stale-frame samples (e.g. terminal disposed while output
+      // was armed): a real render-frame latency is well under 5s; anything
+      // larger is a stale arm, not a real measurement.
+      if (latency < 5_000) {
+        this.latency.record(latency);
+        this.coalesce.record(this.frame.events);
+      }
     }
     this.frame = { firstAt: null, events: 0 };
   }
@@ -173,7 +179,7 @@ function dumpRig(): void {
   out += '═══════════════════════════════\n';
   // Console (devtools, dev) + clipboard (visible in release builds w/o devtools).
   console.log(out);
-  try { void clipboardWrite(out); } catch { /* clipboard unavailable */ }
+  void clipboardWrite(out); // clipboard.ts swallows failures internally
   // Reset after dump → next dump = delta since this one (Zed semantics).
   inputRig.reset();
   outputRig.reset();
@@ -203,10 +209,14 @@ export const rig = {
 // visible in release builds where devtools is off.
 if (typeof window !== 'undefined') {
   (window as unknown as { __coffeeLatency?: typeof rig }).__coffeeLatency = rig;
+  // Capture phase + stopPropagation so the rig OWNS Ctrl/Cmd+Shift+L before
+  // xterm's textarea sees it — otherwise xterm forwards the combo to the PTY
+  // as an escape sequence. preventDefault alone (bubble phase) is too late.
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyL') {
       e.preventDefault();
+      e.stopPropagation();
       dumpRig();
     }
-  });
+  }, true);
 }
