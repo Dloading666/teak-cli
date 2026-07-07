@@ -238,8 +238,9 @@ mod mimocode;
 mod openclaw;
 mod opencode;
 mod qwen;
-// Third-class (T3) launch-only tools — brand icon + one-click launch, no
-// history/hook surface. See each module's doc comment.
+// Lower-tier tools — see each module's doc comment for its tier (Pi &
+// Kimi Code are T2 with history; Aider/Crush/Goose/Copilot are T3
+// launch-only, no history/hook surface).
 mod aider;
 mod copilot;
 mod crush;
@@ -263,9 +264,10 @@ pub static TOOLS: &[&ToolDescriptor] = &[
     // Order here doesn't affect the launchpad (that list is hardcoded in the
     // frontend); it only needs to be in the registry for list_tools + scanning.
     &mimocode::DESCRIPTOR,
-    // T3 launch-only tools: display name + PATH probe + launch binary only.
-    // history_shape: None (skipped by the history scanner) and
-    // has_hook_surface: false (skipped by hook install) keep them at T3.
+    // Pi & Kimi Code are T2 (history + heatmap + changes + resume; see their
+    // module docs). The other four — Crush / Aider / Goose / Copilot — are T3
+    // launch-only: display name + PATH probe + launch binary, history_shape:
+    // None and has_hook_surface: false.
     &pi::DESCRIPTOR,
     &crush::DESCRIPTOR,
     &aider::DESCRIPTOR,

@@ -119,8 +119,8 @@ import HERMES_DATA_URL from '../../icons-inline/hermes.png?inline';
 import TERMINAL_MAC_DATA_URL from '../../icons-inline/terminal-macos.png?inline';
 import TERMINAL_LINUX_DATA_URL from '../../icons-inline/terminal-linux.png?inline';
 import TERMINAL_PWSH_SVG from '../../icons-inline/terminal-powershell.svg?raw';
-// T3 launch-only tool icons (brand icon + one-click launch). SVG → ?raw,
-// PNG → ?inline, same pipeline as the tools above.
+// Additional tool icons (Pi & Kimi Code = T2; Crush/Aider/Goose/Copilot = T3).
+// SVG → ?raw, PNG → ?inline, same pipeline as the tools above.
 import PI_SVG from '../../icons-inline/pi.svg?raw';
 import COPILOT_SVG from '../../icons-inline/copilot.svg?raw';
 import AIDER_DATA_URL from '../../icons-inline/aider.png?inline';
@@ -235,7 +235,7 @@ const SvgAntigravity = () => inlineSvgIcon(ANTIGRAVITY_SVG);
 // PNG-backed icons render via CSS background-image with data-URI sources
 // (see bgIcon). Hermes uses `cover` to fill the rounded square.
 const SvgHermes      = () => bgIcon(HERMES_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)', backgroundSize: 'cover' });
-// T3 launch-only tool icons. Monochrome marks (Pi, Copilot) are inline SVG
+// Additional tool icons. Monochrome marks (Pi, Copilot) are inline SVG
 // using currentColor so they follow the theme; raster brand marks render via
 // bgIcon with a rounded square to match the other PNG-backed icons.
 const SvgPi        = () => inlineSvgIcon(PI_SVG);
@@ -526,7 +526,7 @@ export function CenterPanel() {
   // the order here is the launchpad's preferred presentation order.
   const BUILTIN_AI_CLI_FALLBACK: { key: ToolType; label: string }[] = [
     'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes',
-    // T3 launch-only tools (brand icon + one-click launch).
+    // Pi & Kimi Code (T2) + Crush/Aider/Goose/Copilot (T3 launch-only).
     'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
   ].map((key) => ({ key: key as ToolType, label: getToolDisplayName(key) }));
 
@@ -1116,9 +1116,10 @@ export function CenterPanel() {
       case 'openclaw': return { icon: <SvgOpenClaw />, title: getToolDisplayName('openclaw'), tooltip: undefined };
       case 'codex': return { icon: <SvgCodex />, title: cwd ?? getToolDisplayName('codex'), tooltip: pathTip };
       case 'antigravity': return { icon: <SvgAntigravity />, title: cwd ?? getToolDisplayName('antigravity'), tooltip: pathTip };
-      // T3 launch-only tools — directory-aware tab like the AI CLIs above
-      // (icon + cwd basename). No real status bus, so they get the static
-      // "fake" island via TAB_STATUS_TOOLS below.
+      // Hookless CLIs (Pi/Kimi Code T2 + Crush/Aider/Goose/Copilot T3) —
+      // directory-aware tab like the AI CLIs above (icon + cwd basename).
+      // No real status bus, so they get the static "fake" island via
+      // TAB_STATUS_TOOLS below.
       case 'pi': return { icon: <SvgPi />, title: cwd ?? getToolDisplayName('pi'), tooltip: pathTip };
       case 'crush': return { icon: <SvgCrush />, title: cwd ?? getToolDisplayName('crush'), tooltip: pathTip };
       case 'aider': return { icon: <SvgAider />, title: cwd ?? getToolDisplayName('aider'), tooltip: pathTip };
@@ -1266,8 +1267,9 @@ export function CenterPanel() {
                     TAB_STATUS_TOOLS). Hook-wired tools (claude/codex/opencode
                     via forwarders, mimocode via its preset-driven status
                     ticker, hermes) drive color off session.agentStatus.
-                    Tools with no status bus (antigravity/qwen/openclaw and the
-                    T3 launch-only set) have no agentStatus, so the grid sits at
+                    Hookless CLIs (antigravity/qwen/openclaw/pi/kimicode, plus
+                    the T3 set crush/aider/goose/copilot) have no agentStatus,
+                    so the grid sits at
                     static 'idle' green — the "fake island" baseline. Non-CLI
                     tabs (terminal/remote/history/splits) get no indicator. */}
                 {TAB_STATUS_TOOLS.has(session.tool as string) && (
