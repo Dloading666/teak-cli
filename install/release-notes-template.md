@@ -1,44 +1,49 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-- 修复:提交后"修改记录"面板自动显示"已提交"分组(每 8 秒轮询,无需重开 tab)。
-- 修复:"已提交"分组改为两行布局,commit 标题不再与短 hash 挤换行。
-- 修复:commit 标题悬停 tooltip 改用应用主题风格(不再用浏览器原生灰框),窄面板下也不被右边缘裁切。
+- 新增:Tab 标题跟随工具——Claude Code 对话摘要等 OSC 标题直接显示在 tab(不再只是目录名),跟其他终端一样。
+- 新增:MiMo Code 灵动岛状态支持(绿/橙/蓝)。
+- 修复:长命令(>3.5s)不再误判为"等权限"假蓝;OpenCode 提问时正确亮蓝。
+- 修复:切换工具/重启后 tab 标题不再残留旧标题。
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-- 修復:提交後「修改記錄」面板自動顯示「已提交」分組(每 8 秒輪詢,無需重開分頁)。
-- 修復:「已提交」分組改為兩行佈局,commit 標題不再與短 hash 擠換行。
-- 修復:commit 標題懸停 tooltip 改用應用主題風格(不再用瀏覽器原生灰框),窄面板下也不被右邊緣裁切。
+- 新增:分頁標題跟隨工具——Claude Code 對話摘要等 OSC 標題直接顯示在分頁(不再只是目錄名),跟其他終端一樣。
+- 新增:MiMo Code 靈動島狀態支援(綠/橙/藍)。
+- 修復:長指令(>3.5s)不再誤判為「等待權限」假藍;OpenCode 提問時正確亮藍。
+- 修復:切換工具/重啟後分頁標題不再殘留舊標題。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-- Fixed: the Changes panel now shows the "Committed" group automatically after a commit (8s poll, no need to re-open the tab).
-- Fixed: "Committed" group header is now a 2-line layout — the commit subject no longer crams/wraps against the short hash.
-- Fixed: commit-subject hover tooltip uses the app's themed style (not the browser's native grey box) and no longer clips at the right edge on narrow panels.
+- New: Tab title follows the tool — Claude Code's conversation summary (OSC title) now shows in the tab (not just the directory name), matching other terminals.
+- New: MiMo Code dynamic-island status support (green/orange/blue).
+- Fixed: Long commands (>3.5s) no longer false-trigger "waiting for permission" blue; OpenCode questions now light blue correctly.
+- Fixed: Tab title no longer stale after tool switch / restart.
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-- 修正:コミット後、「変更」パネルが自動的に「コミット済み」グループを表示するように(8秒ポーリング、タブを開き直す不要)。
-- 修正:「コミット済み」グループを2行レイアウトに変更し、コミット件名が短いハッシュと押し合って折り返すのを修正。
-- 修正:コミット件名のホバーツールチップをアプリのテーマスタイルに変更(ブラウザ標準のグレー枠ではなく)、狭いパネルでも右端で切り欠かれないように。
+- 新機能:タブタイトルがツールに追従——Claude Code の会話要約など(OSC タイトル)がタブに表示されるように(ディレクトリ名だけでなく)、他のターミナルと同じ挙動。
+- 新機能:MiMo Code ステータス対応(緑/オレンジ/青)。
+- 修正:長時間コマンド(>3.5s)の「権限待ち」誤表示を解消、OpenCode の質問で正しく青表示。
+- 修正:ツール切替/リスタート後のタブタイトル残留を修正。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-- 수정: 커밋 후 "변경" 패널이 자동으로 "커밋됨" 그룹을 표시하도록(8초 폴링, 탭을 다시 열 필요 없음).
-- 수정: "커밋됨" 그룹을 2줄 레이아웃으로 변경 — 커밋 제목이 짧은 해시와 밀려 줄바꿈되지 않음.
-- 수정: 커밋 제목 호버 툴팁을 앱 테마 스타일로 변경(브라우저 기본 회색 박스 아님), 좁은 패널에서도 우측 가장자리에 잘리지 않음.
+- 신규: 탭 제목이 도구를 따라감 — Claude Code의 대화 요약 등(OSC 제목)이 탭에 표시됨(디렉터리명뿐 아니라), 다른 터미널과 동일.
+- 신규: MiMo Code 다이내믹 아일랜드 상태 지원(녹색/주황/파랑).
+- 수정: 긴 명령(>3.5s)이 더 이상 "권한 대기"로 잘못 파란색 표시하지 않음; OpenCode 질문 시 올바르게 파란색 표시.
+- 수정: 도구 전환/재시작 후 탭 제목 잔류 수정.
 
 </details>
