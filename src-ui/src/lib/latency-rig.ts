@@ -1,14 +1,20 @@
 // src-ui/src/lib/latency-rig.ts
 //
-// Dev-only input/output latency rig. Ports Zed's input-latency methodology
-// (reference/zed/crates/input_latency_ui + gpui window.rs `input-latency-histogram`)
-// to our WebView2 + React + xterm.js stack. See reference/notes/01 + 02.
+// Always-on input/output latency diagnostic. Ports Zed's input-latency
+// methodology (reference/zed/crates/input_latency_ui + gpui window.rs
+// `input-latency-histogram`) to our WebView2 + React + xterm.js stack.
+// See reference/notes/01 + 02.
 //
-// ZERO COST IN PROD: every method is a no-op when !import.meta.env.DEV, so
-// this ships without overhead. Recording only happens in `vite dev`.
+// ALWAYS-ON (active in ALL builds incl. release): the user dogfoods the
+// release build (can't easily switch to dev mid-session), so the rig must
+// be measurable on any build — incl. a release installer on another
+// machine. Cost is near-zero: ~3 performance.now() calls + bounded
+// ring-buffer writes per terminal event (events arrive at most every ~8ms
+// due to Rust-side batching in src/terminal.rs), plus two 20k-sample
+// Float64 ring buffers (~320 KB). No telemetry — dumps are local only
+// (clipboard + console.log).
 //
 // Two paths, each Zed-shaped (latency distribution + per-frame coalesce):
-//
 //   INPUT  : keydown (attachCustomKeyEventHandler, TierTerminal.tsx:680)
 //            → next requestAnimationFrame   [= Zed's dispatch_event → present]
 //   OUTPUT : onOutput (Tauri 'tier-terminal-output', TierTerminal.tsx:855)
@@ -19,15 +25,15 @@
 // just bump the coalesce count. A "frame" = one rAF (input) / one onRender
 // (output).
 //
-// Dump: `window.__coffeeLatency.dump()` in devtools. Resets after each dump,
-// so consecutive dumps show delta-since-last-dump (Zed's delta semantics) —
-// run a scenario, dump, change code, re-run, dump, compare.
+// Dump: Ctrl/Cmd+Shift+L (or window.__coffeeLatency.dump() in devtools).
+// Output goes to the CLIPBOARD (visible in release builds without devtools)
+// + console.log (devtools, for dev). Dumps auto-reset, so consecutive dumps
+// show delta-since-last (Zed's delta semantics) — run a scenario, dump,
+// change code, re-run, dump, compare.
 //
-// v1 omits mid-draw-dropped + render-ms-per-frame (see notes/02 TODO);
-// add them if output-latency trips and we need to split sentinel-scan vs
-// xterm.write cost.
+// v1 omits mid-draw-dropped + render-ms-per-frame (see notes/02 TODO).
 
-const DEV = import.meta.env.DEV;
+import { clipboardWrite } from './clipboard';
 
 // ── fps-aligned buckets (ms) — matches Zed's write_latency_distribution ───────
 const BUCKETS: Array<{ lo: number; hi: number; label: string; note: string }> = [
@@ -164,35 +170,38 @@ function dumpRig(): void {
   out += '\n── OUTPUT path (onOutput → onRender) ──\n';
   out += formatLatency(outputRig.latency, 'output latency');
   out += formatCount(outputRig.coalesce, 'PTY chunks/frame', 'chunks');
-  out += '═════════════════════════════════\n';
+  out += '═══════════════════════════════\n';
+  // Console (devtools, dev) + clipboard (visible in release builds w/o devtools).
   console.log(out);
+  try { void clipboardWrite(out); } catch { /* clipboard unavailable */ }
   // Reset after dump → next dump = delta since this one (Zed semantics).
   inputRig.reset();
   outputRig.reset();
 }
 
-/** Public API. No-ops in prod (DEV gate erased by Vite in `vite build`). */
+/** Public API. Always-on (see header) — near-zero cost, no telemetry. */
 export const rig = {
   /** Call at the top of the keydown handler (attachCustomKeyEventHandler). */
-  inputStart: DEV ? () => {
+  inputStart: () => {
     inputRig.start(performance.now());
     scheduleInputRaf();
-  } : () => {},
+  },
   /** Call at the top of the onOutput handler. */
-  outputStart: DEV ? () => {
+  outputStart: () => {
     outputRig.start(performance.now());
-  } : () => {},
+  },
   /** Call from a term.onRender listener. */
-  outputRenderEnd: DEV ? () => {
+  outputRenderEnd: () => {
     outputRig.stop(performance.now());
-  } : () => {},
-  dump: DEV ? dumpRig : () => {},
-  reset: DEV ? () => { inputRig.reset(); outputRig.reset(); } : () => {},
+  },
+  dump: dumpRig,
+  reset: () => { inputRig.reset(); outputRig.reset(); },
 };
 
-// Expose on window for devtools convenience + a dev shortcut so the report
-// can be triggered without opening devtools (Ctrl/Cmd+Shift+L). Dev-only.
-if (DEV && typeof window !== 'undefined') {
+// Expose on window for devtools + a shortcut so the report can be triggered
+// without devtools (Ctrl/Cmd+Shift+L). The dump goes to the clipboard, so it's
+// visible in release builds where devtools is off.
+if (typeof window !== 'undefined') {
   (window as unknown as { __coffeeLatency?: typeof rig }).__coffeeLatency = rig;
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyL') {
