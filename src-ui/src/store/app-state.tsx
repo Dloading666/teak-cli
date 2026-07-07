@@ -628,7 +628,12 @@ function getInitialState(): AppState {
   let leftPanelHidden = false;
   let rightPanelHidden = false;
   let multiAgentLayout: 'grid' | 'columns' = 'grid';
-  let taskViewMode: 'list' | 'note' = 'list';
+  // Default 'note' (big sticky-note view) — the welcome guide + the whole
+  // task-board UX are tuned for it. A saved pref in localStorage (written by
+  // the SET_TASK_VIEW_MODE toggle) still wins for returning users. Previously
+  // 'list', only flipped to 'note' by the TaskBoard first-launch seed — which
+  // was fragile (cleared localStorage or a removed seed fell back to list).
+  let taskViewMode: 'list' | 'note' = 'note';
   try {
     leftPanelHidden = localStorage.getItem('cc-left-hidden') === '1';
     rightPanelHidden = localStorage.getItem('cc-right-hidden') === '1';
