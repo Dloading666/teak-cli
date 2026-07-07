@@ -1651,7 +1651,7 @@ export function CenterPanel() {
                           {AGENT_CATALOG.filter(item => item.type === 'ai-cli').map(item => {
                             const pinId = `agent:${item.key}`;
                             const isPinned = pinnedItems.includes(pinId);
-                            const hasGear = (['claude', 'codex', 'antigravity', 'qwen', 'opencode', 'mimocode', 'openclaw', 'hermes'] as const).includes(item.key as any);
+                            const hasGear = (['claude', 'codex', 'antigravity', 'qwen', 'opencode', 'mimocode', 'openclaw', 'hermes', 'pi', 'kimicode'] as const).includes(item.key as any);
                             return (
                               <div
                                 key={item.key}

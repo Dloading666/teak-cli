@@ -57,6 +57,10 @@ const TOOL_DEFAULTS: Record<string, ToolConfigEntry> = {
   // history_path empty so the backend resolves via tools::hermes::hermes_home
   // rather than the UI mis-displaying `~/.hermes/sessions` on Windows.
   hermes:   { command: 'hermes',   extra_args: [], default_cwd: '', history_path: '' },
+  // Pi — depth-2 JSONL walker at ~/.pi/agent/sessions (same shape as Claude).
+  pi:       { command: 'pi',   extra_args: [], default_cwd: '', history_path: '~/.pi/agent/sessions' },
+  // Kimi Code — index-based layout under ~/.kimi-code (flat on every OS).
+  kimicode: { command: 'kimi', extra_args: [], default_cwd: '', history_path: '~/.kimi-code' },
 };
 
 // Tools whose session history Coffee CLI's history scanner actually reads
@@ -65,7 +69,7 @@ const TOOL_DEFAULTS: Record<string, ToolConfigEntry> = {
 // no Qwen scanner has been written), the field is hidden — letting the
 // user fill a path that nothing ever scans would just be a footgun.
 const HISTORY_SCANNED_TOOLS = new Set([
-  'claude', 'codex', 'antigravity', 'hermes', 'opencode', 'openclaw', 'mimocode',
+  'claude', 'codex', 'antigravity', 'hermes', 'opencode', 'openclaw', 'mimocode', 'pi', 'kimicode',
 ]);
 
 const defaultsFor = (key: string): ToolConfigEntry => TOOL_DEFAULTS[key] ?? EMPTY;
