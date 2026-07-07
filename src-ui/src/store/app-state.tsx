@@ -130,6 +130,10 @@ export interface TerminalSession {
   tool: ToolType;
   toolData?: string;  // Extra context for the tool (e.g. SSH connection JSON for remote)
   folderPath: string | null;
+  /// Live terminal title set by the tool via OSC 0/2 (e.g. Claude Code's
+  /// conversation summary). When set, the tab shows this instead of the cwd
+  /// basename — matching how other terminals display the tool's own title.
+  toolTitle?: string;
   restartKey?: number;
   /// When set, this tab was opened from a history "Continue this session"
   /// action. TierTerminal's mount effect passes it to tierTerminalStart,
@@ -281,7 +285,8 @@ type Action =
   | { type: 'TOGGLE_LEFT_PANEL' }
   | { type: 'TOGGLE_RIGHT_PANEL' }
   | { type: 'SET_MULTI_AGENT_LAYOUT'; layout: 'grid' | 'columns' }
-  | { type: 'SET_TASK_VIEW_MODE'; mode: 'list' | 'note' };
+  | { type: 'SET_TASK_VIEW_MODE'; mode: 'list' | 'note' }
+  | { type: 'SET_TAB_TITLE'; id: string; title: string };
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
 
@@ -301,6 +306,12 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         terminals: state.terminals.map(t => t.id === state.activeTerminalId ? { ...t, folderPath: null } : t)
       };
+    case 'SET_TAB_TITLE':
+      // OSC 0/2 title from the tool (xterm onTitleChange). Skip if unchanged
+      // to avoid redundant renders — onTitleChange can fire frequently.
+      return state.terminals.some(t => t.id === action.id && t.toolTitle === action.title)
+        ? state
+        : { ...state, terminals: state.terminals.map(t => t.id === action.id ? { ...t, toolTitle: action.title } : t) };
     case 'SET_THEME':
       return { ...state, currentTheme: action.theme };
     case 'SET_SHAPE':
@@ -356,7 +367,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_TERMINAL_TOOL':
       return {
         ...state,
-        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken } : t)
+        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, toolTitle: undefined } : t)
       };
     case 'SET_TERMINAL_HIDDEN':
       return {

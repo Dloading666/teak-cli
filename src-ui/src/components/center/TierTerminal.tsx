@@ -839,6 +839,10 @@ function TierTerminalImpl({
     // header); near-zero cost — one performance.now() + bounded ring-buffer
     // write per render, no-ops when no output armed this frame.
     term.onRender(() => rig.outputRenderEnd());
+    // Tool sets its own tab title via OSC 0/2 (e.g. Claude Code's conversation
+    // summary) → xterm fires onTitleChange → mirror it to the tab title.
+    // Falls back to cwd basename when no tool title is set (renderTabContent).
+    term.onTitleChange(title => dispatch({ type: 'SET_TAB_TITLE', id: sessionId, title }));
 
     // Auto-focus so keyboard input works immediately
     term.focus();

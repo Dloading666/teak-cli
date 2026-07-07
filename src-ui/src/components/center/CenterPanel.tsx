@@ -1216,7 +1216,10 @@ export function CenterPanel() {
           if (session.isHidden && session.id !== activeTerminalId) return null;
 
           const isActive = session.id === activeTerminalId;
-          const { icon, title } = renderTabContent(session, isActive);
+          const { icon, title: baseTitle } = renderTabContent(session, isActive);
+          // Tool's live OSC 0/2 title (Claude Code conversation summary, etc.)
+          // overrides the cwd basename when the tool has set one.
+          const title = session.toolTitle ?? baseTitle;
           const isDragging = tabDrag?.sessionId === session.id;
 
           // Sibling shift: while a different tab is being dragged, this
