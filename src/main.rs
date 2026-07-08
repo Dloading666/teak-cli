@@ -74,6 +74,26 @@ fn main() -> Result<()> {
         }
     }
 
+    // ── Raise fd soft limit (macOS / Linux) ─────────────────────────────
+    // macOS defaults RLIMIT_NOFILE soft to 256; a process hosting many PTY
+    // tabs (each = master+slave fds, plus git subprocesses) hits EMFILE fast,
+    // surfacing as portable-pty spawn failures. Raise the soft limit to
+    // min(hard, 1<<20) once at startup — never exceeds the hard limit, best-
+    // effort (errors ignored). Windows has no equivalent.
+    #[cfg(unix)]
+    unsafe {
+        let mut rlim: libc::rlimit = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+        if libc::getrlimit(libc::RLIMIT_NOFILE, &mut rlim) == 0 {
+            let target = std::cmp::min(rlim.rlim_max, (1 << 20) as libc::rlim_t);
+            if target > rlim.rlim_cur {
+                let _ = libc::setrlimit(
+                    libc::RLIMIT_NOFILE,
+                    &libc::rlimit { rlim_cur: target, rlim_max: rlim.rlim_max },
+                );
+            }
+        }
+    }
+
     // ── PATH inheritance fix (macOS / Linux) ────────────────────────────
     // GUI apps on macOS / Linux launched from Dock / Finder / .desktop
     // entries get a minimal PATH (typically /usr/bin:/bin:/usr/sbin:/sbin)

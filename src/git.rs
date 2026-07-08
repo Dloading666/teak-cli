@@ -25,6 +25,11 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 fn git_output(dir: &str, args: &[&str]) -> Result<String, String> {
     let mut cmd = Command::new("git");
     cmd.arg("-C").arg(dir).args(args);
+    // Read-only calls (status/diff/log/rev-parse/show) never need git's
+    // optional index locks — disabling them here means no polled or on-demand
+    // call can stall on the index lock, with zero behavior change for the one
+    // write call (git init, which doesn't use them).
+    cmd.env("GIT_OPTIONAL_LOCKS", "0");
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
     let out = cmd.output().map_err(|e| format!("git not available: {e}"))?;
@@ -140,7 +145,7 @@ fn parse_numstat(out: String) -> HashMap<String, (u32, u32)> {
 /// delta the "未提交" group displays. Untracked files aren't tracked by git
 /// and never appear here — they're handled separately via porcelain.
 fn numstat_worktree_vs_head(repo_root: &str) -> HashMap<String, (u32, u32)> {
-    let out = git_output(repo_root, &["--no-optional-locks", "diff", "--numstat", "-z", "HEAD"])
+    let out = git_output(repo_root, &["diff", "--numstat", "-z", "HEAD"])
         .unwrap_or_default();
     parse_numstat(out)
 }
@@ -266,7 +271,7 @@ pub fn git_changes(folder: String) -> GitChanges {
     // isn't mis-parsed as its own entry.
     let porcelain = git_output(
         &repo_root,
-        &["--no-optional-locks", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
     )
     .unwrap_or_default();
     let fields: Vec<&str> = porcelain.split('\0').collect();
