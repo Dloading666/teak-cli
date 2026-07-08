@@ -23,7 +23,6 @@ export const en = {
   'tool.terminal': 'Terminal',
   'tool.remote': 'Remote Terminal',
   'library.agent_tools': 'Agent Tools',
-  'sentinel.protocol': 'Sentinel Protocol',
   'tool.two_split': 'Independent Dual',
   'tool.three_split': 'Independent Triple',
   'tool.four_split': 'Independent Quad',
@@ -59,14 +58,12 @@ export const en = {
   'task.greeting.evening': 'Evening. Feeling ambitious?',
   'task.tab.tasks': 'Tasks',
   'task.tab.changes': 'Changes',
-  'changes.empty': 'No changes yet.',
   'launchpad.open_folder': 'Open Folder',
   'changes.clean': 'No changes — working tree clean.',
   'changes.no_git': 'Git is not installed — code diff, branches and other git features are unavailable.',
   'changes.not_repo': 'This folder is not a Git repository.',
   'changes.init_here': 'Initialize Git here',
   'changes.initializing': 'Initializing…',
-  'changes.committed': 'Committed',
   'changes.uncommitted': 'Uncommitted',
   'changes.untracked': 'Untracked',
   'diff.loading': 'Loading…',
@@ -159,7 +156,6 @@ Delete this note whenever you're ready, and start your first task.`,
   'theme.color.fuchsia': 'Fuchsia',
 
   // Gambit — floating compose window. Chess term for a calculated opening move.
-  'gambit.title': 'GAMBIT',
   'gambit.placeholder': 'Compose your move... ({send} to send, {newline} for newline, paste images)',
   'gambit.send_failed_hint': 'Open an active session first',
   'gambit.send_empty_hint': 'Type a message or paste an image first (Ctrl+V)',
@@ -172,10 +168,6 @@ Delete this note whenever you're ready, and start your first task.`,
   'heatmap.tooltip_some': '{count} messages on {date}',
   'heatmap.tooltip_one': '1 message on {date}',
   'heatmap.tooltip_none': 'No activity on {date}',
-
-  // Skills panel toggle toasts
-  'skills.toast.enabled': 'Enabled',
-  'skills.toast.disabled': 'Disabled',
 
 } as const;
 

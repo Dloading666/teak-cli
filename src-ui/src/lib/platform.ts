@@ -23,4 +23,3 @@ function detectPlatform(needle: string): boolean {
 }
 
 export const IS_MACOS: boolean = detectPlatform('mac');
-export const IS_LINUX: boolean = detectPlatform('linux');

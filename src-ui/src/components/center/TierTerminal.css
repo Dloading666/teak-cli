@@ -124,19 +124,6 @@
     opacity: 0 !important;
 }
 
-/* In TUI mode the tool manages its own scrolling internally
-   (vim, htop, claude alt-screen) — disable browser-side scroll
-   on the xterm viewport so wheel events are forwarded raw to
-   the PTY instead of moving the host scrollback. The DOM scrollbar
-   is also meaningless in this mode (no host-side scrollback), so
-   hide it explicitly. */
-.tier-xterm.tui-inverted .xterm-viewport {
-    overflow: hidden !important;
-}
-.tier-xterm.tui-inverted .xterm-scrollable-element > .scrollbar {
-    display: none !important;
-}
-
 /* ─── Startup Loading Splash ───────────────────────────────── */
 .tier-loading-splash {
     position: absolute;
