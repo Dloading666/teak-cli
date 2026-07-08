@@ -94,7 +94,7 @@ export const de = {
   'settings.appearance': 'Darstellung',
   'settings.wallpaper': 'Hintergrund',
   'settings.terminal': 'Terminal',
-  'settings.gambit': 'Gambit',
+  'settings.gambit': 'Tastenkürzel',
   'settings.language': 'Sprache',
   'settings.feedback': 'Fehler & Feedback',
   'settings.feedback.desc': 'Einen Fehler gefunden oder einen Vorschlag? Klicke unten, um dein Problem zu melden:',

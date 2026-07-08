@@ -94,7 +94,7 @@ export const pt = {
   'settings.appearance': 'Aparência',
   'settings.wallpaper': 'Papel de parede',
   'settings.terminal': 'Terminal',
-  'settings.gambit': 'Gambit',
+  'settings.gambit': 'Atalhos',
   'settings.language': 'Idioma',
   'settings.feedback': 'Bugs e sugestões',
   'settings.feedback.desc': 'Encontrou um bug ou tem uma sugestão? Clique abaixo para enviar seu problema:',

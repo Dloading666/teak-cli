@@ -94,7 +94,7 @@ export const ru = {
   'settings.appearance': 'Оформление',
   'settings.wallpaper': 'Обои',
   'settings.terminal': 'Терминал',
-  'settings.gambit': 'Gambit',
+  'settings.gambit': 'Горячие клавиши',
   'settings.language': 'Язык',
   'settings.feedback': 'Баги и предложения',
   'settings.feedback.desc': 'Нашли баг или есть предложение? Нажмите ниже, чтобы отправить проблему:',

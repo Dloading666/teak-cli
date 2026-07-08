@@ -96,7 +96,7 @@ export const vi = {
   'settings.appearance': 'Giao diện',
   'settings.wallpaper': 'Hình nền',
   'settings.terminal': 'Terminal',
-  'settings.gambit': 'Nước cờ',
+  'settings.gambit': 'Phím tắt',
   'settings.language': 'Ngôn ngữ',
   'settings.feedback': 'Lỗi & Góp ý',
   'settings.feedback.desc': 'Gặp lỗi hoặc có góp ý? Nhấp vào bên dưới để gửi vấn đề của bạn:',

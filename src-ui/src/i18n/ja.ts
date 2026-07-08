@@ -93,7 +93,7 @@ export const ja = {
   'settings.appearance': '外観',
   'settings.wallpaper': '壁紙',
   'settings.terminal': 'ターミナル',
-  'settings.gambit': '一手',
+  'settings.gambit': 'ショートカット',
   'settings.language': '言語',
   'settings.feedback': 'バグ・フィードバック',
   'settings.feedback.desc': 'バグを見つけた、またはご提案がある場合は、下のリンクから内容を送信してください：',

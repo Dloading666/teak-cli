@@ -107,7 +107,7 @@ export const en = {
   'settings.font.monospace': 'Monospace',
   'settings.font.other': 'Other fonts',
   'settings.font.search': 'Search fonts…',
-  'settings.gambit': 'Gambit',
+  'settings.gambit': 'Shortcuts',
   'settings.send.title': 'Send message',
   'settings.send.newline': 'for a new line',
   'settings.gambit.hotkey': 'Toggle shortcut',

@@ -105,7 +105,7 @@ export const zhCN = {
   'settings.font.monospace': '等宽',
   'settings.font.other': '其他字体',
   'settings.font.search': '搜索字体…',
-  'settings.gambit': '妙手',
+  'settings.gambit': '快捷键',
   'settings.send.title': '发送消息',
   'settings.send.newline': '换行',
   'settings.gambit.hotkey': '开关快捷键',

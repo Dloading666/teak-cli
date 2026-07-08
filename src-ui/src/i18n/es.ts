@@ -93,7 +93,7 @@ export const es = {
   'settings.appearance': 'Apariencia',
   'settings.wallpaper': 'Fondo',
   'settings.terminal': 'Terminal',
-  'settings.gambit': 'Gambit',
+  'settings.gambit': 'Atajos',
   'settings.language': 'Idioma',
   'settings.feedback': 'Errores y sugerencias',
   'settings.feedback.desc': '¿Encontraste un error o tienes una sugerencia? Haz clic abajo para enviar tu problema:',
