@@ -288,14 +288,6 @@
     animation: gambitSkillPopoverIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.gambit-skill-popover-empty {
-    padding: 12px;
-    font-size: 12px;
-    color: var(--text-3, #6f6c66);
-    text-align: center;
-    line-height: 1.5;
-}
-
 .gambit-skill-popover-item {
     display: flex;
     align-items: center;

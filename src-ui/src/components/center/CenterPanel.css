@@ -529,11 +529,6 @@
    the main launchpad — gear is a one-time setup affordance, not a
    recurring action like the folder picker. See .library-gear-btn.) */
 
-/* Remove — no longer used */
-.launchpad-card-main {
-  display: contents;
-}
-
 /* Disabled state — tool not installed */
 .launchpad-card-disabled {
   opacity: 0.35;
@@ -692,10 +687,6 @@
 .empty-icon {
   color: var(--text-3);
   opacity: 0.6;
-}
-.empty-hint {
-  font-size: 13px;
-  color: var(--text-2);
 }
 
 /* ─── Library (Agents) ─────────────────────────────────────────────────── */
@@ -1492,10 +1483,6 @@
 .tool-config-btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
-.tab-drag-ghost.ready {
-  border-color: #34d399;
-  box-shadow: 0 12px 40px rgba(52, 211, 153, 0.25), 0 0 0 1px rgba(52, 211, 153, 0.3);
-}
 
 /* ─── Terminal Card Subtle Remote Hint ─── */
 
@@ -1783,8 +1770,4 @@
   background: #ef4444;
   color: #fff;
   box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
-}
-.multi-agent-toggle.is-on {
-  color: var(--accent, #6cc275);
-  border-color: var(--accent, #6cc275);
 }

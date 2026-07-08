@@ -252,13 +252,6 @@
   overflow: hidden;
 }
 
-/* ─── Drag: FLIP Shift Animation ────────────────────────────────────────────── */
-
-.task-card.shift-down {
-  transform: translateY(44px);
-  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
 /* ─── Add Animation ─────────────────────────────────────────────────────────── */
 
 .task-card.adding {
