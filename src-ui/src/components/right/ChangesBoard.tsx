@@ -200,20 +200,20 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
 
   const toggleCommit = (hash: string) => {
     if (!repoRoot) return;
-    setExpandedCommits(prev => {
-      const next = new Set(prev);
-      if (next.has(hash)) {
-        next.delete(hash);
-      } else {
-        next.add(hash);
-        if (!commitFiles.has(hash)) {
-          commands.gitCommitFiles(repoRoot, hash)
-            .then(files => setCommitFiles(m => new Map(m).set(hash, files)))
-            .catch(() => {});
-        }
-      }
-      return next;
-    });
+    // Collapse: just flip the Set.
+    if (expandedCommits.has(hash)) {
+      setExpandedCommits(prev => { const n = new Set(prev); n.delete(hash); return n; });
+      return;
+    }
+    // Expand: fetch files (if not cached) BEFORE flipping the Set — keep the
+    // updater pure (React.StrictMode double-invokes updaters in dev, which
+    // would double-fire the IPC if it lived inside the setter).
+    if (!commitFiles.has(hash)) {
+      commands.gitCommitFiles(repoRoot, hash)
+        .then(files => setCommitFiles(m => new Map(m).set(hash, files)))
+        .catch(() => setCommitFiles(m => new Map(m).set(hash, []))); // stable empty, not pending-forever
+    }
+    setExpandedCommits(prev => { const n = new Set(prev); n.add(hash); return n; });
   };
 
   const handleInit = async () => {

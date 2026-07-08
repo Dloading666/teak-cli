@@ -233,13 +233,32 @@ fn last_commit(repo_root: &str) -> Option<LastCommit> {
     Some(LastCommit { hash, message, author, time, files: commit_files(repo_root, "HEAD") })
 }
 
+/// Current HEAD hash, or "" on an unborn branch (fresh `git init`, no commits).
+/// The empty sentinel means session_commits_since lists ALL commits (every
+/// commit IS "made this window" when the repo had none at launch).
+fn current_head(repo_root: &str) -> String {
+    git_output(repo_root, &["rev-parse", "HEAD"])
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}
+
 /// Commits made since the session baseline (`git log <baseline>..HEAD`),
-/// metadata only (files are lazy via `git_commit_files`). Empty if no baseline
-/// yet. If the baseline hash no longer resolves (reset/rebase rewrote history
-/// below it), the stale entry is cleared so the next call re-captures.
+/// metadata only (files are lazy via `git_commit_files`). Empty baseline ⇒
+/// fresh repo ⇒ `git log HEAD` (all commits). If the baseline hash no longer
+/// resolves (reset/rebase rewrote history below it), re-capture a fresh one
+/// inline (git_changes only reads the map) so the next call has a baseline.
 fn session_commits_since(repo_root: &str, baseline: &str) -> Vec<CommitMeta> {
-    let range = format!("{baseline}..HEAD");
-    match git_output(repo_root, &["log", &range, "--format=%h%x1f%an%x1f%at%x1f%s"]) {
+    let fmt = "--format=%h%x1f%an%x1f%at%x1f%s";
+    let range = if baseline.is_empty() {
+        None
+    } else {
+        Some(format!("{baseline}..HEAD"))
+    };
+    let result = match &range {
+        Some(r) => git_output(repo_root, &["log", "--no-merges", r.as_str(), fmt]),
+        None => git_output(repo_root, &["log", "--no-merges", fmt]),
+    };
+    match result {
         Ok(out) => out
             .lines()
             .filter_map(|line| {
@@ -252,10 +271,11 @@ fn session_commits_since(repo_root: &str, baseline: &str) -> Vec<CommitMeta> {
             })
             .collect(),
         Err(_) => {
-            // Baseline gone (history rewritten). Drop it so the next git_changes
-            // re-captures a fresh baseline instead of persisting the error.
+            // Baseline gone (history rewritten). Re-capture a fresh baseline
+            // inline — git_changes only reads the map, so without this the
+            // stale baseline would persist the error until the next tab switch.
             if let Ok(mut map) = baselines().lock() {
-                map.remove(repo_root);
+                map.insert(repo_root.to_string(), current_head(repo_root));
             }
             Vec::new()
         }
@@ -448,6 +468,13 @@ pub fn git_changes(folder: String) -> GitChanges {
 ///   • untracked:        old = ""                new = working file on disk
 #[tauri::command]
 pub fn git_show_file(repo_root: String, spec: String) -> Option<String> {
+    // Defense against arg-injection: `spec` is frontend-built (HEAD:rel,
+    // <hash>:rel, :rel). Reject a leading '-' so a crafted commitHash can't
+    // lead the spec and be parsed as a git option. (A legit spec never starts
+    // with '-' — it's HEAD, a hex hash, or ':rel'.)
+    if spec.starts_with('-') {
+        return None;
+    }
     git_output(&repo_root, &["show", &spec]).ok()
 }
 
@@ -469,9 +496,13 @@ pub fn git_capture_baseline(folder: String) {
     };
     if let Ok(mut map) = baselines().lock() {
         if !map.contains_key(&repo_root) {
-            if let Ok(sha) = git_output(&repo_root, &["rev-parse", "HEAD"]) {
-                map.insert(repo_root, sha.trim().to_string());
-            }
+            // rev-parse HEAD fails on an unborn branch (fresh `git init`) —
+            // capture "" as a sentinel so session_commits_since lists ALL
+            // commits (every commit IS "made this window" when the repo had
+            // none at launch). Without this the first commit falls to
+            // last_commit + vanishes on the next edit — re-introducing the bug.
+            let head = current_head(&repo_root);
+            map.insert(repo_root, head);
         }
     }
 }
@@ -480,5 +511,12 @@ pub fn git_capture_baseline(folder: String) {
 /// session commit in the 修改记录 list). Reuses `commit_files`.
 #[tauri::command]
 pub fn git_commit_files(repo_root: String, hash: String) -> Vec<GitFileEntry> {
+    // Defense against arg-injection: `hash` is round-tripped through the
+    // frontend (session_commits[].hash). Reject non-hex so a crafted value
+    // can't reach `git diff-tree` as an option. (Internal `commit_files("HEAD")`
+    // bypasses this — "HEAD" is a literal, not frontend input.)
+    if !hash.bytes().all(|b| b.is_ascii_hexdigit()) || !(4..=40).contains(&hash.len()) {
+        return Vec::new();
+    }
     commit_files(&repo_root, &hash)
 }
