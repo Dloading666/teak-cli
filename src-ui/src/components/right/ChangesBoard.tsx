@@ -54,10 +54,10 @@ function loadStoredDiffHeight(): number {
 // One group of changed files. `kind` travels with the group so a selected
 // row knows which diff to ask git for (uncommitted = HEAD↔worktree,
 // untracked = no blob, committed = <hash>~1↔<hash>). `commitHash` scopes the
-// committed diff to a specific session commit (default HEAD = last_commit).
+// committed diff to a specific session commit.
 type Group = { tag: 'uncommitted' | 'untracked' | 'committed'; label: string; entries: GitFileEntry[]; kind: 'uncommitted' | 'untracked' | 'committed'; commitHash?: string };
 
-// A commit's display fields (common to LastCommit and CommitMeta).
+// A commit's display fields (mirrors CommitMeta from tauri.ts).
 type CommitRow = { hash: string; message: string; author: string; time: number };
 
 // A flattened render item — section header, a (toggleable) commit header, or
@@ -65,13 +65,29 @@ type CommitRow = { hash: string; message: string; author: string; time: number }
 // `git init`'d repo can list thousands of untracked files).
 type RenderItem =
   | { type: 'header'; key: string; label: string; count: number }
-  | { type: 'commit-header'; key: string; commit: CommitRow; expanded: boolean; fileCount: number; toggleable: boolean }
+  | { type: 'commit-header'; key: string; commit: CommitRow; expanded: boolean; toggleable: boolean }
   | { type: 'file'; key: string; entry: GitFileEntry; group: Group };
 
 // Selection is encoded as "<group-tag>\x00<abs-path>" so the same file
 // appearing in both Staged and Unstaged stays two distinct, separately
 // clickable rows. Parent (TaskBoard) treats the string as opaque.
 const selKey = (tag: string, path: string) => `${tag}\x00${path}`;
+
+// Relative time for a commit (epoch seconds) — Intl.RelativeTimeFormat yields
+// locale-correct "5分钟前" / "3 hours ago" with zero per-locale string tables.
+// Session commits cluster in minutes-to-hours, so we want finer granularity
+// than HistoryBoard's just-now/today/yesterday scheme (which would label every
+// commit in a burst "刚刚"). <60s reuses time.just_now; >=1 week falls back to
+// a locale short date.
+function formatCommitTime(epochSec: number, t: (k: any) => string, lang: string): string {
+  const diffSec = Math.max(0, Math.floor((Date.now() / 1000) - epochSec));
+  if (diffSec < 60) return t('time.just_now' as any) || 'Just now';
+  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
+  if (diffSec < 3600) return rtf.format(-Math.floor(diffSec / 60), 'minute');
+  if (diffSec < 86400) return rtf.format(-Math.floor(diffSec / 3600), 'hour');
+  if (diffSec < 604800) return rtf.format(-Math.floor(diffSec / 86400), 'day');
+  return new Date(epochSec * 1000).toLocaleDateString(lang, { month: 'short', day: 'numeric' });
+}
 
 export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onToggleDiffExpanded }: ChangesBoardProps) {
   const t = useT();
@@ -89,7 +105,7 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
   // Session-commit expand state + lazy file cache. Expanding a session commit
   // fetches its files via `gitCommitFiles` (cached), so the poll stays cheap
   // (one `git log` for metadata) and per-commit file cost is paid only on
-  // expand. (last_commit fallback is NOT toggleable — its files come upfront.)
+  // expand.
   const [expandedCommits, setExpandedCommits] = useState<Set<string>>(new Set());
   const [commitFiles, setCommitFiles] = useState<Map<string, GitFileEntry[]>>(new Map());
 
@@ -123,31 +139,26 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
 
   const repoRoot = changes?.state === 'ok' ? changes.repo_root : null;
 
-  // Flatten to render items: session-commits list (or last_commit fallback)
-  // ALWAYS shown, then uncommitted / untracked below when the tree is dirty.
-  // (Previously these were mutually exclusive — a clean-tree gate hid the
-  // commit the moment the agent edited a file. Now the session list persists
-  // across dirty/clean; uncommitted stacks underneath.)
+  // Flatten to render items: session commits made this window (if any), then
+  // uncommitted / untracked below when the tree is dirty. An old project just
+  // opened has no session commits and (when clean) shows the empty/clean state
+  // — HEAD is NOT surfaced as a fallback (matches VSCode/GitHub Desktop: a
+  // Changes view shows working-tree changes, not history).
   const items = useMemo<RenderItem[]>(() => {
     if (!changes || changes.state !== 'ok') return [];
     const out: RenderItem[] = [];
 
-    // Commits: session_commits (made this window) if any, else last_commit
-    // (HEAD) as a single-commit fallback so the panel isn't empty when idle.
-    const isFallback = changes.session_commits.length === 0 && !!changes.last_commit;
-    const commits: CommitRow[] = changes.session_commits.length
-      ? changes.session_commits.map(c => ({ hash: c.hash, message: c.message, author: c.author, time: c.time }))
-      : changes.last_commit
-        ? [{ hash: changes.last_commit.hash, message: changes.last_commit.message, author: changes.last_commit.author, time: changes.last_commit.time }]
-        : [];
+    // Session commits only — no HEAD fallback. An old repo opened this window
+    // contributes nothing here until the agent makes a commit.
+    const commits: CommitRow[] = changes.session_commits.map(c => ({ hash: c.hash, message: c.message, author: c.author, time: c.time }));
+    if (commits.length) {
+      out.push({ type: 'header', key: 'h-committed', label: t('changes.committed' as any) || 'Committed', count: commits.length });
+    }
     for (const c of commits) {
-      // Fallback (last_commit) carries files upfront + is always expanded + not
-      // toggleable. Session commits are collapsed-by-default + lazy on expand.
-      const expanded = isFallback || expandedCommits.has(c.hash);
-      const files = isFallback
-        ? (changes.last_commit?.files ?? [])
-        : (expanded ? (commitFiles.get(c.hash) ?? []) : []);
-      out.push({ type: 'commit-header', key: `commit-${c.hash}`, commit: c, expanded, fileCount: files.length, toggleable: !isFallback });
+      // Session commits are collapsed-by-default + lazy on expand.
+      const expanded = expandedCommits.has(c.hash);
+      const files = expanded ? (commitFiles.get(c.hash) ?? []) : [];
+      out.push({ type: 'commit-header', key: `commit-${c.hash}`, commit: c, expanded, toggleable: true });
       for (const entry of files) {
         out.push({ type: 'file', key: selKey('committed', entry.path), entry, group: { tag: 'committed', label: '', entries: [], kind: 'committed', commitHash: c.hash } });
       }
@@ -303,16 +314,16 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
               return (
                 <div
                   key={it.key}
-                  className={`changes-group-header changes-commit-header${it.toggleable ? ' changes-commit-toggleable' : ''}`}
+                  className={`changes-commit-row${it.toggleable ? ' changes-commit-toggleable' : ''}`}
                   role={it.toggleable ? 'button' : undefined}
                   tabIndex={it.toggleable ? 0 : undefined}
                   onClick={it.toggleable ? () => toggleCommit(c.hash) : undefined}
                   onKeyDown={it.toggleable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCommit(c.hash); } } : undefined}
                 >
-                  {it.toggleable && <span className="changes-commit-chevron" aria-hidden="true">{it.expanded ? '▾' : '▸'}</span>}
+                  <span className="changes-commit-chevron" aria-hidden="true">{it.toggleable ? (it.expanded ? '▾' : '▸') : ''}</span>
                   <span className="changes-commit-hash">{c.hash}</span>
                   <span className="changes-commit-subject" data-tip={c.message}>{c.message}</span>
-                  {it.expanded && it.fileCount > 0 && <span className="changes-commit-count">{it.fileCount}</span>}
+                  <span className="changes-commit-time">{formatCommitTime(c.time, t, state.currentLang || 'en')}</span>
                 </div>
               );
             }

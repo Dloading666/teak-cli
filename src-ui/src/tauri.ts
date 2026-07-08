@@ -49,16 +49,6 @@ export interface GitFileEntry {
   added: number;
   deleted: number;
 }
-export interface LastCommit {
-  /** Short hash (e.g. "abc1234"). */
-  hash: string;
-  /** Commit subject (first line). */
-  message: string;
-  author: string;
-  /** Commit time, epoch seconds. */
-  time: number;
-  files: GitFileEntry[];
-}
 /** A commit's metadata for the session-commits list (files fetched lazily via
  *  `gitCommitFiles` when the user expands a commit). */
 export interface CommitMeta {
@@ -82,9 +72,6 @@ export type GitChanges =
        *  commit"). The staged/unstaged split was collapsed 2026-07-06. */
       uncommitted: GitFileEntry[];
       untracked: GitFileEntry[];
-      /** Most recent commit — the "已提交" fallback shown when no commits were
-       *  made this session. null on a repo with no commits. */
-      last_commit: LastCommit | null;
       /** Commits made since this Coffee CLI window opened (baseline..HEAD),
        *  metadata only — files fetched lazily via `gitCommitFiles`. Push-
        *  agnostic (push doesn't move HEAD). Reset on app close. */
@@ -209,7 +196,7 @@ export const commands = {
   // ── Git-backed changes panel ──────────────────────────────────────
   // The right-side "修改记录" tab reads the active folder's git working
   // tree. `gitChanges` returns no_git / not_repo / ok (with uncommitted +
-  // untracked groups, plus last_commit shown as "已提交" when clean); the
+  // untracked groups, plus session_commits made this window); the
   // DiffPanel pulls each side's blob via `gitShowFile` and feeds the existing
   // jsdiff + Shiki pipeline.
   gitChanges: (folder: string) => invoke<GitChanges>('git_changes', { folder }),

@@ -64,6 +64,7 @@ export const en = {
   'changes.not_repo': 'This folder is not a Git repository.',
   'changes.init_here': 'Initialize Git here',
   'changes.initializing': 'Initializing…',
+  'changes.committed': 'Committed',
   'changes.uncommitted': 'Uncommitted',
   'changes.untracked': 'Untracked',
   'diff.loading': 'Loading…',

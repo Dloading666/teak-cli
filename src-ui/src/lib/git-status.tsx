@@ -89,7 +89,8 @@ function deriveDirtyDirs(map: FileStatsMap): Set<string> {
 function changesSignature(c: GitChanges | null): string {
   if (!c || c.state !== 'ok') return c?.state ?? 'null';
   const f = (e: GitFileEntry) => `${e.rel}\x01${e.status}\x01${e.added}\x01${e.deleted}`;
-  return [c.branch, c.uncommitted.map(f).join(','), c.untracked.map(f).join(','), c.last_commit?.hash ?? ''].join('\x02');
+  const g = (m: { hash: string }) => m.hash;
+  return [c.branch, c.uncommitted.map(f).join(','), c.untracked.map(f).join(','), c.session_commits.map(g).join(',')].join('\x02');
 }
 
 export function GitStatusProvider({ children }: { children: ReactNode }) {

@@ -102,34 +102,15 @@ pub enum GitChanges {
         uncommitted: Vec<GitFileEntry>,
         /// New files git isn't tracking yet.
         untracked: Vec<GitFileEntry>,
-        /// Most recent commit (HEAD) — shown as the "已提交" group when the
-        /// working tree is clean so the panel isn't empty after a commit.
-        /// `None` on a repo with no commits (fresh `git init`).
-        last_commit: Option<LastCommit>,
         /// Commits made since this Coffee CLI window opened (baseline..HEAD),
         /// metadata only — files fetched lazily via `git_commit_files`.
         session_commits: Vec<CommitMeta>,
     },
 }
 
-/// Most-recent-commit summary for the "已提交" group (shown when the working
-/// tree is clean). `files` are the changes in HEAD vs its parent (or vs empty
-/// for the initial commit), so clicking one diffs `HEAD~1:rel` ↔ `HEAD:rel`.
-#[derive(serde::Serialize)]
-pub struct LastCommit {
-    /// Short hash (e.g. "abc1234").
-    pub hash: String,
-    /// Commit subject (first line).
-    pub message: String,
-    pub author: String,
-    /// Commit time, epoch seconds.
-    pub time: i64,
-    pub files: Vec<GitFileEntry>,
-}
-
 /// A commit's metadata for the session-commits list. Files are NOT included —
-/// fetched lazily via `git_commit_files` when the user expands a commit, so a
-/// poll with many session commits stays cheap (one `git log` for metadata).
+/// fetched lazily via `git_commit_files` when the user expands a commit, so
+/// the poll with many session commits stays cheap (one `git log` for metadata).
 #[derive(serde::Serialize)]
 pub struct CommitMeta {
     /// Short hash (e.g. "abc1234").
@@ -188,8 +169,8 @@ fn numstat_worktree_vs_head(repo_root: &str) -> HashMap<String, (u32, u32)> {
 /// diff viewer doesn't need rename tracking.
 /// Files changed in a single commit vs its parent: `diff-tree --numstat`.
 /// `--root` makes the initial commit (no parent) read as all-additions;
-/// `--no-renames` keeps parsing simple (rename → delete+add). Reused by
-/// `last_commit` (HEAD) and the `git_commit_files` IPC (any commit hash).
+/// `--no-renames` keeps parsing simple (rename → delete+add). Used by the
+/// `git_commit_files` IPC (any commit hash) when a session commit is expanded.
 fn commit_files(repo_root: &str, hash: &str) -> Vec<GitFileEntry> {
     let out = git_output(
         repo_root,
@@ -215,22 +196,6 @@ fn commit_files(repo_root: &str, hash: &str) -> Vec<GitFileEntry> {
     // diff-tree gives no ordering guarantee; sort by path for a stable list.
     files.sort_by(|a, b| a.rel.cmp(&b.rel));
     files
-}
-
-/// Most-recent-commit summary (HEAD) — the "已提交" fallback shown when no
-/// commits were made this session. `None` on a repo with no commits (fresh
-/// `git init`) — `git log -1` exits non-zero there. Files via `commit_files`.
-fn last_commit(repo_root: &str) -> Option<LastCommit> {
-    // %h short hash · %x1f unit-separator (won't appear in a commit subject)
-    // · %an author · %at committer-date epoch seconds · %s subject.
-    let log = git_output(repo_root, &["log", "-1", "--format=%h%x1f%an%x1f%at%x1f%s"]).ok()?;
-    let log = log.trim_end_matches(['\n', '\r']);
-    let mut parts = log.splitn(4, '\x1f');
-    let hash = parts.next()?.to_string();
-    let author = parts.next()?.to_string();
-    let time: i64 = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
-    let message = parts.next().unwrap_or("").to_string();
-    Some(LastCommit { hash, message, author, time, files: commit_files(repo_root, "HEAD") })
 }
 
 /// Current HEAD hash, or "" on an unborn branch (fresh `git init`, no commits).
@@ -429,26 +394,11 @@ pub fn git_changes(folder: String) -> GitChanges {
         Some(b) => session_commits_since(&repo_root, &b),
         None => Vec::new(),
     };
-    // last_commit (HEAD) is the FALLBACK shown when no commits were made this
-    // session — only computed then (saves the diff-tree call when there are
-    // session commits). Kept behind the clean-tree gate so the no-session case
-    // preserves the prior "show HEAD when clean" behavior; when there ARE
-    // session commits they show regardless of dirty/clean (no gate) — that's
-    // the fix for "commit vanishes the moment the agent edits".
-    let last_commit = if session_commits.is_empty()
-        && uncommitted.is_empty()
-        && untracked.is_empty()
-    {
-        last_commit(&repo_root)
-    } else {
-        None
-    };
     GitChanges::Ok {
         repo_root,
         branch,
         uncommitted,
         untracked,
-        last_commit,
         session_commits,
     }
 }
@@ -499,8 +449,8 @@ pub fn git_capture_baseline(folder: String) {
             // rev-parse HEAD fails on an unborn branch (fresh `git init`) —
             // capture "" as a sentinel so session_commits_since lists ALL
             // commits (every commit IS "made this window" when the repo had
-            // none at launch). Without this the first commit falls to
-            // last_commit + vanishes on the next edit — re-introducing the bug.
+            // none at launch). Without this the first commit would be missed
+            // until the next tab switch re-captured a baseline.
             let head = current_head(&repo_root);
             map.insert(repo_root, head);
         }

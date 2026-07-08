@@ -224,19 +224,30 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* "已提交" group header — shown when the working tree is clean, in place of
- * the empty "working tree clean" state. Two-line layout so a long commit
- * subject never crams/wraps against the hash (the original single-line row
- * squeezed + wrapped badly on narrow panels): line 1 = 已提交 label (left) +
- * short hash (right), line 2 = subject (full-width, truncated, themed tooltip
- * on hover for the full text). The subject is a sentence, so it MUST NOT
- * inherit the header's text-transform: uppercase. */
-.changes-commit-header {
-  flex-wrap: wrap;          /* subject wraps to its own line */
+/* "已提交" session-commit row — single line: chevron + hash + subject (fills,
+ * truncates) + relative time (right). Replaces the old 3-line wrap layout
+ * (chevron+hash on line 1, subject on line 2, count pill on line 3) which
+ * wasted vertical space when several commits stacked. The count pill is
+ * dropped: the file list below an expanded commit already shows the files, so
+ * a redundant number was noise (per user feedback). Sits under a "已提交"
+ * group header (count pill there carries the commit total). The subject is a
+ * sentence, so it MUST NOT inherit any header's text-transform: uppercase. */
+.changes-commit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  width: 100%;
+  text-align: left;
+  color: var(--text-1);
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: var(--radius-sm);
+  user-select: none;
 }
-/* Toggleable session-commit header (expand to lazy-load files). The global
+/* Toggleable session-commit row (expand to lazy-load files). The global
    `* { cursor: default !important }` (global.css) forces an explicit pointer
-   override or the header shows no click affordance. */
+   override or the row shows no click affordance. */
 .changes-commit-toggleable {
   cursor: pointer !important;
 }
@@ -249,27 +260,16 @@
   color: var(--text-3, var(--text-2));
   font-size: 10px;
 }
-.changes-commit-count {
-  /* mirror .changes-group-count (pill) */
-  flex: 0 0 auto;
-  font-weight: 600;
-  color: var(--text-2);
-  background: var(--bg-hover);
-  border-radius: 999px;
-  padding: 0 7px;
-  font-size: 10px;
-}
 .changes-commit-hash {
-  margin-left: auto;        /* push to the right edge of line 1 */
   flex: 0 0 auto;
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0;
   text-transform: none;
   color: var(--text-3, var(--text-2));
 }
 .changes-commit-subject {
-  flex: 0 0 100%;           /* full width → own line (line 2) */
+  flex: 1 1 auto;           /* fill remaining space, truncate */
   position: relative;       /* anchor for the ::after tooltip */
   min-width: 0;
   overflow: hidden;
@@ -280,6 +280,13 @@
   letter-spacing: 0;
   text-transform: none;
   color: var(--text-1);     /* brightest — the main info, not a muted label */
+}
+.changes-commit-time {
+  flex: 0 0 auto;
+  color: var(--text-3, var(--text-2));
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 /* Themed tooltip — replaces the native title= chrome (per the no-native-
  * tooltips rule; matches the heatmap's data-tip pill). Shows the full commit
