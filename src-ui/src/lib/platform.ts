@@ -23,3 +23,7 @@ function detectPlatform(needle: string): boolean {
 }
 
 export const IS_MACOS: boolean = detectPlatform('mac');
+// Windows navigator.platform is "Win32", userAgentData.platform is "Windows".
+// Used by the shell picker to decide between the Windows (pwsh/cmd/git-bash)
+// and Unix (zsh/bash/fish/sh) candidate sets.
+export const IS_WINDOWS: boolean = detectPlatform('win');

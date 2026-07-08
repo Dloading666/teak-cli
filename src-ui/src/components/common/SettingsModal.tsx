@@ -15,7 +15,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAppState, useAppDispatch, HOTKEY_SCHEMES, type HotkeyScheme, type TitlebarToggleDisplay, type ThemeColor, type ThemeShape, type IconTheme } from '../../store/app-state';
 import { useT } from '../../i18n/useT';
-import { IS_MACOS } from '../../lib/platform';
+import { IS_MACOS, IS_WINDOWS } from '../../lib/platform';
 import { TERM_COLOR_SCHEMES } from '../center/TierTerminal';
 import { commands, type FontInfo } from '../../tauri';
 import { FontPicker } from './FontPicker';
@@ -102,6 +102,16 @@ export function SettingsModal() {
   // Installed fonts for the terminal font picker — loaded lazily (Rust scan)
   // the first time the Terminal section is opened. null = not loaded yet.
   const [fonts, setFonts] = useState<FontInfo[] | null>(null);
+  // Probed shell availability, fed to the default-shell picker so it only
+  // offers shells the user actually has installed. null = not probed yet.
+  // Platform-specific fields are absent cross-OS — read with optional
+  // chaining.
+  const [shellCaps, setShellCaps] = useState<{
+    pwsh_available?: boolean; git_bash_available?: boolean;
+    zsh_available?: boolean; bash_available?: boolean;
+    fish_available?: boolean; sh_available?: boolean;
+    wsl_available: boolean;
+  } | null>(null);
 
   const open = state.settingsOpen;
   const close = () => dispatch({ type: 'SET_SETTINGS_OPEN', open: false });
@@ -125,11 +135,14 @@ export function SettingsModal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Lazy-load the system font list when the Terminal section is first shown.
+  // Lazy-load the system font list + probe available shells when the
+  // Terminal section is first shown. Both come from the Rust side and are
+  // cheap, but no point paying them when the user never opens Terminal.
   useEffect(() => {
-    if (!open || section !== 'terminal' || fonts !== null) return;
-    commands.listSystemFonts().then(setFonts).catch(() => setFonts([]));
-  }, [open, section, fonts]);
+    if (!open || section !== 'terminal') return;
+    if (fonts === null) commands.listSystemFonts().then(setFonts).catch(() => setFonts([]));
+    if (shellCaps === null) commands.detectShells().then(setShellCaps).catch(() => {});
+  }, [open, section, fonts, shellCaps]);
 
   if (!open) return null;
 
@@ -175,6 +188,10 @@ export function SettingsModal() {
     const clean = family.replace(/["\\]/g, '');
     try { clean ? localStorage.setItem('cc-term-font', clean) : localStorage.removeItem('cc-term-font'); } catch {}
     dispatch({ type: 'SET_TERM_FONT', font: clean });
+  };
+  const setDefaultShell = (shell: string) => {
+    try { shell ? localStorage.setItem('cc-default-shell', shell) : localStorage.removeItem('cc-default-shell'); } catch {}
+    dispatch({ type: 'SET_DEFAULT_SHELL', shell });
   };
   const setOpacity = (n: number) => dispatch({ type: 'SET_WALLPAPER_OPACITY', opacity: n });
   const setTaskView = (mode: 'list' | 'note') => dispatch({ type: 'SET_TASK_VIEW_MODE', mode });
@@ -362,6 +379,78 @@ export function SettingsModal() {
                   style={{ fontFamily: state.termFont ? `"${state.termFont}", monospace` : 'monospace' }}
                 >
                   {'Coffee CLI · AaBb 0123 {}=>'}
+                </div>
+
+                {/* Default shell picker. Shell NAMES are not translated
+                    (read from the OS / detection as-is); only this label
+                    and the "not recommended" suffix are localized. Card
+                    style reuses the gambit keyboard-card — same control
+                    surface the user already knows from hotkey selection.
+                    Shells that weren't detected installed are omitted so
+                    the user can't pick a dead one; Auto is always first. */}
+                <div className="settings-section-label">{t('settings.terminal.shell' as any)}</div>
+                <div className="settings-key-row">
+                  <button
+                    className={`settings-key-card${state.defaultShell === '' ? ' active' : ''}`}
+                    onClick={() => setDefaultShell('')}
+                    aria-pressed={state.defaultShell === ''}
+                  >
+                    <span className="settings-key-combo"><kbd>Auto</kbd></span>
+                    <span className="settings-key-sub">{t('settings.terminal.shell.auto' as any)}</span>
+                  </button>
+                  {IS_WINDOWS && (() => {
+                    const caps = shellCaps;
+                    // Order: pwsh → PowerShell (inbox) → Git Bash → cmd (末位).
+                    // pwsh / git-bash only when detected; PowerShell + cmd are
+                    // inbox on every supported Windows so always offered.
+                    const opts: { id: string; label: string; show: boolean; notRecommended?: boolean }[] = [
+                      { id: 'pwsh', label: 'pwsh', show: !!caps?.pwsh_available },
+                      { id: 'powershell', label: 'PowerShell', show: true },
+                      { id: 'git-bash', label: 'Git Bash', show: !!caps?.git_bash_available },
+                      { id: 'cmd', label: 'Command Prompt', show: true, notRecommended: true },
+                    ];
+                    return opts.filter(o => o.show).map(o => {
+                      const active = state.defaultShell === o.id;
+                      return (
+                        <button
+                          key={o.id}
+                          className={`settings-key-card${active ? ' active' : ''}`}
+                          onClick={() => setDefaultShell(o.id)}
+                          aria-pressed={active}
+                        >
+                          <span className="settings-key-combo"><kbd>{o.label}</kbd></span>
+                          {o.notRecommended && (
+                            <span className="settings-key-sub">{t('settings.terminal.shell.not_recommended' as any)}</span>
+                          )}
+                        </button>
+                      );
+                    });
+                  })()}
+                  {!IS_WINDOWS && (() => {
+                    // macOS/Linux: each candidate is probed via `which`, so
+                    // only installed shells get a card (fish is absent by
+                    // default on macOS → no dead card). Auto reads $SHELL.
+                    const caps = shellCaps;
+                    const opts = [
+                      { id: 'zsh', label: 'zsh', show: !!caps?.zsh_available },
+                      { id: 'bash', label: 'bash', show: !!caps?.bash_available },
+                      { id: 'fish', label: 'fish', show: !!caps?.fish_available },
+                      { id: 'sh', label: 'sh', show: !!caps?.sh_available },
+                    ];
+                    return opts.filter(o => o.show).map(o => {
+                      const active = state.defaultShell === o.id;
+                      return (
+                        <button
+                          key={o.id}
+                          className={`settings-key-card${active ? ' active' : ''}`}
+                          onClick={() => setDefaultShell(o.id)}
+                          aria-pressed={active}
+                        >
+                          <span className="settings-key-combo"><kbd>{o.label}</kbd></span>
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
               </>
             )}

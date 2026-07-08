@@ -119,8 +119,8 @@ export const commands = {
   windowClose: () => invoke<void>('window_close'),
 
   // Tier Terminal API
-  tierTerminalStart: (sessionId: string, tool: string | null, cols: number, rows: number, themeMode: string, locale?: string, toolData?: string, cwd?: string, resumeToken?: string) =>
-    invoke<void>('tier_terminal_start', { sessionId, tool, toolData: toolData ?? null, cols, rows, themeMode, locale: locale ?? null, cwd: cwd ?? null, resumeToken: resumeToken ?? null }),
+  tierTerminalStart: (sessionId: string, tool: string | null, cols: number, rows: number, themeMode: string, locale?: string, toolData?: string, cwd?: string, resumeToken?: string, shell?: string) =>
+    invoke<void>('tier_terminal_start', { sessionId, tool, toolData: toolData ?? null, cols, rows, themeMode, locale: locale ?? null, cwd: cwd ?? null, resumeToken: resumeToken ?? null, shell: shell ?? null }),
   tierTerminalInput: (sessionId: string, data: string) => 
     invoke<void>('tier_terminal_input', { sessionId, data }),
   /** Raw write to PTY — does NOT trigger agent-status detection.
@@ -171,6 +171,19 @@ export const commands = {
   // Tool availability detection
   checkToolsInstalled: () =>
     invoke<Record<string, boolean>>('check_tools_installed'),
+
+  /** Probed availability of optional shells (pwsh / Git Bash / wsl on
+   *  Windows; zsh/bash/fish/sh on Unix). Fed to the SettingsModal shell
+   *  picker so it only shows shells the user actually has. Inbox shells
+   *  (powershell/cmd on Windows) are assumed present and NOT in this
+   *  payload. Platform-specific fields are absent cross-OS — read with
+   *  optional chaining. */
+  detectShells: () => invoke<{
+    pwsh_available?: boolean; git_bash_available?: boolean;
+    zsh_available?: boolean; bash_available?: boolean;
+    fish_available?: boolean; sh_available?: boolean;
+    wsl_available: boolean;
+  }>('detect_shells'),
 
   /** Static list of tools registered in the Rust src/tools/ registry —
    *  one entry per supported AI CLI with the canonical display name.

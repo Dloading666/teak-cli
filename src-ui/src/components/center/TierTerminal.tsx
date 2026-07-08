@@ -1015,7 +1015,7 @@ function TierTerminalImpl({
       const initialRows = term.rows || 24;
 
         try {
-          await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined, resumeToken);
+          await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined, resumeToken, appStateRef.current.defaultShell);
         } catch (err) {
           // Resume / launch validation failures (missing cwd, bad token
           // format, binary not on PATH) land here. The upstream CLI's own

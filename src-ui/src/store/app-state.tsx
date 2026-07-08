@@ -176,6 +176,10 @@ export interface AppState {
   termColorScheme: string;
   // Terminal font family override ('' = bundled CascadiaMono + fallbacks)
   termFont: string;
+  // Default shell id for new terminal tabs ('' = Auto / platform fallback).
+  // Resolved to a concrete program at spawn time on the Rust side. See
+  // src/shell_probe.rs and SettingsModal's shell picker.
+  defaultShell: string;
 
   // Terminals
   terminals: TerminalSession[];
@@ -279,6 +283,7 @@ type Action =
   | { type: 'SET_WALLPAPER_OPACITY'; opacity: number }
   | { type: 'SET_TERM_SCHEME'; scheme: string }
   | { type: 'SET_TERM_FONT'; font: string }
+  | { type: 'SET_DEFAULT_SHELL'; shell: string }
   | { type: 'TOGGLE_GAMBIT' }
   | { type: 'TOGGLE_SETTINGS' }
   | { type: 'SET_SETTINGS_OPEN'; open: boolean }
@@ -406,6 +411,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, termColorScheme: action.scheme };
     case 'SET_TERM_FONT':
       return { ...state, termFont: action.font };
+    case 'SET_DEFAULT_SHELL':
+      return { ...state, defaultShell: action.shell };
     case 'TOGGLE_GAMBIT':
       return { ...state, gambitOpen: !state.gambitOpen };
     case 'TOGGLE_SETTINGS':
@@ -576,6 +583,7 @@ function getInitialState(): AppState {
   let bgType: 'image' | 'video' | 'none' = 'none';
   let termColorScheme = '';
   let termFont = '';
+  let defaultShell = '';
   let wallpaperOpacity = 70;
   // Default Enter-to-send; only opt-out if the user explicitly stored 'false'.
   let gambitEnterToSend = true;
@@ -608,6 +616,7 @@ function getInitialState(): AppState {
 
     termColorScheme = localStorage.getItem('cc-term-scheme') || '';
     termFont = localStorage.getItem('cc-term-font') || '';
+    defaultShell = localStorage.getItem('cc-default-shell') || '';
     gambitEnterToSend = localStorage.getItem('cc-gambit-enter-send') !== 'false';
     const storedScheme = localStorage.getItem('cc-hotkey-scheme');
     if (storedScheme && HOTKEY_SCHEMES.some(h => h.code === storedScheme)) {
@@ -668,6 +677,7 @@ function getInitialState(): AppState {
     wallpaperOpacity,
     termColorScheme,
     termFont,
+    defaultShell,
     terminals: [{ id: defaultTerminalId, tool: null, folderPath }],
     activeTerminalId: defaultTerminalId,
     gambitOpen: false,

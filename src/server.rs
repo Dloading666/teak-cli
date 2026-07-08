@@ -128,6 +128,17 @@ fn check_tools_installed() -> std::collections::HashMap<String, bool> {
     result
 }
 
+/// Probe which optional shells are installed, so the settings picker can
+/// show only the ones the user actually has (avoids offering a dead Git
+/// Bash card when Git for Windows isn't installed, etc.). Cheap — a few
+/// `where`/`exists` checks — safe to call on settings open. See
+/// `shell_probe::detect_capabilities` for the per-shell strategy.
+#[tauri::command]
+fn detect_shells() -> crate::shell_probe::ShellCapabilitiesJson {
+    let caps = crate::shell_probe::detect_capabilities();
+    crate::shell_probe::ShellCapabilitiesJson::from(&caps)
+}
+
 // ─── File System Live Watcher ────────────────────────────────────────────────
 //
 // Start/stop a recursive fs watcher on the workspace folder so changes
@@ -445,6 +456,7 @@ async fn tier_terminal_start(
     locale: Option<String>,
     cwd: Option<String>,
     resume_token: Option<String>,
+    shell: Option<String>,
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -458,7 +470,7 @@ async fn tier_terminal_start(
     tauri::async_runtime::spawn_blocking(move || {
         tier_terminal_start_blocking(
             session_id, tool, tool_data, cols, rows,
-            theme_mode, locale, cwd, resume_token, app, terminal_session,
+            theme_mode, locale, cwd, resume_token, shell, app, terminal_session,
         )
     })
     .await
@@ -475,6 +487,7 @@ fn tier_terminal_start_blocking(
     locale: Option<String>,
     cwd: Option<String>,
     resume_token: Option<String>,
+    shell: Option<String>,
     app: tauri::AppHandle,
     terminal_session: terminal::SharedSession,
 ) -> Result<(), String> {
@@ -575,54 +588,26 @@ fn tier_terminal_start_blocking(
         },
 
         _ => if cfg!(target_os = "windows") {
-            // Prefer PowerShell 7 (`pwsh.exe`) when it's installed, falling
-            // back to Windows PowerShell 5.1 (`powershell.exe`). A user who
-            // installs pwsh expects Coffee CLI's terminal to use it rather
-            // than the bundled 5.1 (issue #51). Both accept `-NoExit`. Power
-            // users can still pin a specific shell via the `terminal` entry
-            // in ~/.coffee-cli/tools.json (handled just below).
-            let shell = if binary_on_path("pwsh.exe") {
-                "pwsh.exe"
-            } else {
-                "powershell.exe"
-            };
-            (shell.to_string(), vec!["-NoExit".to_string()])
+            // User's chosen default shell (settings → Terminal), resolved to a
+            // concrete (program, args). `Auto` keeps the historical pwsh→
+            // powershell fallback. Resolving to an ABSOLUTE path here also
+            // defeats the Microsoft-Store App Execution Alias trap: a 0-byte
+            // `pwsh.exe` reparse point probes as "installed" via `where` but
+            // fails to spawn with ERROR_ACCESS_DENIED. shell_probe treats
+            // aliases as not-installed, so the picker never offers a dead
+            // shell. Power users can still override via `terminal` in
+            // ~/.coffee-cli/tools.json (applied just below, as final word).
+            let id = crate::shell_probe::ShellId::from_opt(&shell);
+            let caps = crate::shell_probe::detect_capabilities();
+            crate::shell_probe::resolve_shell(id, &caps)
         } else {
-            // Use the user's real login shell (`$SHELL`) rather than forcing
-            // bash: macOS has defaulted to zsh since Catalina, and Linux users
-            // often run zsh/fish. Falls back to bash if `$SHELL` is unset.
-            // (issue #51, Unix counterpart of the pwsh change above.)
-            let shell = std::env::var("SHELL")
-                .ok()
-                .filter(|s| !s.trim().is_empty())
-                // Guard against a stale $SHELL (shell uninstalled / relocated)
-                // — spawning a missing path yields a dead tab, whereas bash is
-                // near-universal. Mirrors the binary_on_path() guard on the
-                // Windows pwsh path. $SHELL is virtually always absolute, so a
-                // plain existence check is enough and avoids a subprocess.
-                .filter(|s| std::path::Path::new(s).exists())
-                .unwrap_or_else(|| "bash".to_string());
-            let basename = std::path::Path::new(&shell)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("");
-            let mut args = vec!["-l".to_string(), "-i".to_string()];
-            // OSC 7 cwd reporting drives the left workspace tree's cd-follow.
-            // bash gets it via PROMPT_COMMAND (injected in terminal.rs); fish
-            // ignores PROMPT_COMMAND, so inject an equivalent `--on-variable
-            // PWD` hook via fish's `-C` init-command (emits the same
-            // `file://<host><pwd>` shape extract_osc7_cwd parses, and fires
-            // once for the initial dir). zsh has no clean env/flag hook, so it
-            // forgoes auto cd-follow — users can still navigate the tree
-            // manually, and a specific shell can be pinned via tools.json.
-            if basename == "fish" {
-                args.push("-C".to_string());
-                args.push(
-                    r#"function __coffee_osc7 --on-variable PWD; printf '\033]7;file://%s%s\033\\' (hostname) "$PWD"; end; __coffee_osc7"#
-                        .to_string(),
-                );
-            }
-            (shell, args)
+            // Unix: `Auto` reads $SHELL (with an existence guard) and falls
+            // back to bash; an explicit choice spawns that shell directly.
+            // fish gets its OSC 7 cwd-reporting hook via -C (bash gets it via
+            // PROMPT_COMMAND in terminal.rs; zsh has no clean flag hook).
+            let id = crate::shell_probe::ShellId::from_opt(&shell);
+            let caps = crate::shell_probe::ShellCapabilities::default();
+            crate::shell_probe::resolve_shell(id, &caps)
         }
     };
 
@@ -3339,6 +3324,7 @@ pub fn start_ui() -> anyhow::Result<()> {
             read_mimocode_session,
             check_network_port,
             check_tools_installed,
+            detect_shells,
             crate::tools::list_tools,
             install_hook_for_tool,
             start_fs_watcher,
