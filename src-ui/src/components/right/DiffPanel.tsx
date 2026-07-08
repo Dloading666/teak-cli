@@ -88,6 +88,10 @@ interface DiffPanelProps {
    *  - 'untracked'   → old `""`,          new = working file (no git blob)
    *  - 'committed'   → old `HEAD~1:rel`,  new = `HEAD:rel` (last commit's diff) */
   kind: 'uncommitted' | 'untracked' | 'committed';
+  /** Commit hash to diff against for `kind === 'committed'` (default HEAD).
+   *  A session commit passes its hash so the diff is <hash>~1↔<hash> instead
+   *  of HEAD~1↔HEAD. */
+  commitHash?: string;
   onClose: () => void;
   expanded: boolean;
   onToggleExpanded: () => void;
@@ -102,7 +106,7 @@ interface DiffPanelProps {
   deleted?: number;
 }
 
-export function DiffPanel({ path, repoRoot, rel, kind, onClose, expanded, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
+export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, expanded, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
   const t = useT();
   const dataTheme = useDataAttr('data-theme');
   const [result, setResult] = useState<DiffResult>({ state: 'loading' });
@@ -181,9 +185,10 @@ export function DiffPanel({ path, repoRoot, rel, kind, onClose, expanded, onTogg
           oldText = '';
           newText = (await commands.readTextFile(path)) ?? '';
         } else if (kind === 'committed') {
+          const ref = commitHash ?? 'HEAD';
           const [o, n] = await Promise.all([
-            commands.gitShowFile(repoRoot, `HEAD~1:${rel}`),
-            commands.gitShowFile(repoRoot, `HEAD:${rel}`),
+            commands.gitShowFile(repoRoot, `${ref}~1:${rel}`),
+            commands.gitShowFile(repoRoot, `${ref}:${rel}`),
           ]);
           oldText = o ?? '';
           newText = n ?? '';
@@ -241,7 +246,7 @@ export function DiffPanel({ path, repoRoot, rel, kind, onClose, expanded, onTogg
     })();
 
     return () => { cancelled = true; };
-  }, [path, repoRoot, rel, kind, dataTheme]);
+  }, [path, repoRoot, rel, kind, commitHash, dataTheme]);
 
   const basename = useMemo(() => path.replace(/\\/g, '/').split('/').pop() || path, [path]);
 

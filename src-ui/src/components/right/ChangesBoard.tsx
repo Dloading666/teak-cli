@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useAppState, resolveDiffContext } from '../../store/app-state';
 import { useGitStatus, useGitPollingGate } from '../../lib/git-status';
-import { commands, type GitFileEntry, type LastCommit } from '../../tauri';
+import { commands, type GitFileEntry } from '../../tauri';
 import { useT } from '../../i18n/useT';
 import { ScrollPanel } from '../common/ScrollPanel';
 import { ContextMenu } from '../left/Explorer';
@@ -53,15 +53,19 @@ function loadStoredDiffHeight(): number {
 
 // One group of changed files. `kind` travels with the group so a selected
 // row knows which diff to ask git for (uncommitted = HEAD↔worktree,
-// untracked = no blob, committed = HEAD~1↔HEAD).
-type Group = { tag: 'uncommitted' | 'untracked' | 'committed'; label: string; entries: GitFileEntry[]; kind: 'uncommitted' | 'untracked' | 'committed' };
+// untracked = no blob, committed = <hash>~1↔<hash>). `commitHash` scopes the
+// committed diff to a specific session commit (default HEAD = last_commit).
+type Group = { tag: 'uncommitted' | 'untracked' | 'committed'; label: string; entries: GitFileEntry[]; kind: 'uncommitted' | 'untracked' | 'committed'; commitHash?: string };
 
-// A flattened render item — section header (or a richer commit header) or
-// file row — so one progressive loader / scroller covers all groups (a freshly
+// A commit's display fields (common to LastCommit and CommitMeta).
+type CommitRow = { hash: string; message: string; author: string; time: number };
+
+// A flattened render item — section header, a (toggleable) commit header, or
+// a file row — so one progressive loader / scroller covers all groups (a freshly
 // `git init`'d repo can list thousands of untracked files).
 type RenderItem =
   | { type: 'header'; key: string; label: string; count: number }
-  | { type: 'commit-header'; key: string; commit: LastCommit }
+  | { type: 'commit-header'; key: string; commit: CommitRow; expanded: boolean; fileCount: number; toggleable: boolean }
   | { type: 'file'; key: string; entry: GitFileEntry; group: Group };
 
 // Selection is encoded as "<group-tag>\x00<abs-path>" so the same file
@@ -82,6 +86,12 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [diffHeight, setDiffHeight] = useState<number>(loadStoredDiffHeight);
   const [initializing, setInitializing] = useState(false);
+  // Session-commit expand state + lazy file cache. Expanding a session commit
+  // fetches its files via `gitCommitFiles` (cached), so the poll stays cheap
+  // (one `git log` for metadata) and per-commit file cost is paid only on
+  // expand. (last_commit fallback is NOT toggleable — its files come upfront.)
+  const [expandedCommits, setExpandedCommits] = useState<Set<string>>(new Set());
+  const [commitFiles, setCommitFiles] = useState<Map<string, GitFileEntry[]>>(new Map());
 
   const startResize = (e: React.PointerEvent) => {
     if (diffExpanded) return;
@@ -113,37 +123,53 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
 
   const repoRoot = changes?.state === 'ok' ? changes.repo_root : null;
 
-  // Build the three groups (skip empties) → flatten to header+row items.
+  // Flatten to render items: session-commits list (or last_commit fallback)
+  // ALWAYS shown, then uncommitted / untracked below when the tree is dirty.
+  // (Previously these were mutually exclusive — a clean-tree gate hid the
+  // commit the moment the agent edited a file. Now the session list persists
+  // across dirty/clean; uncommitted stacks underneath.)
   const items = useMemo<RenderItem[]>(() => {
     if (!changes || changes.state !== 'ok') return [];
-    const uncommitted: GitFileEntry[] = changes.uncommitted;
-    const untracked: GitFileEntry[] = changes.untracked;
-    const lastCommit: LastCommit | null = changes.last_commit;
-    // Pending changes win — show 未提交 / 未跟踪. Only when the working tree is
-    // clean do we surface the last commit as 已提交 (so the panel isn't empty
-    // right after a commit — issue: "已提交就空了,修改记录就空了").
-    const groups: Group[] = uncommitted.length || untracked.length
-      ? [
-          { tag: 'uncommitted', label: t('changes.uncommitted' as any) || 'Uncommitted', entries: uncommitted, kind: 'uncommitted' },
-          { tag: 'untracked', label: t('changes.untracked' as any) || 'Untracked', entries: untracked, kind: 'untracked' },
-        ]
-      : lastCommit
-        ? [{ tag: 'committed', label: t('changes.committed' as any) || 'Committed', entries: lastCommit.files, kind: 'committed' }]
-        : [];
     const out: RenderItem[] = [];
-    for (const g of groups) {
-      if (g.entries.length === 0) continue;
-      if (g.kind === 'committed' && lastCommit) {
-        out.push({ type: 'commit-header', key: `h-${g.tag}`, commit: lastCommit });
-      } else {
-        out.push({ type: 'header', key: `h-${g.tag}`, label: g.label, count: g.entries.length });
+
+    // Commits: session_commits (made this window) if any, else last_commit
+    // (HEAD) as a single-commit fallback so the panel isn't empty when idle.
+    const isFallback = changes.session_commits.length === 0 && !!changes.last_commit;
+    const commits: CommitRow[] = changes.session_commits.length
+      ? changes.session_commits.map(c => ({ hash: c.hash, message: c.message, author: c.author, time: c.time }))
+      : changes.last_commit
+        ? [{ hash: changes.last_commit.hash, message: changes.last_commit.message, author: changes.last_commit.author, time: changes.last_commit.time }]
+        : [];
+    for (const c of commits) {
+      // Fallback (last_commit) carries files upfront + is always expanded + not
+      // toggleable. Session commits are collapsed-by-default + lazy on expand.
+      const expanded = isFallback || expandedCommits.has(c.hash);
+      const files = isFallback
+        ? (changes.last_commit?.files ?? [])
+        : (expanded ? (commitFiles.get(c.hash) ?? []) : []);
+      out.push({ type: 'commit-header', key: `commit-${c.hash}`, commit: c, expanded, fileCount: files.length, toggleable: !isFallback });
+      for (const entry of files) {
+        out.push({ type: 'file', key: selKey('committed', entry.path), entry, group: { tag: 'committed', label: '', entries: [], kind: 'committed', commitHash: c.hash } });
       }
-      for (const entry of g.entries) {
-        out.push({ type: 'file', key: selKey(g.tag, entry.path), entry, group: g });
+    }
+
+    // Uncommitted + untracked — below the commits, when the tree is dirty.
+    const uncommitted = changes.uncommitted;
+    const untracked = changes.untracked;
+    if (uncommitted.length) {
+      out.push({ type: 'header', key: 'h-uncommitted', label: t('changes.uncommitted' as any) || 'Uncommitted', count: uncommitted.length });
+      for (const entry of uncommitted) {
+        out.push({ type: 'file', key: selKey('uncommitted', entry.path), entry, group: { tag: 'uncommitted', label: '', entries: [], kind: 'uncommitted' } });
+      }
+    }
+    if (untracked.length) {
+      out.push({ type: 'header', key: 'h-untracked', label: t('changes.untracked' as any) || 'Untracked', count: untracked.length });
+      for (const entry of untracked) {
+        out.push({ type: 'file', key: selKey('untracked', entry.path), entry, group: { tag: 'untracked', label: '', entries: [], kind: 'untracked' } });
       }
     }
     return out;
-  }, [changes, t]);
+  }, [changes, t, expandedCommits, commitFiles]);
 
   // Progressive load over the flattened list — caps DOM nodes when a fresh
   // repo lists thousands of untracked files.
@@ -171,6 +197,24 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
     return hit && hit.type === 'file' ? hit : null;
   }, [items, selectedPath]);
   const effectiveSelected = selectedFile ? selectedPath : null;
+
+  const toggleCommit = (hash: string) => {
+    if (!repoRoot) return;
+    setExpandedCommits(prev => {
+      const next = new Set(prev);
+      if (next.has(hash)) {
+        next.delete(hash);
+      } else {
+        next.add(hash);
+        if (!commitFiles.has(hash)) {
+          commands.gitCommitFiles(repoRoot, hash)
+            .then(files => setCommitFiles(m => new Map(m).set(hash, files)))
+            .catch(() => {});
+        }
+      }
+      return next;
+    });
+  };
 
   const handleInit = async () => {
     if (!activeFolderPath || initializing) return;
@@ -257,10 +301,18 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
             if (it.type === 'commit-header') {
               const c = it.commit;
               return (
-                <div key={it.key} className="changes-group-header changes-commit-header">
-                  <span className="changes-group-label">{t('changes.committed' as any) || 'Committed'}</span>
+                <div
+                  key={it.key}
+                  className={`changes-group-header changes-commit-header${it.toggleable ? ' changes-commit-toggleable' : ''}`}
+                  role={it.toggleable ? 'button' : undefined}
+                  tabIndex={it.toggleable ? 0 : undefined}
+                  onClick={it.toggleable ? () => toggleCommit(c.hash) : undefined}
+                  onKeyDown={it.toggleable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCommit(c.hash); } } : undefined}
+                >
+                  {it.toggleable && <span className="changes-commit-chevron" aria-hidden="true">{it.expanded ? '▾' : '▸'}</span>}
                   <span className="changes-commit-hash">{c.hash}</span>
                   <span className="changes-commit-subject" data-tip={c.message}>{c.message}</span>
+                  {it.expanded && it.fileCount > 0 && <span className="changes-commit-count">{it.fileCount}</span>}
                 </div>
               );
             }
@@ -301,6 +353,7 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
             repoRoot={repoRoot}
             rel={selectedFile.entry.rel}
             kind={selectedFile.group.kind}
+            commitHash={selectedFile.group.commitHash}
             onClose={() => setSelectedPath(null)}
             expanded={diffExpanded}
             onToggleExpanded={onToggleDiffExpanded}

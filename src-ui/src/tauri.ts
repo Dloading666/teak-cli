@@ -59,6 +59,17 @@ export interface LastCommit {
   time: number;
   files: GitFileEntry[];
 }
+/** A commit's metadata for the session-commits list (files fetched lazily via
+ *  `gitCommitFiles` when the user expands a commit). */
+export interface CommitMeta {
+  /** Short hash (e.g. "abc1234"). */
+  hash: string;
+  /** Commit subject (first line). */
+  message: string;
+  author: string;
+  /** Commit time, epoch seconds. */
+  time: number;
+}
 export type GitChanges =
   | { state: 'no_git' }
   | { state: 'not_repo' }
@@ -71,9 +82,13 @@ export type GitChanges =
        *  commit"). The staged/unstaged split was collapsed 2026-07-06. */
       uncommitted: GitFileEntry[];
       untracked: GitFileEntry[];
-      /** Most recent commit — shown as the "已提交" group when the working
-       *  tree is clean. null on a repo with no commits. */
+      /** Most recent commit — the "已提交" fallback shown when no commits were
+       *  made this session. null on a repo with no commits. */
       last_commit: LastCommit | null;
+      /** Commits made since this Coffee CLI window opened (baseline..HEAD),
+       *  metadata only — files fetched lazily via `gitCommitFiles`. Push-
+       *  agnostic (push doesn't move HEAD). Reset on app close. */
+      session_commits: CommitMeta[];
     };
 
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -205,6 +220,14 @@ export const commands = {
     invoke<string | null>('git_show_file', { repoRoot, spec }),
   // `git init` a folder — backs the not-a-repo state's "initialize" button.
   gitInit: (folder: string) => invoke<void>('git_init', { folder }),
+  // Capture the session baseline (current HEAD) for a repo, idempotently.
+  // Called at app launch + tab switch (not poll-gated — one rev-parse). Scopes
+  // the "修改记录" session-commits list to commits made this window.
+  gitCaptureBaseline: (folder: string) => invoke<void>('git_capture_baseline', { folder }),
+  // Files changed in a single commit (lazy — on expand in the session-commits
+  // list).
+  gitCommitFiles: (repoRoot: string, hash: string) =>
+    invoke<GitFileEntry[]>('git_commit_files', { repoRoot, hash }),
   // Current on-disk text of a file (lossy-UTF8 so GBK / latin-1 still
   // render; null = missing / binary). Used for the working-tree "new" side
   // and for untracked files, which have no git blob to `show`.

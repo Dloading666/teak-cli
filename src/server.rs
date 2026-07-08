@@ -3374,6 +3374,8 @@ pub fn start_ui() -> anyhow::Result<()> {
             crate::git::git_changes,
             crate::git::git_show_file,
             crate::git::git_init,
+            crate::git::git_capture_baseline,
+            crate::git::git_commit_files,
         ])
         .setup(|app| {
             // Install Claude/Qwen hook scripts + settings patches.

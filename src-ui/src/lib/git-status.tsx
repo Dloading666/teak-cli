@@ -111,6 +111,15 @@ export function GitStatusProvider({ children }: { children: ReactNode }) {
   }, []);
   const pollEnabled = pollSubscribers > 0;
 
+  // Capture the session baseline (current HEAD) for the active folder —
+  // cheap (one rev-parse), NOT poll-gated, so it runs at app launch + on tab
+  // switch regardless of whether the 修改记录 tab is open. Scopes the
+  // session-commits list to commits made this window (reset on app close).
+  useEffect(() => {
+    if (!activeFolderPath) return;
+    commands.gitCaptureBaseline(activeFolderPath).catch(() => {});
+  }, [activeFolderPath]);
+
   const debounceRef = useRef<number | null>(null);
   const lastSigRef = useRef<string>('');
   useEffect(() => {

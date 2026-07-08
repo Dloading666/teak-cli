@@ -13,11 +13,24 @@
 
 use std::collections::HashMap;
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Per-repo session baseline: the HEAD captured when Coffee CLI first saw
+/// this repo this process (via `git_capture_baseline`, called at app launch +
+/// tab switch). Scopes the "修改记录" session-commits list to commits made
+/// this window (`git log <baseline>..HEAD`). In-memory ⇒ cleared on app
+/// close, so the list resets on reopen (no persistence / no counting — just a
+/// baseline hash per repo). Pattern matches terminal.rs's `JOB` OnceLock.
+static BASELINES: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+fn baselines() -> &'static Mutex<HashMap<String, String>> {
+    BASELINES.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 /// Run `git -C <dir> <args>`, capturing stdout. Err on a missing binary or a
 /// non-zero exit (carrying stderr). Display commands like `diff` exit 0 even
@@ -93,6 +106,9 @@ pub enum GitChanges {
         /// working tree is clean so the panel isn't empty after a commit.
         /// `None` on a repo with no commits (fresh `git init`).
         last_commit: Option<LastCommit>,
+        /// Commits made since this Coffee CLI window opened (baseline..HEAD),
+        /// metadata only — files fetched lazily via `git_commit_files`.
+        session_commits: Vec<CommitMeta>,
     },
 }
 
@@ -109,6 +125,20 @@ pub struct LastCommit {
     /// Commit time, epoch seconds.
     pub time: i64,
     pub files: Vec<GitFileEntry>,
+}
+
+/// A commit's metadata for the session-commits list. Files are NOT included —
+/// fetched lazily via `git_commit_files` when the user expands a commit, so a
+/// poll with many session commits stays cheap (one `git log` for metadata).
+#[derive(serde::Serialize)]
+pub struct CommitMeta {
+    /// Short hash (e.g. "abc1234").
+    pub hash: String,
+    /// Commit subject (first line).
+    pub message: String,
+    pub author: String,
+    /// Commit time, epoch seconds.
+    pub time: i64,
 }
 
 /// Parse a `git diff --numstat -z` stream into path → (added, deleted).
@@ -156,29 +186,21 @@ fn numstat_worktree_vs_head(repo_root: &str) -> HashMap<String, (u32, u32)> {
 /// to its parent (or to empty for the initial commit, so all files read as
 /// additions). `--no-renames` keeps parsing simple (rename → delete+add); the
 /// diff viewer doesn't need rename tracking.
-fn last_commit(repo_root: &str) -> Option<LastCommit> {
-    // %h short hash · %x1f unit-separator (won't appear in a commit subject)
-    // · %an author · %at committer-date epoch seconds · %s subject.
-    let log = git_output(repo_root, &["log", "-1", "--format=%h%x1f%an%x1f%at%x1f%s"]).ok()?;
-    let log = log.trim_end_matches(['\n', '\r']);
-    let mut parts = log.splitn(4, '\x1f');
-    let hash = parts.next()?.to_string();
-    let author = parts.next()?.to_string();
-    let time: i64 = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
-    let message = parts.next().unwrap_or("").to_string();
-
+/// Files changed in a single commit vs its parent: `diff-tree --numstat`.
+/// `--root` makes the initial commit (no parent) read as all-additions;
+/// `--no-renames` keeps parsing simple (rename → delete+add). Reused by
+/// `last_commit` (HEAD) and the `git_commit_files` IPC (any commit hash).
+fn commit_files(repo_root: &str, hash: &str) -> Vec<GitFileEntry> {
     let out = git_output(
         repo_root,
-        &["diff-tree", "--no-commit-id", "-r", "--numstat", "-z", "--no-renames", "--root", "HEAD"],
+        &["diff-tree", "--no-commit-id", "-r", "--numstat", "-z", "--no-renames", "--root", hash],
     )
     .unwrap_or_default();
     let counts = parse_numstat(out);
-
     let mut files = Vec::new();
     for (rel, (added, deleted)) in counts {
         // Derive a display status from the numstat: add-only → A, del-only → D,
-        // else M. (A rename shows here as a D + an A under --no-renames, which
-        // is what we want for the "已提交" file list.)
+        // else M. (A rename shows here as a D + an A under --no-renames.)
         let status = if added > 0 && deleted == 0 { 'A' }
             else if deleted > 0 && added == 0 { 'D' }
             else { 'M' };
@@ -192,7 +214,52 @@ fn last_commit(repo_root: &str) -> Option<LastCommit> {
     }
     // diff-tree gives no ordering guarantee; sort by path for a stable list.
     files.sort_by(|a, b| a.rel.cmp(&b.rel));
-    Some(LastCommit { hash, message, author, time, files })
+    files
+}
+
+/// Most-recent-commit summary (HEAD) — the "已提交" fallback shown when no
+/// commits were made this session. `None` on a repo with no commits (fresh
+/// `git init`) — `git log -1` exits non-zero there. Files via `commit_files`.
+fn last_commit(repo_root: &str) -> Option<LastCommit> {
+    // %h short hash · %x1f unit-separator (won't appear in a commit subject)
+    // · %an author · %at committer-date epoch seconds · %s subject.
+    let log = git_output(repo_root, &["log", "-1", "--format=%h%x1f%an%x1f%at%x1f%s"]).ok()?;
+    let log = log.trim_end_matches(['\n', '\r']);
+    let mut parts = log.splitn(4, '\x1f');
+    let hash = parts.next()?.to_string();
+    let author = parts.next()?.to_string();
+    let time: i64 = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+    let message = parts.next().unwrap_or("").to_string();
+    Some(LastCommit { hash, message, author, time, files: commit_files(repo_root, "HEAD") })
+}
+
+/// Commits made since the session baseline (`git log <baseline>..HEAD`),
+/// metadata only (files are lazy via `git_commit_files`). Empty if no baseline
+/// yet. If the baseline hash no longer resolves (reset/rebase rewrote history
+/// below it), the stale entry is cleared so the next call re-captures.
+fn session_commits_since(repo_root: &str, baseline: &str) -> Vec<CommitMeta> {
+    let range = format!("{baseline}..HEAD");
+    match git_output(repo_root, &["log", &range, "--format=%h%x1f%an%x1f%at%x1f%s"]) {
+        Ok(out) => out
+            .lines()
+            .filter_map(|line| {
+                let mut parts = line.splitn(4, '\x1f');
+                let hash = parts.next()?.to_string();
+                let author = parts.next()?.to_string();
+                let time: i64 = parts.next().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+                let message = parts.next().unwrap_or("").to_string();
+                Some(CommitMeta { hash, message, author, time })
+            })
+            .collect(),
+        Err(_) => {
+            // Baseline gone (history rewritten). Drop it so the next git_changes
+            // re-captures a fresh baseline instead of persisting the error.
+            if let Ok(mut map) = baselines().lock() {
+                map.remove(repo_root);
+            }
+            Vec::new()
+        }
+    }
 }
 
 /// Absolute, forward-slashed key with an upper-cased Windows drive letter —
@@ -327,13 +394,31 @@ pub fn git_changes(folder: String) -> GitChanges {
         }
     }
 
-    // Only fetch the last commit when the working tree is clean — the frontend
-    // shows the "已提交" group only then, so computing it on every poll while an
-    // agent is editing (the common dirty case) would waste 2 git subprocesses
-    // (git log -1 + diff-tree --numstat) per 800ms tick for data never shown.
-    // None = "don't show committed group" on the frontend, identical to the
-    // dirty-case behavior. (Code-review 2026-07-06.)
-    let last_commit = if uncommitted.is_empty() && untracked.is_empty() {
+    // Session commits: commits made since this Coffee CLI window opened
+    // (baseline = HEAD at first sight of this repo, captured by
+    // `git_capture_baseline` at app launch + tab switch, in-memory ⇒ reset on
+    // close). Push-agnostic — push doesn't move HEAD, so committed entries
+    // stay in the list. Metadata only; files are fetched lazily via
+    // `git_commit_files` when the user expands a commit, so a poll with many
+    // session commits is still one `git log` call.
+    let baseline = baselines()
+        .lock()
+        .ok()
+        .and_then(|map| map.get(&repo_root).cloned());
+    let session_commits = match baseline {
+        Some(b) => session_commits_since(&repo_root, &b),
+        None => Vec::new(),
+    };
+    // last_commit (HEAD) is the FALLBACK shown when no commits were made this
+    // session — only computed then (saves the diff-tree call when there are
+    // session commits). Kept behind the clean-tree gate so the no-session case
+    // preserves the prior "show HEAD when clean" behavior; when there ARE
+    // session commits they show regardless of dirty/clean (no gate) — that's
+    // the fix for "commit vanishes the moment the agent edits".
+    let last_commit = if session_commits.is_empty()
+        && uncommitted.is_empty()
+        && untracked.is_empty()
+    {
         last_commit(&repo_root)
     } else {
         None
@@ -344,6 +429,7 @@ pub fn git_changes(folder: String) -> GitChanges {
         uncommitted,
         untracked,
         last_commit,
+        session_commits,
     }
 }
 
@@ -370,4 +456,29 @@ pub fn git_show_file(repo_root: String, spec: String) -> Option<String> {
 #[tauri::command]
 pub fn git_init(folder: String) -> Result<(), String> {
     git_output(&folder, &["init"]).map(|_| ())
+}
+
+/// Capture the session baseline (current HEAD) for a repo, idempotently.
+/// Called at app launch + on tab switch (NOT poll-gated — one rev-parse).
+/// Scopes the "修改记录" session-commits list to commits made this window.
+#[tauri::command]
+pub fn git_capture_baseline(folder: String) {
+    let repo_root = match git_output(&folder, &["rev-parse", "--show-toplevel"]) {
+        Ok(s) => s.trim().to_string(),
+        Err(_) => return, // not a repo — nothing to baseline
+    };
+    if let Ok(mut map) = baselines().lock() {
+        if !map.contains_key(&repo_root) {
+            if let Ok(sha) = git_output(&repo_root, &["rev-parse", "HEAD"]) {
+                map.insert(repo_root, sha.trim().to_string());
+            }
+        }
+    }
+}
+
+/// Files changed in a single commit (lazy — called when the user expands a
+/// session commit in the 修改记录 list). Reuses `commit_files`.
+#[tauri::command]
+pub fn git_commit_files(repo_root: String, hash: String) -> Vec<GitFileEntry> {
+    commit_files(&repo_root, &hash)
 }
