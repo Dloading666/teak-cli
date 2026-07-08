@@ -111,6 +111,11 @@ export const en = {
   'settings.send.title': 'Send message',
   'settings.send.newline': 'for a new line',
   'settings.gambit.hotkey': 'Toggle shortcut',
+  // Titlebar panel-toggle display mode (settings → 快捷键)
+  'settings.titlebar.toggle': 'Titlebar toggles',
+  'settings.titlebar.toggle.icon-hotkey': 'Icon + shortcut',
+  'settings.titlebar.toggle.icon': 'Icon only',
+  'settings.titlebar.toggle.hidden': 'Hidden',
   // Task board form (to-do list vs sticky notes)
   'settings.tasks': 'Tasks',
   'settings.tasks.view': 'Task style',

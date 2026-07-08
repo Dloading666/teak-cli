@@ -61,6 +61,11 @@ export const HOTKEY_SCHEMES = [
 export type HotkeyScheme = typeof HOTKEY_SCHEMES[number]['code'];
 export type HotkeyAction = 'left' | 'gambit' | 'right';
 
+// How the titlebar's three panel toggles (left / Gambit / right) render:
+// 'icon-hotkey' = icon + shortcut hint (default); 'icon' = icon only;
+// 'hidden' = hide the toggles entirely (keyboard-only — Alt+Q/W/E still work).
+export type TitlebarToggleDisplay = 'icon-hotkey' | 'icon' | 'hidden';
+
 // Which chrome toggle a keydown maps to under the active scheme, or null. The
 // caller MUST then preventDefault (cancels the macOS Alt-glyph + the control
 // byte) AND stopPropagation (keeps the combo out of xterm's own keydown).
@@ -194,6 +199,8 @@ export interface AppState {
   // three chrome toggles — left panel / Gambit / right panel — via a global
   // capture-phase listener in ActiveGambit.
   hotkeyScheme: HotkeyScheme;
+  // How the titlebar's three panel toggles render (icon+hotkey / icon / hidden).
+  titlebarToggleDisplay: TitlebarToggleDisplay;
 
   // IDE-style layout toggles driven from titlebar controls.
   // Default both panels visible — matches first-time user expectation.
@@ -277,6 +284,7 @@ type Action =
   | { type: 'SET_SETTINGS_OPEN'; open: boolean }
   | { type: 'SET_GAMBIT_ENTER_TO_SEND'; value: boolean }
   | { type: 'SET_HOTKEY_SCHEME'; value: HotkeyScheme }
+  | { type: 'SET_TITLEBAR_TOGGLE_DISPLAY'; value: TitlebarToggleDisplay }
   | { type: 'SET_GAMBIT_DRAFT'; id: string; draft: string }
   | { type: 'SET_PANE_TOOL'; tabId: string; paneIdx: number; tool: ToolType; toolData?: string; folderPath?: string | null }
   | { type: 'SET_PANE_SENTINEL'; tabId: string; paneIdx: number; enabled: boolean }
@@ -408,6 +416,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, gambitEnterToSend: action.value };
     case 'SET_HOTKEY_SCHEME':
       return { ...state, hotkeyScheme: action.value };
+    case 'SET_TITLEBAR_TOGGLE_DISPLAY':
+      return { ...state, titlebarToggleDisplay: action.value };
     case 'SET_GAMBIT_DRAFT':
       return {
         ...state,
@@ -575,6 +585,7 @@ function getInitialState(): AppState {
   // Ctrl+QWE preset is opt-in despite clashing with terminal Ctrl+W/E/Q.
   // Overridden only by a stored valid scheme.
   let hotkeyScheme: HotkeyScheme = 'alt-qwe';
+  let titlebarToggleDisplay: TitlebarToggleDisplay = 'icon-hotkey';
   try {
     const storedPath = localStorage.getItem('cc-bg-path');
     const storedType = localStorage.getItem('cc-bg-type') as 'image' | 'video' | 'none' | null;
@@ -601,6 +612,10 @@ function getInitialState(): AppState {
     const storedScheme = localStorage.getItem('cc-hotkey-scheme');
     if (storedScheme && HOTKEY_SCHEMES.some(h => h.code === storedScheme)) {
       hotkeyScheme = storedScheme as HotkeyScheme;
+    }
+    const storedTtd = localStorage.getItem('cc-titlebar-toggle-display');
+    if (storedTtd === 'icon-hotkey' || storedTtd === 'icon' || storedTtd === 'hidden') {
+      titlebarToggleDisplay = storedTtd;
     }
     // New key (post-refactor): wallpaper opacity, 0-100, larger = more
     // visible. Old key was `cc-wallpaper-dim` (0-80, larger = darker
@@ -659,6 +674,7 @@ function getInitialState(): AppState {
     settingsOpen: false,
     gambitEnterToSend,
     hotkeyScheme,
+    titlebarToggleDisplay,
     leftPanelHidden,
     rightPanelHidden,
     multiAgentLayout,

@@ -1042,6 +1042,19 @@ html.is-macos .titlebar-left-slot.is-collapsed {
     white-space: nowrap;
     pointer-events: none; /* clicks fall through to the button (toggle Gambit) */
 }
+
+/* Titlebar panel-toggle display mode (settings → 快捷键):
+   icon = icon only (hide the shortcut hint); hidden = hide the three panel
+   toggles entirely (keyboard-only — Alt+Q/W/E still work). The gear +
+   multi-agent picker stay (they're not .titlebar-btn--hinted). Specificity
+   (0,3,0) outranks the base .titlebar-btn / --hinted rules so display:none
+   wins. */
+.titlebar-layout-toggles[data-toggle-display="icon"] .titlebar-hotkey-hint {
+    display: none;
+}
+.titlebar-layout-toggles[data-toggle-display="hidden"] .titlebar-btn--hinted {
+    display: none;
+}
 .titlebar-controls {
     display: flex;
     height: 100%; /* full bar height so min/max/close hover (incl the close-red) fills the bar */

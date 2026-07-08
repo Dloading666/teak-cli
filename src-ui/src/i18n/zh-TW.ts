@@ -109,6 +109,11 @@ export const zhTW = {
   'settings.send.title': '發送訊息',
   'settings.send.newline': '換行',
   'settings.gambit.hotkey': '開關快捷鍵',
+  // 頂部快捷開關顯示模式(設定 → 快捷鍵)
+  'settings.titlebar.toggle': '頂部快捷開關',
+  'settings.titlebar.toggle.icon-hotkey': '圖示 + 快捷鍵',
+  'settings.titlebar.toggle.icon': '僅圖示',
+  'settings.titlebar.toggle.hidden': '隱藏',
   'settings.tasks': '任務',
   'settings.tasks.view': '任務形態',
   'task.view.list': '待辦式',

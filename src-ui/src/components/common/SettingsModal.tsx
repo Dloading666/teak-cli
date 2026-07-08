@@ -13,7 +13,7 @@
 // is unchanged; only the presentation moved.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { useAppState, useAppDispatch, HOTKEY_SCHEMES, type HotkeyScheme, type ThemeColor, type ThemeShape, type IconTheme } from '../../store/app-state';
+import { useAppState, useAppDispatch, HOTKEY_SCHEMES, type HotkeyScheme, type TitlebarToggleDisplay, type ThemeColor, type ThemeShape, type IconTheme } from '../../store/app-state';
 import { useT } from '../../i18n/useT';
 import { IS_MACOS } from '../../lib/platform';
 import { TERM_COLOR_SCHEMES } from '../center/TierTerminal';
@@ -185,6 +185,10 @@ export function SettingsModal() {
   const setHotkeyScheme = (value: HotkeyScheme) => {
     dispatch({ type: 'SET_HOTKEY_SCHEME', value });
     try { localStorage.setItem('cc-hotkey-scheme', value); } catch {}
+  };
+  const setTitlebarToggleDisplay = (value: TitlebarToggleDisplay) => {
+    dispatch({ type: 'SET_TITLEBAR_TOGGLE_DISPLAY', value });
+    try { localStorage.setItem('cc-titlebar-toggle-display', value); } catch {}
   };
 
   const hasBg = state.bgType !== 'none' && state.bgPath !== '';
@@ -398,6 +402,22 @@ export function SettingsModal() {
                         {/* Modifier + the three keys (left · Gambit · right, in
                             that L→R order). Titlebar hints show which is which. */}
                         <span className="settings-key-combo"><kbd>{s.mod}</kbd><span className="settings-key-plus">+</span><kbd>{s.keys.left.key}</kbd><kbd>{s.keys.gambit.key}</kbd><kbd>{s.keys.right.key}</kbd></span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="settings-section-label">{t('settings.titlebar.toggle' as any)}</div>
+                <div className="settings-key-row">
+                  {([
+                    { code: 'icon-hotkey', labelKey: 'settings.titlebar.toggle.icon-hotkey' },
+                    { code: 'icon', labelKey: 'settings.titlebar.toggle.icon' },
+                    { code: 'hidden', labelKey: 'settings.titlebar.toggle.hidden' },
+                  ] as const).map(m => {
+                    const active = state.titlebarToggleDisplay === m.code;
+                    return (
+                      <button key={m.code} className={`settings-key-card${active ? ' active' : ''}`} onClick={() => setTitlebarToggleDisplay(m.code)} aria-pressed={active}>
+                        <span className="settings-key-combo">{t(m.labelKey as any)}</span>
                       </button>
                     );
                   })}

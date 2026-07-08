@@ -109,6 +109,11 @@ export const zhCN = {
   'settings.send.title': '发送消息',
   'settings.send.newline': '换行',
   'settings.gambit.hotkey': '开关快捷键',
+  // 顶部快捷开关显示模式(设置 → 快捷键)
+  'settings.titlebar.toggle': '顶部快捷开关',
+  'settings.titlebar.toggle.icon-hotkey': '图标 + 快捷键',
+  'settings.titlebar.toggle.icon': '仅图标',
+  'settings.titlebar.toggle.hidden': '隐藏',
   'settings.tasks': '任务',
   'settings.tasks.view': '任务形态',
   'task.view.list': '待办式',

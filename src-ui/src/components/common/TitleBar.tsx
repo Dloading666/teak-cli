@@ -102,7 +102,7 @@ export function TitleBar() {
           the outer border instead of crossing through it — avoids the
           "crossed-lines" look the user flagged. Active signal still travels
           via .is-active background only. */}
-      <div className="titlebar-layout-toggles">
+      <div className="titlebar-layout-toggles" data-toggle-display={state.titlebarToggleDisplay}>
         {/* Left panel · Gambit · right panel — the three hinted chrome toggles,
             adjacent with Gambit in the MIDDLE so the row mirrors the screen
             (left panel on the left, right on the right) and the default Alt+QWE
