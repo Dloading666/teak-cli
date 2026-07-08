@@ -12,6 +12,7 @@ mod tools;
 mod skills;
 mod marketplace;
 mod git;
+mod paths;
 #[cfg(target_os = "windows")]
 mod windows_path;
 

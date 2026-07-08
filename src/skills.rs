@@ -24,6 +24,8 @@ use std::path::{Path, PathBuf};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 
+use crate::paths::home;
+
 /// Coffee CLI's bundled skills, baked into the binary at compile time.
 /// Currently 2 entries (`screenshot`, `vibeid`); both live under
 /// `skills/` at the repo root and ship as part of Coffee CLI's
@@ -88,10 +90,6 @@ pub struct SkillEntry {
     /// pill expands to an instruction pointing the agent at
     /// `<path>/SKILL.md`. Native separators (backslash on Windows).
     pub path: String,
-}
-
-fn home() -> Result<PathBuf, String> {
-    dirs::home_dir().ok_or_else(|| "No home directory".to_string())
 }
 
 pub fn skills_root() -> Result<PathBuf, String> {

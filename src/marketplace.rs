@@ -27,14 +27,12 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::paths::home;
+
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
-fn home() -> Result<PathBuf, String> {
-    dirs::home_dir().ok_or_else(|| "No home directory".to_string())
-}
 
 pub fn marketplace_root() -> Result<PathBuf, String> {
     Ok(home()?.join(".coffee-cli").join("marketplace"))
