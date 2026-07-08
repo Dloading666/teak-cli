@@ -305,7 +305,7 @@
   border-color: var(--accent, #c4956a);
   background: color-mix(in srgb, var(--accent, #c4956a) 12%, transparent);
 }
-.settings-key-combo { display: flex; align-items: center; gap: 5px; }
+.settings-key-combo { display: flex; align-items: center; gap: 5px; color: var(--text-2, rgba(255, 255, 255, 0.7)); }
 .settings-key-plus { color: var(--text-3, rgba(255, 255, 255, 0.4)); font-size: 12px; }
 .settings-key-card kbd {
   display: inline-flex;
