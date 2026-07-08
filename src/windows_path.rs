@@ -37,7 +37,10 @@ pub(crate) fn hydrate() {
     let current = std::env::var("PATH").unwrap_or_default();
     let merged = merge_into_path(&current, &candidates);
     if merged != current {
-        std::env::set_var("PATH", merged);
+        // `set_var` becomes `unsafe` in edition 2024 (cross-thread env races);
+        // we run single-threaded at GUI startup before any spawn threads exist,
+        // mirroring the `unsafe{}` wrapping in main.rs's GDK/PATH blocks.
+        unsafe { std::env::set_var("PATH", merged); }
     }
 }
 
