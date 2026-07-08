@@ -13,9 +13,10 @@
 // editable path string. AI CLI agents that support local image paths (e.g.
 // Claude Code) will read the file; agents that don't just see the raw path.
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { clipboardRead, clipboardWrite } from '../../lib/clipboard';
+import { subscribeGambitHistory, getGambitHistorySnapshot, pushGambitHistory } from '../../lib/gambit-history';
 import { commands } from '../../tauri';
 import { useT } from '../../i18n/useT';
 import { useAppState } from '../../store/app-state';
@@ -101,6 +102,30 @@ function GambitImpl({
   // content edit (typing / paste) from a non-content trigger (pill toggle,
   // window resize) so only the former is allowed to move the scroll position.
   const lastSizedDraftRef = useRef(draft);
+
+  // ─── Prompt history (↑/↓ recall) ──────────────────────────────────
+  // Global, localStorage-persisted, shared across every tab's Gambit
+  // (see lib/gambit-history.ts). The navigation cursor + the in-progress
+  // draft saved on first ↑ are this instance's interaction state — they
+  // reset when the user switches tabs (Gambit unmounts), which is fine:
+  // nobody is mid-recall across a tab switch.
+  const history = useSyncExternalStore(subscribeGambitHistory, getGambitHistorySnapshot);
+  // Index into `history` while navigating, or null at the live prompt.
+  // When ↓ scrolls PAST the newest entry the cursor returns to null and we
+  // restore `savedDraftRef` — the text the user was typing before they
+  // pressed ↑ — standard shell/REPL behavior so you never lose a half-typed
+  // prompt by peeking at history.
+  const historyCursorRef = useRef<number | null>(null);
+  const savedDraftRef = useRef('');
+  // Mutations to `draft` that come from history navigation itself set this
+  // flag so the effect below knows to leave the cursor alone. Every OTHER
+  // draft change (typing, paste, file-drop, cut) ends navigation mode by
+  // clearing the cursor — a single, mutation-path-agnostic reset point.
+  const isNavMutationRef = useRef(false);
+  useEffect(() => {
+    if (isNavMutationRef.current) { isNavMutationRef.current = false; return; }
+    historyCursorRef.current = null;
+  }, [draft]);
 
   // Docked height (px), user-resizable via the top-edge handle. Persists.
   const [dockedH, setDockedH] = useState<number>(() => {
@@ -533,6 +558,58 @@ function GambitImpl({
     setCtxMenu(null);
   };
 
+  // ─── History navigation ──────────────────────────────────────────
+  // Walk the global prompt history (lib/gambit-history.ts) with ↑/↓.
+  //   • First ↑ from the live prompt: save the in-progress draft and jump
+  //     to the newest entry. Subsequent ↑ moves toward older entries.
+  //   • ↓ moves toward newer entries; scrolling past the newest restores
+  //     the saved in-progress draft (so peeking at history never costs
+  //     you the half-typed prompt you were working on).
+  //   • ↑ at the oldest / ↓ at the newest is a no-op (cursor clamps).
+  // Returns false for no-ops so onKeyDown can leave native caret movement
+  // untouched when there's nothing to recall.
+  const navigateHistory = useCallback((direction: -1 | 1): boolean => {
+    const hist = history;
+    const cur = historyCursorRef.current;
+    let next: number | null;
+    let text: string;
+    if (cur === null) {
+      // Entering history mode from the live prompt.
+      if (direction === 1) return false;     // already at newest — ↓ no-op
+      if (hist.length === 0) return false;    // nothing to recall
+      next = hist.length - 1;                 // newest entry
+      savedDraftRef.current = draft;          // stash what the user was typing
+      text = hist[next];
+    } else {
+      const cand = cur + direction;
+      if (cand < 0) return false;             // already at oldest — ↑ clamps
+      if (cand >= hist.length) {              // scrolled past newest
+        next = null;
+        text = savedDraftRef.current;         // restore the in-progress draft
+      } else {
+        next = cand;
+        text = hist[cand];
+      }
+    }
+    historyCursorRef.current = next;
+    // Flag this onDraftChange as navigation-driven so the [draft] effect
+    // doesn't immediately exit history mode (which would reset the cursor
+    // we just set).
+    isNavMutationRef.current = true;
+    onDraftChange(text);
+    // Park the caret at the end of the recalled text so typing continues
+    // from the tail — matches shell recall UX. Runs after React commits
+    // the controlled value (same rAF pattern as ctxPaste).
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.selectionStart = text.length;
+      ta.selectionEnd = text.length;
+    });
+    return true;
+  }, [history, draft, onDraftChange]);
+
   const handleSend = useCallback(() => {
     // CRITICAL: the draft text is the ONLY thing that gets sent.
     // Thumbnails rendered from pastedImagePaths are a pure derived view
@@ -560,6 +637,14 @@ function GambitImpl({
       setSendFailed(true);
       return;
     }
+    // Record the user's RAW prompt (not `finalText`, which carries the
+    // skill preamble we generated) so ↑ recall shows what they actually
+    // typed. Skill-only sends (empty `text`) push nothing — there's no
+    // user prompt to recall. pushGambitHistory trims + dedupes + caps.
+    pushGambitHistory(text);
+    // Sent → leave history navigation mode so the next ↑ starts from the
+    // newest entry (which is the one we just pushed).
+    historyCursorRef.current = null;
     onDraftChange('');
     setAttachedSkills([]);
   }, [draft, attachedSkills, onSend, onDraftChange]);
@@ -568,6 +653,27 @@ function GambitImpl({
     // IME composition in progress — let the IME keep Enter for confirming
     // candidates. nativeEvent.isComposing is the canonical flag.
     if (e.nativeEvent.isComposing) return;
+    // ↑/↓ history recall — only at the top / bottom line of the textarea so
+    // multi-line caret movement stays intact in the middle of a long draft.
+    // The textarea is rows=1 with auto-grow, so an unedited single-line
+    // draft always qualifies; a multi-line draft only recalls when the
+    // caret sits on the edge line. This mirrors shells, Python REPL, and
+    // the fzf-style prompt navigation users already expect.
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      const ta = e.currentTarget;
+      const value = ta.value;
+      const pos = ta.selectionStart ?? 0;
+      // Selection (non-collapsed) → let the browser adjust it natively;
+      // intercepting would break shift+arrow selection across lines.
+      const isCaret = ta.selectionStart === ta.selectionEnd;
+      const onFirstLine = isCaret && !value.slice(0, pos).includes('\n');
+      const onLastLine = isCaret && !value.slice(pos).includes('\n');
+      if ((e.key === 'ArrowUp' && onFirstLine) || (e.key === 'ArrowDown' && onLastLine)) {
+        if (navigateHistory(e.key === 'ArrowUp' ? -1 : 1)) e.preventDefault();
+        return;
+      }
+      // Fall through: native caret movement within / between lines.
+    }
     // Backspace at the very start of an empty draft pops the last skill
     // pill — mirrors how chip inputs let you delete attachments with ⌫.
     if (e.key === 'Backspace' && draft.length === 0 && attachedSkills.length > 0) {
