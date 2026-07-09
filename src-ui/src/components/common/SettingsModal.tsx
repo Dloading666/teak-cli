@@ -243,7 +243,18 @@ export function SettingsModal() {
               {s.label}
             </button>
           ))}
-          {version && <div className="settings-rail-version">v{version}</div>}
+          {version && (
+            <div className="settings-rail-version">
+              <span className="settings-rail-version-num">v{version}</span>
+              <button
+                type="button"
+                className="settings-rail-version-link"
+                onClick={() => commands.openUrl('https://coffeecli.com').catch(() => {})}
+              >
+                CoffeeCLI.com
+              </button>
+            </div>
+          )}
         </aside>
 
         <section className="settings-content">

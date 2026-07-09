@@ -75,7 +75,9 @@
 .settings-rail-icon { display: flex; opacity: 0.85; }
 .settings-rail-icon svg { width: 16px; height: 16px; }
 
-/* App version pinned to the bottom of the rail. */
+/* App version + site link pinned to the bottom of the rail. Two stacked
+   lines (rail is only ~148px usable — side-by-side crowds, and version vs.
+   link are semantically distinct: one is read-only, one is clickable). */
 .settings-rail-version {
   margin-top: auto;
   padding: 10px 12px 4px;
@@ -83,6 +85,28 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   color: var(--text-3, rgba(255, 255, 255, 0.35));
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.settings-rail-version-num { display: block; }
+.settings-rail-version-link {
+  /* Reset <button> chrome — read as plain text, colored as a link on hover. */
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+}
+.settings-rail-version-link:hover {
+  color: var(--accent, #c4956a);
+  text-decoration: underline;
 }
 
 /* ── Content (fixed header + scrolling body) ───────────────────────────── */
