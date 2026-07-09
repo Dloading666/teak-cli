@@ -149,6 +149,15 @@
   text-overflow: ellipsis;
 }
 
+/* In tab mode the header name is hidden (the chrome-tab strip carries the
+ * filename), so only the actions remain. With nothing on the left, the
+ * header's default space-between would pin the lone actions cluster to the
+ * left edge — push it to the right (top-right corner) where close/fold
+ * affordances belong. */
+.diff-panel--tab .diff-header {
+  justify-content: flex-end;
+}
+
 .diff-header-actions {
   display: inline-flex;
   align-items: center;
