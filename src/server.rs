@@ -135,7 +135,11 @@ fn check_tools_installed() -> std::collections::HashMap<String, bool> {
 /// `shell_probe::detect_capabilities` for the per-shell strategy.
 #[tauri::command]
 fn detect_shells() -> crate::shell_probe::ShellCapabilitiesJson {
-    let caps = crate::shell_probe::detect_capabilities();
+    let mut caps = crate::shell_probe::detect_capabilities();
+    // Exact versions are probed here (Settings open), not in
+    // detect_capabilities (startup/spawn) — powershell.exe's $PSVersionTable
+    // takes ~1-2s and would stall boot if it ran there.
+    crate::shell_probe::populate_versions(&mut caps);
     crate::shell_probe::ShellCapabilitiesJson::from(&caps)
 }
 

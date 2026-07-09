@@ -101,6 +101,19 @@ pub struct ShellCapabilities {
     /// 5.1 `powershell.exe` is available.
     #[cfg(target_os = "windows")]
     pub pwsh_available: bool,
+    /// Exact version string of PowerShell 7, e.g. "7.4.6" (from
+    /// `pwsh --version`). Surfaced in the picker so users see which build
+    /// they're picking — most want 7 over 5, and seeing the real version
+    /// builds confidence the detection is live, not a guess. `None` when
+    /// pwsh isn't installed or the version probe failed.
+    #[cfg(target_os = "windows")]
+    pub pwsh_version: Option<String>,
+    /// Exact version string of inbox PowerShell 5.1, e.g. "5.1.22621.4116"
+    /// (from `$PSVersionTable.PSVersion`). `None` if the probe failed —
+    /// the card still shows (5.1 is always present on supported Windows)
+    /// but without a version suffix.
+    #[cfg(target_os = "windows")]
+    pub powershell_version: Option<String>,
     /// Absolute path to Git-for-Windows `bash.exe`, when found at any of
     /// the standard install locations. `None` if Git Bash isn't installed
     /// (or is installed somewhere we don't look — accepted gap; `Auto`
@@ -139,6 +152,10 @@ pub struct ShellCapabilitiesJson {
     #[cfg(target_os = "windows")]
     pub pwsh_available: bool,
     #[cfg(target_os = "windows")]
+    pub pwsh_version: Option<String>,
+    #[cfg(target_os = "windows")]
+    pub powershell_version: Option<String>,
+    #[cfg(target_os = "windows")]
     pub git_bash_available: bool,
     pub wsl_available: bool,
     #[cfg(not(target_os = "windows"))]
@@ -157,6 +174,10 @@ impl From<&ShellCapabilities> for ShellCapabilitiesJson {
             #[cfg(target_os = "windows")]
             pwsh_available: c.pwsh_available,
             #[cfg(target_os = "windows")]
+            pwsh_version: c.pwsh_version.clone(),
+            #[cfg(target_os = "windows")]
+            powershell_version: c.powershell_version.clone(),
+            #[cfg(target_os = "windows")]
             git_bash_available: c.git_bash_path.is_some(),
             wsl_available: c.wsl_available,
             #[cfg(not(target_os = "windows"))]
@@ -174,6 +195,10 @@ impl From<&ShellCapabilities> for ShellCapabilitiesJson {
 /// Probe the host for optional shells. Cheap (a few `where`/`exists`
 /// checks); safe to call once on app start and cache for the process
 /// lifetime — re-install-during-run is rare, and `Auto` always works.
+/// Does NOT probe exact versions — that's a slower step (powershell.exe
+/// takes ~1-2s to report $PSVersionTable) gated to `populate_versions()`,
+/// called only when the Settings picker opens, so app startup and every
+/// terminal spawn stay fast.
 pub fn detect_capabilities() -> ShellCapabilities {
     let mut caps = ShellCapabilities::default();
     #[cfg(target_os = "windows")]
@@ -197,6 +222,71 @@ pub fn detect_capabilities() -> ShellCapabilities {
         caps.sh_available = crate::server::check_tool_unix("sh");
     }
     caps
+}
+
+/// Fill in exact version strings for the Windows PowerShell shells. Called
+/// only from `detect_shells` (Settings picker open), NOT from startup —
+/// `powershell.exe -Command $PSVersionTable` takes ~1-2s, which would
+/// stall app boot and every terminal spawn if it ran in
+/// `detect_capabilities`. Each probe is CREATE_NO_WINDOW so opening
+/// Settings doesn't flash console windows.
+#[cfg(target_os = "windows")]
+pub fn populate_versions(caps: &mut ShellCapabilities) {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+
+    // PowerShell 7: `pwsh --version` prints "PowerShell 7.4.6" and exits
+    // fast (~150ms, single-file .NET app). Only probe if we already found a
+    // real pwsh path (avoids re-triggering the App Execution Alias trap).
+    if caps.pwsh_available {
+        if let Some(path) = caps.pwsh_path.as_ref() {
+            caps.pwsh_version = Command::new(path)
+                .arg("--version")
+                .creation_flags(0x08000000)
+                .output()
+                .ok()
+                .and_then(|o| {
+                    if o.status.success() {
+                        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                        // "PowerShell 7.4.6" → take the last whitespace token.
+                        s.split_whitespace().last().map(|v| v.to_string())
+                    } else {
+                        None
+                    }
+                });
+        }
+    }
+
+    // PowerShell 5.1: `$PSVersionTable.PSVersion.ToString()` prints
+    // "5.1.22621.4116". powershell.exe cold-starts slowly, so this is the
+    // probe that motivated gating versions out of startup. Always probe
+    // (5.1 is inbox on every supported Windows) — a failure just leaves
+    // the version None and the card shows without a suffix.
+    caps.powershell_version = Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$PSVersionTable.PSVersion.ToString()",
+        ])
+        .creation_flags(0x08000000)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                if s.is_empty() { None } else { Some(s) }
+            } else {
+                None
+            }
+        });
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn populate_versions(_caps: &mut ShellCapabilities) {
+    // Unix shells don't carry a meaningful single "version" in the picker —
+    // zsh/bash/fish versions are rarely actionable for the user. No-op so
+    // the Settings command can call this unconditionally across platforms.
 }
 
 /// `(program, args)` handed to `terminal::spawn`. The program is an

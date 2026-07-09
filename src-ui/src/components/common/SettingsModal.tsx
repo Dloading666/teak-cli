@@ -107,7 +107,8 @@ export function SettingsModal() {
   // Platform-specific fields are absent cross-OS — read with optional
   // chaining.
   const [shellCaps, setShellCaps] = useState<{
-    pwsh_available?: boolean; git_bash_available?: boolean;
+    pwsh_available?: boolean; pwsh_version?: string | null; powershell_version?: string | null;
+    git_bash_available?: boolean;
     zsh_available?: boolean; bash_available?: boolean;
     fish_available?: boolean; sh_available?: boolean;
     wsl_available: boolean;
@@ -400,12 +401,22 @@ export function SettingsModal() {
                   </button>
                   {IS_WINDOWS && (() => {
                     const caps = shellCaps;
-                    // Order: pwsh → PowerShell (inbox) → Git Bash → cmd (末位).
-                    // pwsh / git-bash only when detected; PowerShell + cmd are
-                    // inbox on every supported Windows so always offered.
-                    const opts: { id: string; label: string; show: boolean; notRecommended?: boolean }[] = [
-                      { id: 'pwsh', label: 'pwsh', show: !!caps?.pwsh_available },
-                      { id: 'powershell', label: 'PowerShell', show: true },
+                    // Order: pwsh (PowerShell 7) → PowerShell 5 (inbox) →
+                    // Git Bash → cmd (末位). pwsh / git-bash only when
+                    // detected; PowerShell 5 + cmd are inbox on every
+                    // supported Windows so always offered.
+                    //
+                    // Labels show the major version (PowerShell 7 / 5) plus
+                    // the EXACT probed version as a sub-label — 7 and 5 are
+                    // distinct CLIs with different runtimes (.NET 8+ cross-
+                    // platform vs inbox Windows-only) and users have
+                    // opinions. A bare "pwsh" vs "PowerShell" pair was
+                    // opaque; showing the real build (e.g. 7.4.6) lets users
+                    // pick the one they want (most prefer 7) and proves the
+                    // detection is live.
+                    const opts: { id: string; label: string; show: boolean; version?: string; notRecommended?: boolean }[] = [
+                      { id: 'pwsh', label: 'PowerShell 7', show: !!caps?.pwsh_available, version: caps?.pwsh_version ?? undefined },
+                      { id: 'powershell', label: 'PowerShell 5', show: true, version: caps?.powershell_version ?? undefined },
                       { id: 'git-bash', label: 'Git Bash', show: !!caps?.git_bash_available },
                       { id: 'cmd', label: 'Command Prompt', show: true, notRecommended: true },
                     ];
@@ -419,7 +430,10 @@ export function SettingsModal() {
                           aria-pressed={active}
                         >
                           <span className="settings-key-combo"><kbd>{o.label}</kbd></span>
-                          {o.notRecommended && (
+                          {o.version && (
+                            <span className="settings-key-sub">{o.version}</span>
+                          )}
+                          {o.notRecommended && !o.version && (
                             <span className="settings-key-sub">{t('settings.terminal.shell.not_recommended' as any)}</span>
                           )}
                         </button>
