@@ -141,13 +141,17 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
       return next;
     });
 
-  // Keyboard handling — same DiffPanel element across two visual sizes:
-  //   half (default): bottom-anchored overlay covering ~55% of the panel
-  //   expanded: full-window portal (modal). Esc collapses expanded → half,
-  //   then half → closes the diff entirely. So: Esc has a single, learnable
-  //   meaning ("step back one zoom level"), unlike a UA toggle button.
-  // In expanded mode we also blur the active element so keystrokes can't
-  // leak into a focused Gambit textarea behind the dim layer.
+  // Keyboard handling. Esc = step back one level:
+  //   overlay mode → close the diff entirely (onClose → CLEAR_DIFF).
+  //   tab mode     → close the diff entirely too.
+  // Previously tab-mode Esc folded back to the overlay, but the overlay only
+  // mounts when the right panel is visible AND on the Changes tab — if the
+  // user had hidden the right panel or switched to Tasks (the common reason
+  // to use tab mode), the fold stranded the diff with no visible surface and
+  // no close button. Closing is always safe; the explicit fold glyph in the
+  // tab header still offers fold-back when the overlay host is available.
+  // In tab mode we also blur the active element so keystrokes can't leak
+  // into a focused terminal behind the surface.
   useEffect(() => {
     if (expanded) {
       (document.activeElement as HTMLElement | null)?.blur();
@@ -155,13 +159,12 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (expanded) onToggleExpanded();
-        else onClose();
+        onClose();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [expanded, onToggleExpanded, onClose]);
+  }, [expanded, onClose]);
 
   useEffect(() => {
     let cancelled = false;

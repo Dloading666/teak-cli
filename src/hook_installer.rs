@@ -1043,24 +1043,16 @@ pub fn repair_broken_npm_bins() {
         if crate::server::binary_on_path(bin) {
             continue;
         }
-        // Is the npm package actually installed globally? If not, the user
-        // never had this tool via npm — don't materialize it. `npm ls -g
-        // --json` is the reliable presence check (parses cleanly, exits 0
-        // even when listing). CREATE_NO_WINDOW so no console flash at boot.
-        // npm ships as a .cmd shim on Windows — CreateProcessW won't resolve
-        // it directly, so go through cmd.exe /c (same as the terminal spawn).
-        let ls = match Command::new("cmd")
-            .args(["/c", "npm", "ls", "-g", "--json", "--depth=0"])
-            .creation_flags(0x08000000)
-            .output()
-        {
-            Ok(o) => o,
-            Err(_) => continue, // npm not on PATH — nothing to repair via npm
-        };
-        let stdout = String::from_utf8_lossy(&ls.stdout);
-        // Crude but robust: the package name appears as a key in "dependencies"
-        // iff it's installed. Avoids pulling a JSON parser for one check.
-        if !stdout.contains(pkg) {
+        // FAST PATH — detect the breakage WITHOUT spawning npm. The signature
+        // of a shattered bin is orphan files in npm's global bin dir: npm
+        // renames `opencode.cmd` → `.opencode.cmd-<rand>` as the first step of
+        // a rewrite, then fails to write the new file, leaving the orphan AND
+        // no usable bin. If no such orphan exists, either the user never had
+        // this tool, or the bin is gone for an unrelated reason — in both
+        // cases an `npm install -g` won't help and would just waste ~1-2s of
+        // boot time spawning npm for users who never installed opencode.
+        let Some(npm_bin_dir) = npm_global_bin_dir() else { continue };
+        if !has_shattered_orphans(&npm_bin_dir, bin) {
             continue;
         }
         // Is the binary currently running? If so, a repair now would hit the
@@ -1077,9 +1069,9 @@ pub fn repair_broken_npm_bins() {
             continue;
         }
         eprintln!(
-            "[hook-installer] {} bin missing but npm global has {} — repairing \
+            "[hook-installer] {} bin missing with orphan files in {} — repairing \
              the bin links with `npm install -g {}`",
-            bin, pkg, pkg
+            bin, npm_bin_dir.display(), pkg
         );
         // Re-run the install to rebuild the bin links. 120s timeout — npm
         // global install can be slow on a cold cache, but we don't want to
@@ -1101,6 +1093,40 @@ pub fn repair_broken_npm_bins() {
             }
         }
     }
+}
+
+/// npm's global bin dir on Windows. npm prefix -g is normally
+/// `%APPDATA%\npm` (where .cmd shims live). Derived from APPDATA rather than
+/// spawning `npm prefix -g` so the orphan-check fast path stays spawn-free.
+#[cfg(target_os = "windows")]
+fn npm_global_bin_dir() -> Option<std::path::PathBuf> {
+    let appdata = std::env::var("APPDATA").ok()?;
+    Some(std::path::PathBuf::from(appdata).join("npm"))
+}
+
+/// True iff npm's global bin dir contains a shattered-orphan file for `bin`:
+/// a file named `.{bin}.cmd-<suffix>`, `.{bin}.ps1-<suffix>`, or
+/// `.{bin}-<suffix>` (the temp-rename residue npm leaves when a bin rewrite
+/// is interrupted). These only exist when a real install was shattered —
+/// users who never installed the tool have no such files, so this is the
+/// zero-spawn signal to skip the repair entirely.
+#[cfg(target_os = "windows")]
+fn has_shattered_orphans(npm_bin_dir: &std::path::Path, bin: &str) -> bool {
+    let Ok(entries) = std::fs::read_dir(npm_bin_dir) else {
+        return false;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        // Orphans look like ".opencode.cmd-S0tGGhyQ", ".opencode.ps1-f0SU9OXr",
+        // ".opencode-TbIJLj3H" — a leading dot, the bin name, then a suffix
+        // after a '-' (the random rename token). The real bin has no leading
+        // dot and no '-' suffix.
+        if name.starts_with(&format!(".{}", bin)) && name.contains('-') {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(target_os = "windows")]

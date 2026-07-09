@@ -376,7 +376,7 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
           {visibleCount < items.length && <div ref={sentinelRef} className="changes-sentinel" aria-hidden="true" />}
         </div>
       </ScrollPanel>
-      {diffMode === 'overlay' && state.diffSelection && repoRoot && (
+      {diffMode === 'overlay' && state.diffSelection && (
         <>
           <div className="diff-resize-handle" style={handleStyle} onPointerDown={startResize} aria-label="Resize diff" />
           <DiffPanel

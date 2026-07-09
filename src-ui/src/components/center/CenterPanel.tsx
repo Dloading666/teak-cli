@@ -1228,7 +1228,10 @@ export function CenterPanel() {
           return terminals.map(session => {
           if (session.isHidden && session.id !== activeTerminalId) return null;
 
-          const isActive = session.id === activeTerminalId;
+          // A terminal tab is "active" only when it's the focused surface —
+          // when the diff tab is focused (diffTabActive), no terminal tab
+          // should show the active highlight (the diff chrome-tab does).
+          const isActive = session.id === activeTerminalId && !diffTabActive;
           const { icon, title: baseTitle } = renderTabContent(session, isActive);
           // Tool's live OSC 0/2 title (Claude Code conversation summary, etc.)
           // overrides the cwd basename when the tool has set a non-empty one.
