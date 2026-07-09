@@ -382,7 +382,7 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
           <DiffPanel
             mode="overlay"
             path={state.diffSelection.path}
-            repoRoot={repoRoot}
+            repoRoot={state.diffSelection.repoRoot}
             rel={state.diffSelection.rel}
             kind={state.diffSelection.kind}
             commitHash={state.diffSelection.commitHash}

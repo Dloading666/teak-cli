@@ -1406,7 +1406,7 @@ export function CenterPanel() {
                   toolName={AGENT_CATALOG.find(a => a.key === t.tool)?.label}
                   theme={state.currentTheme}
                   lang={state.currentLang}
-                  isActive={t.id === activeTerminalId}
+                  isActive={t.id === activeTerminalId && !diffTabActive}
                   toolData={t.toolData}
                   folderPath={t.folderPath}
                   resumeToken={t.resumeToken}

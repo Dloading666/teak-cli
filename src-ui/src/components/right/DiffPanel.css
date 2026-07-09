@@ -118,9 +118,14 @@
 }
 /* Tab-mode diff lives in the center panel (not .panel-right), so the
  * glass opt-out above doesn't reach it — but the same global :not()
- * nuke hits center-panel descendants too. Reassert the solid surface so
- * syntax-highlighted code stays readable through the glass backdrop. */
-[data-shape="glass"] .diff-panel--tab {
+ * nuke (global.css:1543, `.panel-center :is(div,…):not(…)`) hits center-
+ * panel descendants too, and `:not()` does NOT list .diff-panel. Both
+ * rules use !important, so specificity decides: a bare
+ * `[data-shape="glass"] .diff-panel--tab` is (0,2,0) and LOSES to the
+ * nuke's (0,3,1). Adding `.panel-center` as an ancestor + the element's
+ * own `.diff-panel` class brings it to (0,4,0) — clean win. Carbon (the
+ * default theme) shares the same nuke rule, so gate on both shapes. */
+:is([data-shape="glass"], [data-shape="carbon"]) .panel-center .diff-panel.diff-panel--tab {
   background: var(--bg-panel) !important;
   border-color: var(--border) !important;
 }
