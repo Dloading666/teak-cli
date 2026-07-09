@@ -260,10 +260,16 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
 
   const header = (
     <div className="diff-header">
-      {/* In tab mode the chrome-tab strip already shows the filename, so the
-          header name is redundant — hide it. The overlay has no such tab, so
-          it keeps the name here. */}
-      {mode === 'overlay' && <span className="diff-header-name">{basename}</span>}
+      {mode === 'overlay' ? (
+        // Overlay has no chrome-tab carrying the filename, so the header
+        // shows the basename here.
+        <span className="diff-header-name">{basename}</span>
+      ) : (
+        // Tab mode: the chrome-tab strip already shows the basename, so the
+        // header shows the FULL path instead — "which file" is on the tab,
+        // "where it lives" goes here. Truncates with ellipsis when long.
+        <span className="diff-header-path">{path}</span>
+      )}
       <div className="diff-header-actions">
         {expanded ? (
           // Tab mode: fold back to the bottom-right overlay. The glyph is an

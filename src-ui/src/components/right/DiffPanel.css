@@ -149,13 +149,27 @@
   text-overflow: ellipsis;
 }
 
-/* In tab mode the header name is hidden (the chrome-tab strip carries the
- * filename), so only the actions remain. With nothing on the left, the
- * header's default space-between would pin the lone actions cluster to the
- * left edge — push it to the right (top-right corner) where close/fold
- * affordances belong. */
+/* In tab mode the header shows the full file path on the left (basename is
+ * on the chrome-tab strip; the path answers "where"). With a left element
+ * present again, revert to the default space-between so the path sits left
+ * and the fold button sits right. Overlay keeps space-between via the
+ * basename. */
 .diff-panel--tab .diff-header {
-  justify-content: flex-end;
+  justify-content: space-between;
+}
+
+.diff-header-path {
+  /* Fill the left so the fold button docks right; shrink + ellipsis-truncate
+   * when the path is long. Muted vs the basename-on-tab so it reads as
+   * secondary context, not competing with the tab title. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3, var(--text-2));
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
 }
 
 .diff-header-actions {
