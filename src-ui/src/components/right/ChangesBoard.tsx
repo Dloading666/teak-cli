@@ -68,6 +68,10 @@ type RenderItem =
 // Selection is encoded as "<group-tag>\x00<abs-path>" so the same file
 // appearing in both Staged and Unstaged stays two distinct, separately
 // clickable rows. Parent (TaskBoard) treats the string as opaque.
+// Committed rows use a 3-segment form — "<tag>\x00<hash>\x00<path>" — so two
+// session commits that touch the SAME file stay distinct rows when both are
+// expanded (a 2-segment key would collide and leave stale/duplicated rows on
+// collapse). See TaskBoard's selectedChangePath for the matching encoder.
 const selKey = (tag: string, path: string) => `${tag}\x00${path}`;
 
 // Relative time for a commit (epoch seconds) — Intl.RelativeTimeFormat yields
@@ -157,7 +161,10 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
       const files = expanded ? (commitFiles.get(c.hash) ?? []) : [];
       out.push({ type: 'commit-header', key: `commit-${c.hash}`, commit: c, toggleable: true });
       for (const entry of files) {
-        out.push({ type: 'file', key: selKey('committed', entry.path), entry, group: { tag: 'committed', label: '', entries: [], kind: 'committed', commitHash: c.hash } });
+        // 3-segment key (committed\x00<hash>\x00<path>) — see selKey. Two
+        // session commits touching the same file must not share a key, or
+        // React reconciles them as one row and expand/collapse goes wrong.
+        out.push({ type: 'file', key: `committed\x00${c.hash}\x00${entry.path}`, entry, group: { tag: 'committed', label: '', entries: [], kind: 'committed', commitHash: c.hash } });
       }
     }
 

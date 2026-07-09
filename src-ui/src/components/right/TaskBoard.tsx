@@ -93,12 +93,17 @@ export function TaskBoard() {
 
   // Selection lives at the AppState tier now (diffSelection), so a detour to
   // the center diff tab — which unmounts ChangesBoard — doesn't drop it.
-  // ChangesBoard still takes a selKey string (`<tag>\x00<abs-path>`) for row
-  // highlighting; we derive it from diffSelection so the two stay in sync.
+  // ChangesBoard still takes a selKey string for row highlighting; we derive it
+  // from diffSelection so the two stay in sync. Committed rows use a 3-segment
+  // form (`committed\x00<hash>\x00<path>`) so two session commits touching the
+  // SAME file keep distinct keys (else collapse leaves stale/duplicate rows).
+  // Must mirror ChangesBoard's committed-file key encoder exactly.
   const diffSelection = state.diffSelection;
   const diffMode = state.diffMode;
   const selectedChangePath = diffSelection
-    ? `${diffSelection.kind}\x00${diffSelection.path}`
+    ? diffSelection.kind === 'committed'
+      ? `committed\x00${diffSelection.commitHash ?? ''}\x00${diffSelection.path}`
+      : `${diffSelection.kind}\x00${diffSelection.path}`
     : null;
 
   // Inline title editing
