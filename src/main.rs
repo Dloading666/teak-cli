@@ -21,7 +21,8 @@ use anyhow::Result;
 
 fn main() -> Result<()> {
     // ── Native hook forwarder (fast path) ───────────────────────────────
-    // Invoked by Claude Code (`<exe> __hook`) and Codex (`<exe>
+    // Invoked by Claude Code (`<exe> __hook`), Codex hooks (`<exe>
+    // __codex-hook`, stdin JSON), and Codex legacy notify (`<exe>
     // __codex-notify <json>`) to forward agent status to the dynamic
     // island. This MUST run before any GUI / Linux-backend / PATH-inherit
     // setup below — the PATH fix spawns a login shell, which we don't want
@@ -32,6 +33,7 @@ fn main() -> Result<()> {
         let argv: Vec<String> = std::env::args().collect();
         match argv.get(1).map(|s| s.as_str()) {
             Some("__hook") => hook_forwarder::run_claude_hook(),
+            Some("__codex-hook") => hook_forwarder::run_codex_hook(),
             Some("__codex-notify") => hook_forwarder::run_codex_notify(&argv),
             _ => {}
         }

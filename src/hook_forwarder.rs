@@ -66,6 +66,16 @@ pub fn run_codex_notify(args: &[String]) -> ! {
     std::process::exit(0);
 }
 
+/// `<exe> __codex-hook` — Codex hooks system (stdin protocol). Codex writes
+/// the hook payload JSON to stdin (same shape as Claude's `__hook`), with
+/// `hook_event_name` naming the event. Installed by `install_codex` into
+/// ~/.codex/hooks.json for SessionStart / UserPromptSubmit / PermissionRequest
+/// / Stop. Never returns.
+pub fn run_codex_hook() -> ! {
+    let _ = forward_codex_hook();
+    std::process::exit(0);
+}
+
 fn forward_claude() -> Option<()> {
     let ctx = HookCtx::from_env()?;
 
@@ -112,6 +122,47 @@ fn forward_codex(args: &[String]) -> Option<()> {
 
     post(ctx.port, &ctx.tab_id, &ctx.tool, &status, &event);
     Some(())
+}
+
+/// stdin hook path for Codex's hooks system (SessionStart / UserPromptSubmit
+/// / PermissionRequest / Stop, installed in ~/.codex/hooks.json). Reads the
+/// payload the same way Claude's `__hook` does — Codex writes the event JSON
+/// to stdin. `hook_event_name` names the event (same key name as Claude, by
+/// coincidence). Gated on COFFEE_CLI_TOOL=codex so a globally-installed hook
+/// stays silent for Codex sessions started outside Coffee CLI.
+fn forward_codex_hook() -> Option<()> {
+    let ctx = HookCtx::from_env()?;
+    if ctx.tool != "codex" {
+        return None;
+    }
+
+    let mut buf = String::new();
+    std::io::stdin().read_to_string(&mut buf).ok()?;
+    let buf = buf.trim_start_matches('\u{feff}');
+    let data: Value = serde_json::from_str(buf).ok()?;
+
+    let event = data
+        .get("hook_event_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let status = map_codex_hook_status(&event)?;
+
+    post(ctx.port, &ctx.tab_id, &ctx.tool, &status, &event);
+    Some(())
+}
+
+/// Map a Codex hooks-system event to a tab status. Covers the 4 events we
+/// install (SessionStart / UserPromptSubmit / PermissionRequest / Stop) plus
+/// the optional PreToolUse/PostToolUse (mapped to working if the user adds
+/// them manually). Unknown events → None (no-op, don't guess).
+fn map_codex_hook_status(event: &str) -> Option<String> {
+    match event {
+        "SessionStart" | "Stop" => Some("idle".to_string()),
+        "PermissionRequest" => Some("wait_input".to_string()),
+        "UserPromptSubmit" | "PreToolUse" | "PostToolUse" => Some("working".to_string()),
+        _ => None,
+    }
 }
 
 /// Map a Claude Code hook event to a tab status. Mirrors

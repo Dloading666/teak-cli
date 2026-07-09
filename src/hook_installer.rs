@@ -259,6 +259,33 @@ fn install_codex(home: &Path) {
             e
         );
     }
+
+    // Hooks system (SessionStart / UserPromptSubmit / PermissionRequest / Stop)
+    // — the full 3-color status bus. `notify` only carries turn-complete (idle),
+    // so without these hooks Codex's island never shows working (orange) or
+    // wait_input (blue). See install_codex_hooks + patch_codex_features.
+    let hook_cmd = match hook_command(CODEX_HOOK_SUBCOMMAND) {
+        Some(c) => c,
+        None => {
+            eprintln!("[hook-installer] current_exe() failed — cannot install codex hooks");
+            return;
+        }
+    };
+    let hooks_path = home.join(".codex").join("hooks.json");
+    if let Err(e) = install_codex_hooks(&hooks_path, &hook_cmd) {
+        eprintln!(
+            "[hook-installer] failed to patch {}: {}",
+            hooks_path.display(),
+            e
+        );
+    }
+    if let Err(e) = patch_codex_features(&config_path) {
+        eprintln!(
+            "[hook-installer] failed to enable [features].hooks in {}: {}",
+            config_path.display(),
+            e
+        );
+    }
 }
 
 /// OpenCode-family plugin — written directly to ~/.config/<config_subdir>/plugins/
@@ -733,7 +760,11 @@ fn is_coffee_entry(entry: &Value) -> bool {
 /// shell-form hooks via Git Bash on Windows, where backslash paths are
 /// fragile — emit forward slashes there (Git Bash and CreateProcess both
 /// accept `C:/...`). Returns None only if `current_exe()` fails.
-fn claude_hook_command() -> Option<String> {
+/// Build a Coffee CLI hook command: `"<exe>" <subcommand>`. The agent runs
+/// shell-form hooks via Git Bash on Windows, where backslash paths are
+/// fragile — emit forward slashes there (Git Bash and CreateProcess both
+/// accept `C:/...`). Returns None only if `current_exe()` fails.
+fn hook_command(subcommand: &str) -> Option<String> {
     let exe = std::env::current_exe().ok()?;
     let p = exe.display().to_string();
     let p = if cfg!(target_os = "windows") {
@@ -741,7 +772,238 @@ fn claude_hook_command() -> Option<String> {
     } else {
         p
     };
-    Some(format!("\"{}\" {}", p, HOOK_SUBCOMMAND))
+    Some(format!("\"{}\" {}", p, subcommand))
+}
+
+fn claude_hook_command() -> Option<String> {
+    hook_command(HOOK_SUBCOMMAND)
+}
+
+/// Codex hooks subcommand — stdin protocol (like Claude's __hook), installed
+/// into ~/.codex/hooks.json. Distinct from the legacy `__codex-notify` argv
+/// protocol that rides the global `notify` line.
+const CODEX_HOOK_SUBCOMMAND: &str = "__codex-hook";
+
+// ─── Codex hooks.json installation ──────────────────────────────────────────
+//
+// Codex's hooks system (distinct from the legacy `notify` line) reads a JSON
+// file at ~/.codex/hooks.json. Shape (mirrors Claude's settings.json hooks
+// block, but a top-level file):
+//   {
+//     "hooks": {
+//       "SessionStart": [{"matcher": "startup|resume", "hooks": [{...}]}],
+//       "UserPromptSubmit":     [{"hooks": [{...}]}],
+//       "PermissionRequest":    [{"hooks": [{...}]}],
+//       "Stop":                 [{"hooks": [{...}]}]
+//     }
+//   }
+// Each hook entry: {"type":"command","command":"<exe> __codex-hook","timeout":N}.
+//
+// Install is MERGE-only: we touch just the 4 managed event slots, and within
+// each slot we strip our own prior entries (is_coffee_codex_entry) before
+// re-adding one fresh entry — so re-installs don't accumulate. A user's own
+// hooks in other events, or extra groups in our events, are preserved.
+//
+// (Protocol learned from reference/open-vibe-island's CodexHookInstaller.)
+
+/// The 4 events we install, with their matcher (only SessionStart has one,
+/// matching codex's startup|resume session kinds) and timeout. PermissionRequest
+/// gets a long timeout because it awaits human approval; the others are quick.
+const CODEX_HOOK_EVENTS: &[(&str, Option<&str>, u64)] = &[
+    ("SessionStart", Some("startup|resume"), 45),
+    ("UserPromptSubmit", None, 45),
+    ("PermissionRequest", None, 3600),
+    ("Stop", None, 45),
+];
+
+fn install_codex_hooks(path: &Path, hook_cmd: &str) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    // Load existing root (or start fresh). A malformed file is left untouched
+    // — we won't clobber a user's hand-edited config over a parse error.
+    let mut root: Value = if path.exists() {
+        let text = fs::read_to_string(path).unwrap_or_default();
+        match serde_json::from_str::<Value>(&text) {
+            Ok(v) if v.is_object() => v,
+            _ => {
+                eprintln!(
+                    "[hook-installer] {} is unparseable — leaving it untouched",
+                    path.display()
+                );
+                return Ok(());
+            }
+        }
+    } else {
+        json!({})
+    };
+    if !root.is_object() {
+        root = json!({});
+    }
+
+    // Ensure "hooks" is an object.
+    let needs_reset = root
+        .get("hooks")
+        .map(|h| !h.is_object())
+        .unwrap_or(true);
+    if needs_reset {
+        root.as_object_mut()
+            .unwrap()
+            .insert("hooks".into(), json!({}));
+    }
+    let hooks = root
+        .get_mut("hooks")
+        .and_then(|h| h.as_object_mut())
+        .expect("hooks is object");
+
+    // For each managed event: take the existing groups, strip our prior
+    // entries from each group (so re-install doesn't duplicate), then append
+    // one fresh managed group.
+    for (event, matcher, timeout) in CODEX_HOOK_EVENTS {
+        let slot = hooks
+            .entry(event.to_string())
+            .or_insert_with(|| json!([]));
+        if !slot.is_array() {
+            *slot = json!([]);
+        }
+        let arr = slot.as_array_mut().unwrap();
+
+        // Strip our entries from every existing group (a group is our managed
+        // entry iff ALL its hooks are ours — matching the install shape).
+        for group in arr.iter_mut() {
+            if let Some(gs) = group.get_mut("hooks").and_then(|h| h.as_array_mut()) {
+                gs.retain(|h| !is_coffee_codex_entry(h));
+            }
+        }
+        // Drop groups left with zero hooks after stripping.
+        arr.retain(|g: &Value| {
+            g.get("hooks")
+                .and_then(|h: &Value| h.as_array())
+                .map(|a| !a.is_empty())
+                .unwrap_or(true)
+        });
+
+        // Append our fresh managed group.
+        let mut group = json!({
+            "hooks": [{
+                "type": "command",
+                "command": hook_cmd,
+                "timeout": timeout,
+            }]
+        });
+        if let Some(m) = matcher {
+            group["matcher"] = json!(m);
+        }
+        arr.push(group);
+    }
+
+    fs::write(path, serde_json::to_string_pretty(&root)?)?;
+    Ok(())
+}
+
+/// A hook entry is ours iff its command's last whitespace-delimited token is
+/// `__codex-hook` (the native subcommand). Mirrors is_coffee_entry's
+/// last-token match so a user hook whose path merely contains "__codex-hook"
+/// is never misclassified as ours.
+fn is_coffee_codex_entry(entry: &Value) -> bool {
+    entry
+        .get("command")
+        .and_then(|c| c.as_str())
+        .map(|s| s.split_whitespace().last() == Some(CODEX_HOOK_SUBCOMMAND))
+        .unwrap_or(false)
+}
+
+/// Enable `[features].hooks = true` in ~/.codex/config.toml. Newer Codex uses
+/// the `hooks` key; older builds used `codex_hooks`. The two are mutually
+/// exclusive in practice — setting the new key and stripping the legacy one
+/// keeps Codex from seeing conflicting flags. Idempotent; leaves all other
+/// keys (model, providers, user features) untouched.
+///
+/// TOML is line-edited here (not parsed) for the same reason patch_codex_config
+/// line-edits: we must preserve comments, key order, and the user's hand-
+/// formatted sections verbatim. A full TOML round-trip would reorder/drop
+/// comments.
+fn patch_codex_features(path: &Path) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let existing = if path.exists() {
+        fs::read_to_string(path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    // Walk lines, locate the [features] section, and within it manage the
+    // `hooks` / `codex_hooks` keys. Everything outside [features] is copied
+    // verbatim.
+    let mut out: Vec<String> = Vec::new();
+    let mut in_features = false;
+    let mut features_idx: Option<usize> = None; // where [features] header landed in `out`
+    let mut saw_hooks_true = false;
+
+    for line in existing.lines() {
+        let trimmed = line.trim_start();
+        let is_section = trimmed.starts_with('[') && !trimmed.starts_with("[[");
+        if is_section {
+            in_features = trimmed == "[features]";
+        }
+        if in_features {
+            // Drop any legacy `codex_hooks = ...` line (we manage the new key).
+            if trimmed.starts_with("codex_hooks") {
+                let rest = trimmed["codex_hooks".len()..].trim_start();
+                if rest.starts_with('=') {
+                    continue; // skip — don't emit
+                }
+            }
+            // If `hooks = true` already present, keep it; any other value
+            // (false / garbage) → drop and emit our own below.
+            if trimmed.starts_with("hooks") {
+                let rest = trimmed["hooks".len()..].trim_start();
+                if rest.starts_with('=') {
+                    let val = rest.trim_start_matches('=').trim();
+                    if val == "true" {
+                        saw_hooks_true = true;
+                        out.push(line.to_string());
+                        continue;
+                    }
+                    continue;
+                }
+            }
+        }
+        out.push(line.to_string());
+        if is_section && in_features && features_idx.is_none() {
+            features_idx = Some(out.len() - 1);
+        }
+    }
+
+    if !saw_hooks_true {
+        let our_line = "hooks = true";
+        match features_idx {
+            Some(idx) => {
+                // Insert right after the [features] header.
+                out.insert(idx + 1, our_line.to_string());
+            }
+            None => {
+                // No [features] section — append one.
+                if !out.is_empty() && !out.last().map(|s| s.is_empty()).unwrap_or(false) {
+                    out.push(String::new());
+                }
+                out.push("[features]".to_string());
+                out.push(our_line.to_string());
+            }
+        }
+    }
+
+    let mut joined = out.join("\n");
+    if !joined.ends_with('\n') {
+        joined.push('\n');
+    }
+    if joined != existing || !path.exists() {
+        fs::write(path, joined)?;
+    }
+    Ok(())
 }
 
 // ─── Broken-bin repair (Windows) ────────────────────────────────────────────
@@ -885,6 +1147,174 @@ fn run_with_timeout(cmd: &mut std::process::Command, dur: std::time::Duration) -
         // Short sleep so we don't busy-wait; npm install is seconds-to-minutes,
         // a 100ms poll is fine-grained enough.
         std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn fresh_codex_dir(name: &str) -> PathBuf {
+        let mut p = std::env::temp_dir();
+        p.push(format!("coffee-codex-test-{}-{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&p);
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    #[test]
+    fn codex_hooks_json_creates_with_4_events() {
+        let dir = fresh_codex_dir("create");
+        let hooks_path = dir.join("hooks.json");
+        let cmd = "\"/fake/exe\" __codex-hook";
+        install_codex_hooks(&hooks_path, cmd).unwrap();
+
+        let text = fs::read_to_string(&hooks_path).unwrap();
+        let root: Value = serde_json::from_str(&text).unwrap();
+        let hooks = root.get("hooks").and_then(|h| h.as_object()).unwrap();
+        assert!(hooks.contains_key("SessionStart"));
+        assert!(hooks.contains_key("UserPromptSubmit"));
+        assert!(hooks.contains_key("PermissionRequest"));
+        assert!(hooks.contains_key("Stop"));
+
+        // SessionStart has the startup|resume matcher.
+        let ss = hooks.get("SessionStart").unwrap().as_array().unwrap();
+        assert!(ss.iter().any(|g| g.get("matcher").and_then(|m| m.as_str()) == Some("startup|resume")));
+
+        // Each managed event has exactly one group whose single hook command
+        // is ours.
+        for ev in ["SessionStart", "UserPromptSubmit", "PermissionRequest", "Stop"] {
+            let groups = hooks.get(ev).unwrap().as_array().unwrap();
+            let ours: Vec<_> = groups.iter().filter(|g| {
+                g.get("hooks").and_then(|h| h.as_array())
+                    .map(|hs| hs.iter().any(is_coffee_codex_entry))
+                    .unwrap_or(false)
+            }).collect();
+            assert_eq!(ours.len(), 1, "event {} should have exactly one managed group", ev);
+        }
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_hooks_json_idempotent_no_accumulation() {
+        let dir = fresh_codex_dir("idempotent");
+        let hooks_path = dir.join("hooks.json");
+        let cmd = "\"/fake/exe\" __codex-hook";
+        // Install 3x — each should strip the prior managed entry and add one
+        // fresh, never accumulating duplicates.
+        for _ in 0..3 {
+            install_codex_hooks(&hooks_path, cmd).unwrap();
+        }
+        let root: Value = serde_json::from_str(&fs::read_to_string(&hooks_path).unwrap()).unwrap();
+        let hooks = root.get("hooks").and_then(|h| h.as_object()).unwrap();
+        for ev in ["SessionStart", "UserPromptSubmit", "PermissionRequest", "Stop"] {
+            let groups = hooks.get(ev).unwrap().as_array().unwrap();
+            let ours: Vec<_> = groups.iter().filter(|g| {
+                g.get("hooks").and_then(|h| h.as_array())
+                    .map(|hs| hs.iter().any(is_coffee_codex_entry))
+                    .unwrap_or(false)
+            }).collect();
+            assert_eq!(ours.len(), 1, "event {} accumulated {} managed groups", ev, ours.len());
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_hooks_json_preserves_user_hooks() {
+        let dir = fresh_codex_dir("preserve");
+        let hooks_path = dir.join("hooks.json");
+        // User has their own Stop hook + a custom event we don't manage.
+        // Built with serde so there's no hand-written JSON to get wrong.
+        let initial = serde_json::json!({
+            "hooks": {
+                "Stop": [{"hooks": [{"type": "command", "command": "echo user"}]}],
+                "MyCustomEvent": [{"hooks": [{"type": "command", "command": "echo custom"}]}]
+            }
+        });
+        fs::write(&hooks_path, serde_json::to_string_pretty(&initial).unwrap()).unwrap();
+        install_codex_hooks(&hooks_path, "\"/fake/exe\" __codex-hook").unwrap();
+        let root: Value = serde_json::from_str(&fs::read_to_string(&hooks_path).unwrap()).unwrap();
+        let hooks = root.get("hooks").and_then(|h| h.as_object()).unwrap();
+        // Custom event preserved untouched.
+        assert!(hooks.contains_key("MyCustomEvent"));
+        // Stop now has the user's group + our managed group.
+        let stop = hooks.get("Stop").unwrap().as_array().unwrap();
+        assert!(stop.iter().any(|g| {
+            g.get("hooks").and_then(|h| h.as_array())
+                .map(|hs| hs.iter().any(|h| h.get("command").and_then(|c| c.as_str()) == Some("echo user")))
+                .unwrap_or(false)
+        }), "user's Stop hook should be preserved");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_hooks_json_unparseable_left_untouched() {
+        let dir = fresh_codex_dir("unparseable");
+        let hooks_path = dir.join("hooks.json");
+        let garbage = "{ this is not valid json";
+        fs::write(&hooks_path, garbage).unwrap();
+        // Should return Ok (not error) and leave the file as-is.
+        install_codex_hooks(&hooks_path, "\"/fake/exe\" __codex-hook").unwrap();
+        assert_eq!(fs::read_to_string(&hooks_path).unwrap(), garbage);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_features_enables_hooks_and_strips_legacy() {
+        let dir = fresh_codex_dir("features");
+        let cfg = dir.join("config.toml");
+        fs::write(&cfg, "[features]\ncodex_hooks = true\njs_repl = false\n").unwrap();
+        patch_codex_features(&cfg).unwrap();
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(after.contains("hooks = true"), "should add hooks=true: {}", after);
+        assert!(!after.contains("codex_hooks"), "should strip legacy key: {}", after);
+        assert!(after.contains("js_repl = false"), "should preserve other keys: {}", after);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_features_creates_section_if_missing() {
+        let dir = fresh_codex_dir("no-features");
+        let cfg = dir.join("config.toml");
+        fs::write(&cfg, "model = \"gpt-5\"\n").unwrap();
+        patch_codex_features(&cfg).unwrap();
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(after.contains("[features]"), "should create [features] section: {}", after);
+        assert!(after.contains("hooks = true"));
+        assert!(after.contains("model = \"gpt-5\""), "should preserve existing content: {}", after);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_features_idempotent() {
+        let dir = fresh_codex_dir("feat-idempotent");
+        let cfg = dir.join("config.toml");
+        fs::write(&cfg, "[features]\n").unwrap();
+        for _ in 0..3 {
+            patch_codex_features(&cfg).unwrap();
+        }
+        let after = fs::read_to_string(&cfg).unwrap();
+        let count = after.matches("hooks = true").count();
+        assert_eq!(count, 1, "should not duplicate hooks=true line: {}", after);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_features_preserves_user_hooks_false_overwrites() {
+        // If the user has `hooks = false` explicitly, we DO overwrite to true
+        // (we manage this key). This verifies the "any value other than true
+        // → drop and emit our own" branch.
+        let dir = fresh_codex_dir("feat-overwrite");
+        let cfg = dir.join("config.toml");
+        fs::write(&cfg, "[features]\nhooks = false\n").unwrap();
+        patch_codex_features(&cfg).unwrap();
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(!after.contains("hooks = false"));
+        assert!(after.contains("hooks = true"));
+        let _ = fs::remove_dir_all(&dir);
     }
 }
 
