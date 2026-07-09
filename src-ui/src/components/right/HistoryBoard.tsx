@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useT } from '../../i18n/useT';
 import { useAppState } from '../../store/app-state';
 import { isTauri } from '../../tauri';
@@ -104,25 +104,54 @@ export function HistoryBoard() {
 
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
 
-  const baseSessions: SavedSession[] = isTauri ? cachedSessions : cachedSessions.length > 0 ? cachedSessions : [
+  // Memoize baseSessions on cachedSessions so the filter useMemo below doesn't
+  // re-run every render (the isTauri? ternary otherwise rebuilds a fresh array
+  // literal each render, defeating the debounce — a burst of keystrokes would
+  // filter the whole list once per render instead of once per debounce tick).
+  const baseSessions: SavedSession[] = useMemo(() => isTauri ? cachedSessions : cachedSessions.length > 0 ? cachedSessions : [
     { id: 'mock-1', name: 'build a flash card website', tool: 'claude', cwd: '~/projects/flashcards', session_token: 'tk1', saved_at: new Date().toISOString() },
     { id: 'mock-2', name: 'build a snake game', tool: 'claude', cwd: '~/projects/snake', session_token: 'tk2', saved_at: new Date(Date.now() - 3600000).toISOString() },
     { id: 'mock-3', name: 'refactor components', tool: 'qwen', cwd: '~/projects/coffee', session_token: 'tk3', saved_at: new Date(Date.now() - 86400000 * 2).toISOString() },
-  ];
+  ], [cachedSessions]);
 
-  const matchedSessions = baseSessions.filter(s => {
-    if (!sessionSearchQuery) return true;
-    return s.name.toLowerCase().includes(sessionSearchQuery.toLowerCase());
-  });
+  // Debounce the raw query so fast typing doesn't re-filter the full session
+  // list on every keystroke (history-cache can hold thousands of sessions —
+  // a per-key full scan stutters). 150ms is short enough to feel instant and
+  // long enough to coalesce a burst of keystrokes into one filter pass.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  useEffect(() => {
+    const h = setTimeout(() => setDebouncedQuery(sessionSearchQuery), 150);
+    return () => clearTimeout(h);
+  }, [sessionSearchQuery]);
+
+  // Normalize once: trim + collapse runs of whitespace + lowercase. Empty after
+  // normalization means "no query → show all". Matching against projectName(cwd)
+  // too so a user can find a project's sessions by typing its folder name — the
+  // folder is already printed on every card, so this is the one search
+  // dimension the flat time-sorted list genuinely earns. Both fields are
+  // null-guarded: legacy sessions can carry a blank cwd (projectName then
+  // falls back to the tool display name, which is still a useful match — e.g.
+  // typing "claude" surfaces all Claude sessions).
+  const matchedSessions = useMemo(() => {
+    const q = debouncedQuery.trim().replace(/\s+/g, ' ').toLowerCase();
+    if (!q) return baseSessions;
+    return baseSessions.filter(s => {
+      const name = (s.name ?? '').toLowerCase();
+      const proj = projectName(s.cwd ?? '', s.tool ?? '').toLowerCase();
+      return name.includes(q) || proj.includes(q);
+    });
+  }, [baseSessions, debouncedQuery]);
 
   // Progressive render: data is already fully in memory (history-cache reads
   // every jsonl on startup), so "load more" is just rendering more rows.
   // IntersectionObserver on a bottom sentinel bumps visibleCount when it
-  // scrolls into view. Reset to PAGE on search-query change so the results
-  // don't carry a stale window from before.
+  // scrolls into view. Reset to PAGE on the debounced query landing — keying
+  // on the raw query would reset mid-burst while results haven't changed yet,
+  // making the list flap; the debounced value only moves when results actually
+  // change.
   const PAGE = 30;
   const [visibleCount, setVisibleCount] = useState(PAGE);
-  useEffect(() => { setVisibleCount(PAGE); }, [sessionSearchQuery]);
+  useEffect(() => { setVisibleCount(PAGE); }, [debouncedQuery]);
   const filteredSessions = matchedSessions.slice(0, visibleCount);
   const hasMore = matchedSessions.length > visibleCount;
   const sentinelRef = useRef<HTMLDivElement>(null);
