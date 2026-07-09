@@ -160,7 +160,10 @@
 
 .diff-header-path {
   /* Fill the left so the fold button docks right; shrink + ellipsis-truncate
-   * when the path is long. Muted vs the basename-on-tab so it reads as
+   * when the path is long. Font matches the Explorer workspace-path button
+   * (var(--font), 13px, 500) — mono at 11px was fuzzy and hard to read on
+   * CJK/mixed environments; the workspace path is the high-bar reference
+   * for "how a path should look" in this app. Muted color so it reads as
    * secondary context, not competing with the tab title. */
   flex: 1 1 auto;
   min-width: 0;
@@ -168,8 +171,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-3, var(--text-2));
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .diff-header-actions {
