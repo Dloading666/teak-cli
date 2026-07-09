@@ -106,7 +106,6 @@
 }
 .settings-rail-version-link:hover {
   color: var(--accent, #c4956a);
-  text-decoration: underline;
 }
 
 /* ── Content (fixed header + scrolling body) ───────────────────────────── */
