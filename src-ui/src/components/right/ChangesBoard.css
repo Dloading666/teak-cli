@@ -224,7 +224,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* "已提交" session-commit row — single line: chevron + hash + subject (fills,
+/* "已提交" session-commit row — single line: hash + subject (fills,
  * truncates) + relative time (right). Replaces the old 3-line wrap layout
  * (chevron+hash on line 1, subject on line 2, count pill on line 3) which
  * wasted vertical space when several commits stacked. The count pill is
@@ -253,12 +253,6 @@
 }
 .changes-commit-toggleable:hover {
   background: var(--bg-hover);
-}
-.changes-commit-chevron {
-  flex: 0 0 auto;
-  width: 10px;
-  color: var(--text-3, var(--text-2));
-  font-size: 10px;
 }
 .changes-commit-hash {
   flex: 0 0 auto;

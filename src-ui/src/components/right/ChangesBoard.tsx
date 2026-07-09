@@ -65,7 +65,7 @@ type CommitRow = { hash: string; message: string; author: string; time: number }
 // `git init`'d repo can list thousands of untracked files).
 type RenderItem =
   | { type: 'header'; key: string; label: string; count: number }
-  | { type: 'commit-header'; key: string; commit: CommitRow; expanded: boolean; toggleable: boolean }
+  | { type: 'commit-header'; key: string; commit: CommitRow; toggleable: boolean }
   | { type: 'file'; key: string; entry: GitFileEntry; group: Group };
 
 // Selection is encoded as "<group-tag>\x00<abs-path>" so the same file
@@ -158,7 +158,7 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
       // Session commits are collapsed-by-default + lazy on expand.
       const expanded = expandedCommits.has(c.hash);
       const files = expanded ? (commitFiles.get(c.hash) ?? []) : [];
-      out.push({ type: 'commit-header', key: `commit-${c.hash}`, commit: c, expanded, toggleable: true });
+      out.push({ type: 'commit-header', key: `commit-${c.hash}`, commit: c, toggleable: true });
       for (const entry of files) {
         out.push({ type: 'file', key: selKey('committed', entry.path), entry, group: { tag: 'committed', label: '', entries: [], kind: 'committed', commitHash: c.hash } });
       }
@@ -320,7 +320,6 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
                   onClick={it.toggleable ? () => toggleCommit(c.hash) : undefined}
                   onKeyDown={it.toggleable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCommit(c.hash); } } : undefined}
                 >
-                  <span className="changes-commit-chevron" aria-hidden="true">{it.toggleable ? (it.expanded ? '▾' : '▸') : ''}</span>
                   <span className="changes-commit-hash">{c.hash}</span>
                   <span className="changes-commit-subject" data-tip={c.message}>{c.message}</span>
                   <span className="changes-commit-time">{formatCommitTime(c.time, t, state.currentLang || 'en')}</span>
