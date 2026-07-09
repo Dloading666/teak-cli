@@ -15,8 +15,7 @@
 // read-only file-actions menu.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
-import { useAppState, resolveDiffContext } from '../../store/app-state';
+import { useAppState, resolveDiffContext, type DiffSelection } from '../../store/app-state';
 import { useGitStatus, useGitPollingGate } from '../../lib/git-status';
 import { commands, type GitFileEntry } from '../../tauri';
 import { useT } from '../../i18n/useT';
@@ -29,9 +28,7 @@ import './ChangesBoard.css';
 
 interface ChangesBoardProps {
   selectedPath: string | null;
-  setSelectedPath: Dispatch<SetStateAction<string | null>>;
-  diffExpanded: boolean;
-  onToggleDiffExpanded: () => void;
+  diffMode: 'overlay' | 'tab';
 }
 
 const DIFF_HEIGHT_KEY = 'coffee:diff-half-height';
@@ -89,9 +86,9 @@ function formatCommitTime(epochSec: number, t: (k: any) => string, lang: string)
   return new Date(epochSec * 1000).toLocaleDateString(lang, { month: 'short', day: 'numeric' });
 }
 
-export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onToggleDiffExpanded }: ChangesBoardProps) {
+export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
   const t = useT();
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
   const activeSession = state.terminals.find(s => s.id === state.activeTerminalId);
   const activeFolderPath = resolveDiffContext(activeSession)?.folderPath ?? null;
   const changes = useGitStatus();
@@ -110,7 +107,7 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
   const [commitFiles, setCommitFiles] = useState<Map<string, GitFileEntry[]>>(new Map());
 
   const startResize = (e: React.PointerEvent) => {
-    if (diffExpanded) return;
+    if (diffMode === 'tab') return;
     const container = containerRef.current;
     if (!container) return;
     e.preventDefault();
@@ -276,7 +273,9 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
   for (const e of changes.uncommitted) { totalAdded += e.added; totalDeleted += e.deleted; }
   for (const e of changes.untracked) { totalAdded += e.added; totalDeleted += e.deleted; }
 
-  const handleStyle = diffExpanded ? { display: 'none' as const } : { bottom: `${diffHeight}%` };
+  // The resize handle sits at the overlay's top edge. In tab mode the overlay
+  // isn't rendered here (the diff lives in the center tab), so hide the handle.
+  const handleStyle = diffMode === 'tab' ? { display: 'none' as const } : { bottom: `${diffHeight}%` };
 
   return (
     <div className="changes-fullview" ref={containerRef}>
@@ -333,7 +332,29 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
               <div
                 key={it.key}
                 className={`changes-row ${effectiveSelected === it.key ? 'selected' : ''}`}
-                onClick={() => setSelectedPath(prev => prev === it.key ? null : it.key)}
+                onClick={() => {
+                  // Toggle off when re-clicking the already-selected row.
+                  if (effectiveSelected === it.key) {
+                    dispatch({ type: 'CLEAR_DIFF' });
+                    return;
+                  }
+                  // Snapshot the active terminal tab's folderPath alongside the
+                  // clicked row's diff params — a center diff tab is not a
+                  // terminal and has no own cwd to resolveDiffContext against
+                  // later, so the folderPath must travel with the selection.
+                  const folderPath = resolveDiffContext(activeSession)?.folderPath ?? '';
+                  const selection: DiffSelection = {
+                    repoRoot: repoRoot ?? '',
+                    folderPath,
+                    path: entry.path,
+                    rel: entry.rel,
+                    kind: group.kind,
+                    commitHash: group.commitHash,
+                    added: entry.added,
+                    deleted: entry.deleted,
+                  };
+                  dispatch({ type: 'SET_DIFF_SELECTION', selection });
+                }}
                 onMouseDown={(e) => beginExplorerDrag(entry.path, e)}
                 onContextMenu={(e) => {
                   e.preventDefault();
@@ -355,21 +376,21 @@ export function ChangesBoard({ selectedPath, setSelectedPath, diffExpanded, onTo
           {visibleCount < items.length && <div ref={sentinelRef} className="changes-sentinel" aria-hidden="true" />}
         </div>
       </ScrollPanel>
-      {effectiveSelected && selectedFile && repoRoot && (
+      {diffMode === 'overlay' && state.diffSelection && repoRoot && (
         <>
           <div className="diff-resize-handle" style={handleStyle} onPointerDown={startResize} aria-label="Resize diff" />
           <DiffPanel
-            path={selectedFile.entry.path}
+            mode="overlay"
+            path={state.diffSelection.path}
             repoRoot={repoRoot}
-            rel={selectedFile.entry.rel}
-            kind={selectedFile.group.kind}
-            commitHash={selectedFile.group.commitHash}
-            onClose={() => setSelectedPath(null)}
-            expanded={diffExpanded}
-            onToggleExpanded={onToggleDiffExpanded}
+            rel={state.diffSelection.rel}
+            kind={state.diffSelection.kind}
+            commitHash={state.diffSelection.commitHash}
+            onClose={() => dispatch({ type: 'CLEAR_DIFF' })}
+            onToggleExpanded={() => dispatch({ type: 'SET_DIFF_MODE', mode: 'tab' })}
             heightPercent={diffHeight}
-            added={selectedFile.entry.added}
-            deleted={selectedFile.entry.deleted}
+            added={state.diffSelection.added}
+            deleted={state.diffSelection.deleted}
           />
         </>
       )}

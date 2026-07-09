@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { focusTerminal } from '../../lib/focus-registry';
 import { onWindowForeground } from '../../lib/window-focus-filter';
@@ -8,6 +8,7 @@ import { FourSplitGrid } from './FourSplitGrid';
 import { ToolConfigModal } from './ToolConfigModal';
 import { ContributionHeatmap } from './ContributionHeatmap';
 import { ErrorBoundary } from '../common/ErrorBoundary';
+import { DiffPanel } from '../right/DiffPanel';
 import { useAppState, type ToolType } from '../../store/app-state';
 
 // Dropdown shown when a tool card's folder icon is clicked: the globally
@@ -434,6 +435,18 @@ export function CenterPanel() {
   const t = useT();
   const terminals = state.terminals;
   const activeTerminalId = state.activeTerminalId;
+  // Diff tab surface: visible only in tab mode with a selection. The diff
+  // chrome-tab sits in the strip beside terminal tabs; diffTabActive tracks
+  // whether it (not a terminal tab) is the focused surface.
+  const diffTabVisible = state.diffMode === 'tab' && state.diffSelection !== null;
+  const diffTabActive = state.diffTabActive;
+  // Diff tab title = basename of the selected file (mirrors DiffPanel's own
+  // header name). Computed here so the chrome-tab strip shows it without
+  // mounting the DiffPanel body.
+  const diffTabTitle = useMemo(() => {
+    const p = state.diffSelection?.path ?? '';
+    return p.replace(/\\/g, '/').split('/').pop() || p || (t('task.tab.changes' as any) || 'Diff');
+  }, [state.diffSelection?.path, t]);
 
   // Toast carries an id (timestamp) so React re-mounts the element on
   // every showToast() call — the slideDownToast animation is `forwards`
@@ -1306,6 +1319,36 @@ export function CenterPanel() {
         });
         })()}
 
+        {/* Diff tab — a peer of the terminal tabs in the strip, but not a
+            PTY. Visible only in tab mode with a selection. Clicking it
+            focuses the diff surface (SET_DIFF_TAB_ACTIVE); its X clears the
+            diff entirely. No status-grid (diff has no agent state). */}
+        {diffTabVisible && (
+          <div
+            className={`chrome-tab ${diffTabActive ? 'active' : ''}`}
+            onClick={() => dispatch({ type: 'SET_DIFF_TAB_ACTIVE', active: true })}
+          >
+            {/* Diff glyph: two columns, +/−, reads as "comparison". */}
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--accent)' }}>
+              <path d="M12 3v18"/>
+              <path d="M5 8h4M5 12h4M5 16h4" stroke="var(--accent)"/>
+              <path d="M15 8h4M15 12h4M15 16h4" stroke="#e07070"/>
+            </svg>
+            <span className="tab-title" style={{ flex: '0 1 auto', minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{diffTabTitle}</span>
+            <div className="tab-actions">
+              <button
+                className="tab-close-btn"
+                onClick={(e) => { e.stopPropagation(); dispatch({ type: 'CLEAR_DIFF' }); }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         <button className="chrome-tab-new" onClick={handleAddTab}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </button>
@@ -1319,7 +1362,10 @@ export function CenterPanel() {
             className="terminal-wrapper"
             data-session-id={t.id}
             style={{
-              display: t.id === activeTerminalId ? 'flex' : 'none',
+              // Hide every terminal wrapper while the diff tab is focused —
+              // the diff surface takes over the content area (the underlying
+              // PTYs stay mounted, just not displayed).
+              display: (t.id === activeTerminalId && !diffTabActive) ? 'flex' : 'none',
               width: '100%',
               height: '100%',
               position: 'relative'
@@ -1375,7 +1421,27 @@ export function CenterPanel() {
           </div>
         ) : null)}
 
-        {isLaunchpadMode && activeTerminalId && (
+        {/* Diff tab content — fills the content area when the diff tab is
+            focused. The DiffPanel body handles its own loading/error/too-large
+            states; mode="tab" makes it fill this slot (no portal/backdrop). */}
+        {diffTabVisible && diffTabActive && state.diffSelection && (
+          <div className="terminal-wrapper" style={{ display: 'flex', width: '100%', height: '100%', position: 'relative' }}>
+            <DiffPanel
+              mode="tab"
+              path={state.diffSelection.path}
+              repoRoot={state.diffSelection.repoRoot}
+              rel={state.diffSelection.rel}
+              kind={state.diffSelection.kind}
+              commitHash={state.diffSelection.commitHash}
+              onClose={() => dispatch({ type: 'CLEAR_DIFF' })}
+              onToggleExpanded={() => dispatch({ type: 'SET_DIFF_MODE', mode: 'overlay' })}
+              added={state.diffSelection.added}
+              deleted={state.diffSelection.deleted}
+            />
+          </div>
+        )}
+
+        {isLaunchpadMode && activeTerminalId && !diffTabActive && (
           <div className={`launchpad-container${hasBg && bgUrl ? ' launchpad-has-bg' : ''}`} style={{ position: 'relative' }}>
             {hasBg && bgUrl && (
               <div className="launchpad-bg">

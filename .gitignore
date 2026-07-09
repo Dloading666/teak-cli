@@ -96,3 +96,6 @@ binaries/
 .test-opencode
 # Game bundles and raw files (user-downloaded to ~/.coffee-cli/play/ at runtime, or local dev files)
 /play/
+
+# Local agent/tool plan scratch (e.g. .zcode/plans — session-scoped, not for the repo)
+/.zcode/

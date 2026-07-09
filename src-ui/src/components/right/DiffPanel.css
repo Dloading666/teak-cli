@@ -53,6 +53,27 @@
   overflow: hidden;
 }
 
+/* Center-tab surface: the diff renders inside a center tab's content area
+ * (mounted by CenterPanel, NOT portal'd to body). Unlike the half overlay
+ * (absolute, negative margins, bottom-anchored) this fills its parent —
+ * the parent is the tab's terminal-wrapper-sized slot. No box-shadow:
+ * it's not floating over anything, it IS the tab surface (matches how a
+ * terminal pane has no shadow on itself). Border-top replaces the
+ * overlay's "tape on list" edge with a clean panel-to-header separation. */
+.diff-panel--tab {
+  position: relative;
+  left: 0;
+  right: 0;
+  bottom: auto;
+  top: auto;
+  width: 100%;
+  height: 100%;
+  z-index: auto;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 /* Panel theme = sharp lines, no shadows. Strip the soft box-shadows
  * on both the half overlay AND the expanded modal so the diff reads
  * as a hard-edged "panel-on-panel" composition consistent with the
@@ -92,6 +113,14 @@
   border-color: var(--border) !important;
 }
 [data-shape="glass"] .diff-panel--expanded {
+  background: var(--bg-panel) !important;
+  border-color: var(--border) !important;
+}
+/* Tab-mode diff lives in the center panel (not .panel-right), so the
+ * glass opt-out above doesn't reach it — but the same global :not()
+ * nuke hits center-panel descendants too. Reassert the solid surface so
+ * syntax-highlighted code stays readable through the glass backdrop. */
+[data-shape="glass"] .diff-panel--tab {
   background: var(--bg-panel) !important;
   border-color: var(--border) !important;
 }

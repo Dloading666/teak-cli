@@ -11,7 +11,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { createPortal } from 'react-dom';
 import { diffLines } from 'diff';
 import { commands } from '../../tauri';
 import { useT } from '../../i18n/useT';
@@ -93,7 +92,13 @@ interface DiffPanelProps {
    *  of HEAD~1↔HEAD. */
   commitHash?: string;
   onClose: () => void;
-  expanded: boolean;
+  /** Which surface this panel renders on:
+   *  - 'overlay' = right-bottom half-height (anchored inside ChangesBoard)
+   *  - 'tab'     = center tab, fills the panel area (mounted by CenterPanel) */
+  mode: 'overlay' | 'tab';
+  /** Expand the overlay to a center tab, or (in tab mode) fold back to the
+   *  overlay. The glyph swaps per mode: overlay shows ⤢ (expand), tab shows
+   *  the "fold to bottom-right" glyph. */
   onToggleExpanded: () => void;
   /** Height percent (0-100) for the half-paper bottom overlay.
    *  Ignored in expanded mode (which uses fixed-inset modal sizing).
@@ -106,10 +111,13 @@ interface DiffPanelProps {
   deleted?: number;
 }
 
-export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, expanded, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
+export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
   const t = useT();
   const dataTheme = useDataAttr('data-theme');
   const [result, setResult] = useState<DiffResult>({ state: 'loading' });
+  // `expanded` (tab mode) is the legacy name kept locally so the keyboard +
+  // sizing logic below reads as before; the prop surface is `mode`.
+  const expanded = mode === 'tab';
 
   // Latest badge counts (Rust multiset deltas), mirrored into a ref so the
   // open-time size guard can read them WITHOUT the load effect depending on
@@ -254,40 +262,71 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, expa
     <div className="diff-header">
       <span className="diff-header-name">{basename}</span>
       <div className="diff-header-actions">
-        <button
-          type="button"
-          className="diff-header-btn"
-          onClick={onToggleExpanded}
-          aria-label={expanded ? 'Collapse diff' : 'Expand diff'}
-        >
-          {expanded ? '⤓' : '⤢'}
-        </button>
-        <button
-          type="button"
-          className="diff-header-btn"
-          onClick={onClose}
-          aria-label="Close diff"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
+        {expanded ? (
+          // Tab mode: fold back to the bottom-right overlay. The glyph is an
+          // outer frame with a filled inner box pinned to the bottom-right —
+          // the inner box IS the overlay's corner position, so the icon says
+          // "shrink toward there". Close is handled by the tab's own X
+          // (rendered by CenterPanel), so no close button here.
+          <button
+            type="button"
+            className="diff-header-btn"
+            onClick={onToggleExpanded}
+            aria-label="Fold diff back to panel"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <rect x="11" y="11" width="9" height="9" rx="1" fill="currentColor" stroke="none"/>
+            </svg>
+          </button>
+        ) : (
+          // Overlay mode: expand to a center tab. The glyph is an outer frame
+          // with a filled inner box centered — the visual inverse of the tab-
+          // mode fold icon (inner box at bottom-right). Together the pair reads
+          // as "center = tab surface, corner = overlay surface". Close button
+          // too — the overlay has no outer tab to provide an X.
+          <>
+            <button
+              type="button"
+              className="diff-header-btn"
+              onClick={onToggleExpanded}
+              aria-label="Expand diff to tab"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor" stroke="none"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="diff-header-btn"
+              onClick={onClose}
+              aria-label="Close diff"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
 
-  // Same DiffPanel element rendered at two different sizes:
-  //   default: in-flow / parent-anchored overlay (bottom half of changes panel)
-  //   expanded: portal to body, fixed-inset modal (full window)
-  // Backdrop only appears in expanded mode (modal needs a dim+blocker).
+  // Same DiffPanel element rendered on two surfaces:
+  //   overlay (default): in-flow, parent-anchored (bottom half of the changes
+  //     panel). heightPercent drives its height.
+  //   tab: fills the center tab's panel area (mounted by CenterPanel). No
+  //     portal, no backdrop — the center tab IS the surface, and closing is
+  //     the tab's own X (not a backdrop click).
   const panelStyle: CSSProperties | undefined =
-    !expanded && typeof heightPercent === 'number'
+    mode === 'overlay' && typeof heightPercent === 'number'
       ? { height: `${heightPercent}%` }
       : undefined;
   const panel = (
     <div
-      className={`diff-panel${expanded ? ' diff-panel--expanded' : ''}`}
+      className={`diff-panel${mode === 'tab' ? ' diff-panel--tab' : ''}`}
       style={panelStyle}
     >
       {header}
@@ -342,14 +381,11 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, expa
     </div>
   );
 
-  if (!expanded) return panel;
-  return createPortal(
-    <>
-      <div className="diff-backdrop" onMouseDown={onToggleExpanded} />
-      {panel}
-    </>,
-    document.body,
-  );
+  // Overlay returns the panel in-flow (anchored inside ChangesBoard). Tab
+  // mode returns it directly too — CenterPanel mounts it filling the tab's
+  // content area. (Previously tab/expanded used a createPortal full-screen
+  // modal + backdrop; that blocked the agent terminal behind it.)
+  return panel;
 }
 
 // Render one diff line. Module-level so it can be reused for both ordinary

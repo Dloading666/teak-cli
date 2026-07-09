@@ -221,6 +221,43 @@ export interface AppState {
   // text area). Same task data either way — purely a presentation choice made
   // in the settings modal. Default 'list' so existing users see no change.
   taskViewMode: 'list' | 'note';
+
+  // ── Diff view (修改记录 → click a file) ─────────────────────────────────
+  // The right-side Changes tab shows a half-height bottom overlay (DiffPanel)
+  // when a file is selected. The user can "expand" that diff — historically a
+  // full-screen portal modal that blocked the agent terminal behind it. That
+  // is replaced by a center **diff tab** (peer of the Claude/Codex terminal
+  // tabs): `diffMode` selects which surface the open diff renders on.
+  //   'overlay' = right-bottom half-height (default; existing behavior)
+  //   'tab'     = center tab, full panel area
+  // `diffSelection` carries the snapshot needed to render the diff on either
+  // surface. It is snapshotted from the active terminal tab's folderPath +
+  // the clicked file row at selection time, because a diff tab is not a
+  // terminal and has no own folderPath to dynamically resolveDiffContext.
+  // Persisted preference in `cc-diff-mode`; the selection itself is NOT
+  // persisted (it depends on files open at the time).
+  diffSelection: DiffSelection | null;
+  diffMode: 'overlay' | 'tab';
+  /// True while the center diff tab is the active surface (clicked in the tab
+  /// strip). Clicking any terminal tab clears it (folded into SET_ACTIVE_TERMINAL).
+  /// Lets the diff tab coexist in the strip with terminal tabs the user can
+  /// switch back to, without diffMode flipping (mode = which surface the diff
+  /// renders on; this = which tab is focused right now).
+  diffTabActive: boolean;
+}
+
+/// Snapshot of the file the user clicked in ChangesBoard, plus the folderPath
+/// of the terminal tab that was active when they clicked — enough for DiffPanel
+/// to render on either surface without re-resolving against a live terminal.
+export interface DiffSelection {
+  repoRoot: string;
+  folderPath: string;   // active terminal tab's cwd at snapshot time (tab title only)
+  path: string;         // absolute on-disk path
+  rel: string;          // repo-relative path for git specs
+  kind: 'uncommitted' | 'untracked' | 'committed';
+  commitHash?: string;
+  added?: number;
+  deleted?: number;
 }
 
 // ─── Tab tool predicates ────────────────────────────────────────────────────
@@ -299,7 +336,11 @@ type Action =
   | { type: 'TOGGLE_RIGHT_PANEL' }
   | { type: 'SET_MULTI_AGENT_LAYOUT'; layout: 'grid' | 'columns' }
   | { type: 'SET_TASK_VIEW_MODE'; mode: 'list' | 'note' }
-  | { type: 'SET_TAB_TITLE'; id: string; title: string };
+  | { type: 'SET_TAB_TITLE'; id: string; title: string }
+  | { type: 'SET_DIFF_SELECTION'; selection: DiffSelection }
+  | { type: 'CLEAR_DIFF' }
+  | { type: 'SET_DIFF_MODE'; mode: 'overlay' | 'tab' }
+  | { type: 'SET_DIFF_TAB_ACTIVE'; active: boolean };
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
 
@@ -377,7 +418,10 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, terminals: next };
     }
     case 'SET_ACTIVE_TERMINAL':
-      return { ...state, activeTerminalId: action.id };
+      // Activating a terminal tab blurs the diff tab (they're peer tabs in
+      // the strip; only one is focused at a time). diffMode is untouched —
+      // the diff still renders in its chosen surface, just not focused.
+      return { ...state, activeTerminalId: action.id, diffTabActive: false };
     case 'SET_TERMINAL_TOOL':
       return {
         ...state,
@@ -519,6 +563,29 @@ function reducer(state: AppState, action: Action): AppState {
       try { localStorage.setItem('cc-task-view', action.mode); } catch {}
       return { ...state, taskViewMode: action.mode };
     }
+    case 'SET_DIFF_SELECTION':
+      // In tab mode, selecting a file focuses the diff tab immediately (the
+      // user's pref is the center surface, so a click should show it there,
+      // not just park an unfocused tab in the strip). Overlay mode leaves
+      // diffTabActive alone — the overlay renders regardless of focus.
+      return {
+        ...state,
+        diffSelection: action.selection,
+        diffTabActive: state.diffMode === 'tab' ? true : state.diffTabActive,
+      };
+    case 'CLEAR_DIFF':
+      // Dropping the selection also folds the diff tab: a tab only renders
+      // while diffMode==='tab' && diffSelection. Clearing here covers both
+      // the tab's close button and the overlay's close button.
+      return { ...state, diffSelection: null, diffTabActive: false };
+    case 'SET_DIFF_MODE': {
+      try { localStorage.setItem('cc-diff-mode', action.mode); } catch {}
+      // Entering tab mode focuses the diff tab; leaving blurs it. Keeps the
+      // active-surface tracking in lockstep with the surface the diff is on.
+      return { ...state, diffMode: action.mode, diffTabActive: action.mode === 'tab' };
+    }
+    case 'SET_DIFF_TAB_ACTIVE':
+      return { ...state, diffTabActive: action.active };
     default:
       return state;
   }
@@ -658,6 +725,9 @@ function getInitialState(): AppState {
   // 'list', only flipped to 'note' by the TaskBoard first-launch seed — which
   // was fragile (cleared localStorage or a removed seed fell back to list).
   let taskViewMode: 'list' | 'note' = 'note';
+  // Default 'overlay' (the gentle half-height panel) — existing users see no
+  // change. Only flips to 'tab' if the user explicitly expanded-to-tab before.
+  let diffMode: 'overlay' | 'tab' = 'overlay';
   try {
     leftPanelHidden = localStorage.getItem('cc-left-hidden') === '1';
     rightPanelHidden = localStorage.getItem('cc-right-hidden') === '1';
@@ -665,6 +735,8 @@ function getInitialState(): AppState {
     if (savedLayout === 'columns' || savedLayout === 'grid') multiAgentLayout = savedLayout;
     const savedTaskView = localStorage.getItem('cc-task-view');
     if (savedTaskView === 'list' || savedTaskView === 'note') taskViewMode = savedTaskView;
+    const savedDiffMode = localStorage.getItem('cc-diff-mode');
+    if (savedDiffMode === 'tab' || savedDiffMode === 'overlay') diffMode = savedDiffMode;
   } catch {}
 
   return {
@@ -689,6 +761,9 @@ function getInitialState(): AppState {
     rightPanelHidden,
     multiAgentLayout,
     taskViewMode,
+    diffSelection: null,
+    diffMode,
+    diffTabActive: false,
   };
 }
 

@@ -91,27 +91,15 @@ export function TaskBoard() {
     try { localStorage.setItem('cc-right-tab', activeTab); } catch {}
   }, [activeTab]);
 
-  // Selection lives at TaskBoard level so a right-side detour to
-  // Tasks/History doesn't unmount-and-drop it. Single global selection
-  // (no per-tab keying) — matches the global ChangesBoard list, where
-  // the same entry is visible across every tab. Switching center tabs
-  // no longer changes which row is highlighted: that would be confusing
-  // when the list itself is unchanged.
-  const [selectedChangePath, setSelectedChangePath] = useState<string | null>(null);
-
-  // Diff has 3 states (closed / half-overlay / full-screen modal). Half
-  // is the default when a file is selected from ChangesBoard; expanded
-  // promotes the SAME panel to a portal-rendered modal. State lives here
-  // (not in ChangesBoard) so leaving Changes tab + returning to it
-  // preserves the user's expanded preference for the open file.
-  const [diffExpanded, setDiffExpanded] = useState(false);
-  const toggleDiffExpanded = useCallback(() => {
-    setDiffExpanded(prev => !prev);
-  }, []);
-  // Auto-collapse on diff close so reopening starts at the gentler half size.
-  useEffect(() => {
-    if (!selectedChangePath && diffExpanded) setDiffExpanded(false);
-  }, [selectedChangePath, diffExpanded]);
+  // Selection lives at the AppState tier now (diffSelection), so a detour to
+  // the center diff tab — which unmounts ChangesBoard — doesn't drop it.
+  // ChangesBoard still takes a selKey string (`<tag>\x00<abs-path>`) for row
+  // highlighting; we derive it from diffSelection so the two stay in sync.
+  const diffSelection = state.diffSelection;
+  const diffMode = state.diffMode;
+  const selectedChangePath = diffSelection
+    ? `${diffSelection.kind}\x00${diffSelection.path}`
+    : null;
 
   // Inline title editing
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -814,9 +802,7 @@ export function TaskBoard() {
     {activeTab === 'changes' && (
       <ChangesBoard
         selectedPath={selectedChangePath}
-        setSelectedPath={setSelectedChangePath}
-        diffExpanded={diffExpanded}
-        onToggleDiffExpanded={toggleDiffExpanded}
+        diffMode={diffMode}
       />
     )}
 
