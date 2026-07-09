@@ -238,9 +238,17 @@ pub fn populate_versions(caps: &mut ShellCapabilities) {
     // PowerShell 7: `pwsh --version` prints "PowerShell 7.4.6" and exits
     // fast (~150ms, single-file .NET app). Only probe if we already found a
     // real pwsh path (avoids re-triggering the App Execution Alias trap).
+    //
+    // This also doubles as the LIVENESS check for the path `find_pwsh_real_path`
+    // returned: existence there is checked via `is_file()` (App Execution
+    // Aliases report len 0 but is_file true), which can't distinguish a working
+    // alias from a stale one. If `--version` fails to spawn, the path is dead
+    // and we flip `pwsh_available` false so the picker doesn't offer a shell
+    // that won't start. This keeps the startup probe zero-spawn while still
+    // never showing a dead card.
     if caps.pwsh_available {
         if let Some(path) = caps.pwsh_path.as_ref() {
-            caps.pwsh_version = Command::new(path)
+            let version = Command::new(path)
                 .arg("--version")
                 .creation_flags(0x08000000)
                 .output()
@@ -254,6 +262,13 @@ pub fn populate_versions(caps: &mut ShellCapabilities) {
                         None
                     }
                 });
+            if version.is_none() {
+                // Stale App Execution Alias / unlaunchable candidate: the
+                // existence-only startup probe was wrong to accept it. Hide
+                // the shell instead of offering a dead tab.
+                caps.pwsh_available = false;
+            }
+            caps.pwsh_version = version;
         }
     }
 
@@ -371,39 +386,150 @@ fn system_cmd_path() -> String {
     }
 }
 
-/// Find PowerShell 7 (`pwsh.exe`) as a REAL executable, skipping the
-/// 0-byte App Execution Alias reparse point the Microsoft Store leaves
-/// on PATH. Strategy: run `where pwsh.exe`, take each returned path,
-/// keep the first whose file size is > 0 (aliases are 0 bytes). Returns
-/// the absolute path, or `None` when only the alias is present (treated
-/// as "not installed" so the picker doesn't offer a dead shell).
+/// Find PowerShell 7 (`pwsh.exe`) as a REAL, launchable executable — across
+/// every install method Microsoft documents (install-powershell-on-windows):
+///   - **MSIX / Microsoft Store** (winget 7.6+ default, and the ONLY form
+///     from 7.7 onward): the real `pwsh.exe` lives under an ACL-locked
+///     `C:\Program Files\WindowsApps\Microsoft.PowerShell_<ver>_<arch>_<pub>\`
+///     and is NOT on PATH. PATH carries only an App Execution Alias — a
+///     reparse point whose `metadata().len()` returns **0** in a real Win32
+///     process (NOT a normal symlink: `read_link` reports "Unsupported
+///     reparse point type"). The old `len() > 0` filter therefore stripped
+///     the only candidate and reported "not installed" — the bug this fixes.
+///   - **MSI** (global): `%ProgramFiles%\PowerShell\7\pwsh.exe` (+ x86 +
+///     `7-preview`). Only on PATH when ADD_PATH was ticked at install.
+///   - **MSI per-user**: `%LOCALAPPDATA%\Programs\PowerShell\7\pwsh.exe`.
+///   - **.NET global tool**: `%USERPROFILE%\.dotnet\tools\pwsh.exe`.
+///   - **PATH** (`where`): a real MSI exe may show up here (alias does too,
+///     but a real one is preferred when present).
+///
+/// We mirror the VS Code PowerShell extension's MSIX strategy (its
+/// `src/platform.ts`): glob `%LOCALAPPDATA%\Microsoft\WindowsApps\` for a
+/// `Microsoft.PowerShell_*` subdirectory (preview = `Microsoft.PowerShellPreview_*`)
+/// and take `dir/pwsh.exe` — WITHOUT a `len() > 0` gate, because App
+/// Execution Aliases legitimately report 0 bytes. `pwsh_exists()` below
+/// uses `is_file()` (which is `true` for reparse points) instead of `len`.
+///
+/// Existence-only here (no spawn): `detect_capabilities` runs at app startup
+/// and every spawn, so it must stay process-free. Liveness is then proven by
+/// `populate_versions`, which runs `<path> --version` when Settings opens;
+/// if that fails the path is a stale alias and `pwsh_available` flips false.
 #[cfg(target_os = "windows")]
 fn find_pwsh_real_path() -> Option<String> {
+    // 1. MSIX / Microsoft Store — the case winget 7.6+ installs by default.
+    // `%LOCALAPPDATA%\Microsoft\WindowsApps\` is user-readable (unlike the
+    // real install under `C:\Program Files\WindowsApps\`, which is ACL-
+    // locked). The package's execution-alias folder name is the Package
+    // Family Name form (e.g. `Microsoft.PowerShell_8wekyb3d8bbwe`). Stable is
+    // the common case, so try it first; fall back to preview only if absent.
+    if let Some(la) = std::env::var("LOCALAPPDATA").ok() {
+        let apps = std::path::Path::new(&la)
+            .join("Microsoft")
+            .join("WindowsApps");
+        if let Some(p) = find_msix_pwsh(&apps, "Microsoft.PowerShell_") {
+            return Some(p);
+        }
+        if let Some(p) = find_msix_pwsh(&apps, "Microsoft.PowerShellPreview_") {
+            return Some(p);
+        }
+    }
+
+    // 2. MSI global install (official default INSTALLFOLDER).
+    let mut msi: Vec<String> = vec![];
+    if let Ok(pf) = std::env::var("ProgramFiles") {
+        msi.push(format!(r"{}\PowerShell\7\pwsh.exe", pf));
+        msi.push(format!(r"{}\PowerShell\7-preview\pwsh.exe", pf));
+    }
+    if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
+        msi.push(format!(r"{}\PowerShell\7\pwsh.exe", pf86));
+    }
+    for c in &msi {
+        if pwsh_exists(c) {
+            return Some(c.clone());
+        }
+    }
+
+    // 3. MSI per-user install.
+    if let Ok(la) = std::env::var("LOCALAPPDATA") {
+        let c = format!(r"{}\Programs\PowerShell\7\pwsh.exe", la);
+        if pwsh_exists(&c) {
+            return Some(c);
+        }
+    }
+
+    // 4. .NET global tool (official: `dotnet tool install --global PowerShell`).
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let c = format!(r"{}\.dotnet\tools\pwsh.exe", home);
+        if pwsh_exists(&c) {
+            return Some(c);
+        }
+    }
+
+    // 5. PATH fallback (`where`). A real MSI pwsh on PATH surfaces here; a
+    // 0-byte alias does too, but `pwsh_exists` accepts it (is_file true) and
+    // `populate_versions` later proves liveness via `--version`.
     use std::os::windows::process::CommandExt;
     let out = std::process::Command::new("where")
         .arg("pwsh.exe")
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    for line in stdout.lines() {
-        let p = line.trim();
-        if p.is_empty() {
-            continue;
-        }
-        // Alias stubs are 0-byte reparse points; a real pwsh is several MB.
-        // `metadata().len()` follows the reparse point for a normal file
-        // but returns 0 for the alias stub, so >0 filters them out.
-        if let Ok(meta) = std::fs::metadata(p) {
-            if meta.is_file() && meta.len() > 0 {
-                return Some(p.to_string());
+        .ok();
+    if let Some(out) = out {
+        if out.status.success() {
+            for line in String::from_utf8_lossy(&out.stdout).lines() {
+                let p = line.trim();
+                if !p.is_empty() && pwsh_exists(p) {
+                    return Some(p.to_string());
+                }
             }
         }
     }
     None
+}
+
+/// Glob a WindowsApps dir for an MSIX PowerShell execution-alias subfolder
+/// matching `prefix` (stable `"Microsoft.PowerShell_"` or preview
+/// `"Microsoft.PowerShellPreview_"`) and return `dir/pwsh.exe`. The folder
+/// is an App Execution Alias reparse point whose `metadata().len()` is 0,
+/// so we use `is_file()` (true for reparse points) instead of `len() > 0`.
+/// Caller guarantees `prefix` does not match the other variant (stable ≠
+/// preview prefixes are disjoint).
+///
+/// The alias folder name is the **Package Family Name** form —
+/// `Microsoft.PowerShell_<publisher-hash>` (e.g. `Microsoft.PowerShell_8wekyb3d8bbwe`),
+/// which is version-less: the versioned name (`Microsoft.PowerShell_7.6.3.0_x64__…`)
+/// only exists under the ACL-locked `C:\Program Files\WindowsApps\`, not in this
+/// user-readable alias dir. There is at most one folder per prefix (a single
+/// PowerShell package family), so we return the first match without sorting.
+#[cfg(target_os = "windows")]
+fn find_msix_pwsh(apps: &std::path::Path, prefix: &str) -> Option<String> {
+    let entries = std::fs::read_dir(apps).ok()?;
+    for e in entries.flatten() {
+        let name = e.file_name();
+        if !name.to_string_lossy().starts_with(prefix) {
+            continue;
+        }
+        let p = apps.join(&name).join("pwsh.exe");
+        if pwsh_exists(p.to_string_lossy().as_ref()) {
+            return Some(p.to_string_lossy().into_owned());
+        }
+    }
+    None
+}
+
+/// Reparse-point-friendly existence check for a `pwsh.exe` candidate. A real
+/// MSI exe has `len() > 0`; an App Execution Alias (MSIX) is a reparse point
+/// whose `len()` is **0** but `is_file()` is still `true`. We therefore gate
+/// on `is_file()`, not `len()`, so MSIX installs are not mistaken for "absent".
+/// Liveness is confirmed separately by `populate_versions` (`pwsh --version`).
+#[cfg(target_os = "windows")]
+fn pwsh_exists(path: &str) -> bool {
+    // symlink_metadata does not follow the link/reparse point, so even a
+    // dangling alias reports its own attributes; is_file() is true for both
+    // real files and App Execution Aliases, false for directories/missing.
+    std::fs::symlink_metadata(path)
+        .map(|m| m.is_file())
+        .unwrap_or(false)
 }
 
 /// Locate Git-for-Windows `bash.exe`. Avoids `where bash.exe` because many
@@ -493,6 +619,51 @@ mod tests {
         assert_eq!(ShellId::from_opt(&Some("  ".into())), ShellId::Auto);
     }
 
+    /// Live MSIX smoke test — only meaningful on a machine where PowerShell 7
+    /// was installed as an MSIX/Store package (winget 7.6+ default). `#[ignore]`
+    /// so CI / machines without PS7 skip it; run locally with
+    /// `cargo test shell_probe -- --ignored` after `winget install
+    /// Microsoft.PowerShell`. Asserts the new probe finds the alias folder
+    /// under `%LOCALAPPDATA%\Microsoft\WindowsApps\` that the old `len() > 0`
+    /// filter wrongly rejected.
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn finds_msix_pwsh_alias() {
+        let path = find_pwsh_real_path()
+            .expect("find_pwsh_real_path returned None — MSIX PS7 not detected");
+        // The MSIX alias path always lives under the user's WindowsApps dir;
+        // an MSI install would instead resolve to Program Files. This test
+        // is specifically run on a machine with the MSIX install, so assert
+        // the MSIX form.
+        let la = std::env::var("LOCALAPPDATA").unwrap_or_default();
+        assert!(
+            path.starts_with(&format!("{}\\Microsoft\\WindowsApps", la)),
+            "expected MSIX alias path under WindowsApps, got: {path}"
+        );
+        assert!(
+            pwsh_exists(&path),
+            "returned path failed pwsh_exists (is_file): {path}"
+        );
+    }
+
+    /// End-to-end: the same path the Settings picker runs (detect_capabilities
+    /// + populate_versions) must report pwsh as available AND fill a version
+    /// string when PS7 (MSIX or MSI) is installed. `--ignored` because it
+    /// needs a real PS7 install; on a bare CI box it correctly stays absent.
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn end_to_end_detects_installed_pwsh_with_version() {
+        let mut caps = detect_capabilities();
+        assert!(caps.pwsh_available, "pwsh_available false — PS7 not detected");
+        populate_versions(&mut caps);
+        assert!(
+            caps.pwsh_version.is_some(),
+            "pwsh --version failed — path is a stale alias, not a live shell"
+        );
+    }
+
     #[cfg(target_os = "windows")]
     #[test]
     fn parses_windows_ids() {
@@ -522,6 +693,7 @@ mod tests {
             git_bash_path: Some(r"C:\Git\bin\bash.exe".into()),
             wsl_available: false,
             pwsh_path: Some(r"C:\pwsh\pwsh.exe".into()),
+            ..ShellCapabilities::default()
         };
         let json = ShellCapabilitiesJson::from(&caps);
         assert!(json.pwsh_available);
