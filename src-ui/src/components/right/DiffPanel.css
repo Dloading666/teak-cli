@@ -72,6 +72,14 @@
   border: 0;
   border-radius: 0;
   box-shadow: none;
+  /* Tab-mode surface MUST match the center content's unified surface so the
+   * active chrome-tab (which fills with --bg-terminal, CenterPanel.css:65)
+   * reads as continuous with the diff body below it. The base .diff-panel
+   * uses --bg-panel (correct for the right-panel overlay, which sits in a
+   * --bg-panel column), but in tab mode the diff IS the center content area,
+   * whose surface is --bg-terminal. Using --bg-panel here left a visible
+   * seam — the active tab's fill was one tint, the diff body another. */
+  background: var(--bg-terminal);
 }
 
 /* Panel theme = sharp lines, no shadows. Strip the soft box-shadows
@@ -126,7 +134,7 @@
  * own `.diff-panel` class brings it to (0,4,0) — clean win. Carbon (the
  * default theme) shares the same nuke rule, so gate on both shapes. */
 :is([data-shape="glass"], [data-shape="carbon"]) .panel-center .diff-panel.diff-panel--tab {
-  background: var(--bg-panel) !important;
+  background: var(--bg-terminal) !important;
   border-color: var(--border) !important;
 }
 
@@ -303,16 +311,21 @@
  * reveal the hidden lines in place. Deliberately text-only — no
  * background, border, or shadow — so it renders identically under the
  * glass shape, whose nuclear-transparent rule (global.css:1218) strips
- * descendant bg/border/shadow but never touches text color. The italic
- * dim text + hover brighten signal "this is a control" without chrome. */
+ * descendant bg/border/shadow but never touches text color. The dim text
+ * + hover brighten signal "this is a control" without chrome.
+ *
+ * Font: the app's unified UI font (var(--font)), NOT the mono stack the
+ * surrounding code lines use. The marker is UI chrome ("N unchanged
+ * lines"), and the mono-italic previous styling rendered fuzzy /
+ * hard-to-read for non-ASCII locales (CJK italic + mono at 11px is the
+ * worst case). No italic, no bold — plain high-DPI UI text. */
 .diff-gap {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 3px 0;
-  font-family: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font);
   font-size: 11px;
-  font-style: italic;
   white-space: normal;
   color: var(--text-3, var(--text-2));
   opacity: 0.8;
