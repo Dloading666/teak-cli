@@ -102,6 +102,17 @@ pub fn install_all() {
             dispatch_install(tool, &home);
         }
     }
+
+    // Windows-only: opencode/mimocode's `opencode upgrade` (which re-runs
+    // `npm install -g`) shatters the global bin links when the binary is
+    // running — npm renames opencode.cmd → .opencode.cmd-<rand>, then the
+    // write of the new file fails because cmd.exe holds a lock on it, leaving
+    // orphans and no usable bin. Detect that state at launch and repair it
+    // by re-running the install. See repair_broken_npm_bins() for details.
+    #[cfg(target_os = "windows")]
+    {
+        crate::hook_installer::repair_broken_npm_bins();
+    }
 }
 
 /// Install hook(s) for a single tool. Called from the launchpad's
@@ -732,3 +743,148 @@ fn claude_hook_command() -> Option<String> {
     };
     Some(format!("\"{}\" {}", p, HOOK_SUBCOMMAND))
 }
+
+// ─── Broken-bin repair (Windows) ────────────────────────────────────────────
+//
+// `opencode upgrade` re-runs `npm install -g opencode-ai` to rewrite the
+// global bin. On Windows, if an opencode process is running (e.g. the one
+// Coffee CLI launched), cmd.exe holds a lock on opencode.cmd — npm renames
+// it to .opencode.cmd-<rand> as the first step of the rewrite, then fails
+// to write the new file, leaving the orphan AND no usable bin. `where
+// opencode` then fails with "not found".
+//
+// We can't prevent the upgrade (the user runs it themselves, outside our
+// process). But at Coffee CLI launch — when opencode is almost certainly
+// NOT running (the user just opened the app) — we can detect the broken
+// state and re-run the install to rebuild the links. Idempotent and safe:
+// if the bin is fine, we do nothing; if the package isn't npm-installed,
+// we do nothing; if the binary is currently running, we skip (can't fix
+// under the lock anyway — next launch will catch it).
+
+#[cfg(target_os = "windows")]
+const NPM_REPAIR_TARGETS: &[(&str, &str)] = &[
+    // (binary_name we look for on PATH, npm global package that provides it)
+    ("opencode", "opencode-ai"),
+    // MiMo Code is an OpenCode fork with the same upgrade/bin-rewrite shape.
+    // Its npm package name isn't confirmed across installs, so this entry is
+    // best-effort — add the correct name here once verified.
+    // ("mimo", "@mimo-ai/cli"),
+];
+
+#[cfg(target_os = "windows")]
+pub fn repair_broken_npm_bins() {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+
+    for (bin, pkg) in NPM_REPAIR_TARGETS {
+        // Bin still resolves? Nothing to do.
+        if crate::server::binary_on_path(bin) {
+            continue;
+        }
+        // Is the npm package actually installed globally? If not, the user
+        // never had this tool via npm — don't materialize it. `npm ls -g
+        // --json` is the reliable presence check (parses cleanly, exits 0
+        // even when listing). CREATE_NO_WINDOW so no console flash at boot.
+        // npm ships as a .cmd shim on Windows — CreateProcessW won't resolve
+        // it directly, so go through cmd.exe /c (same as the terminal spawn).
+        let ls = match Command::new("cmd")
+            .args(["/c", "npm", "ls", "-g", "--json", "--depth=0"])
+            .creation_flags(0x08000000)
+            .output()
+        {
+            Ok(o) => o,
+            Err(_) => continue, // npm not on PATH — nothing to repair via npm
+        };
+        let stdout = String::from_utf8_lossy(&ls.stdout);
+        // Crude but robust: the package name appears as a key in "dependencies"
+        // iff it's installed. Avoids pulling a JSON parser for one check.
+        if !stdout.contains(pkg) {
+            continue;
+        }
+        // Is the binary currently running? If so, a repair now would hit the
+        // same file lock that broke it. tasklist /fi over the image name,
+        // CREATE_NO_WINDOW. Skip on any error (better to try the repair than
+        // to skip it because tasklist itself failed).
+        if process_is_running(bin) {
+            eprintln!(
+                "[hook-installer] {} bin is broken but the process is running — \
+                 skipping npm repair (would hit the file lock). It'll repair on a \
+                 next launch where {} isn't running.",
+                bin, bin
+            );
+            continue;
+        }
+        eprintln!(
+            "[hook-installer] {} bin missing but npm global has {} — repairing \
+             the bin links with `npm install -g {}`",
+            bin, pkg, pkg
+        );
+        // Re-run the install to rebuild the bin links. 120s timeout — npm
+        // global install can be slow on a cold cache, but we don't want to
+        // hang the app boot forever if something's wrong. cmd /c for the
+        // same .cmd-shim reason as the ls above.
+        let mut repair = Command::new("cmd");
+        repair
+            .args(["/c", "npm", "install", "-g", pkg])
+            .creation_flags(0x08000000);
+        match run_with_timeout(&mut repair, std::time::Duration::from_secs(120)) {
+            Ok(true) => {
+                eprintln!("[hook-installer] {} repair install finished", bin);
+            }
+            Ok(false) => {
+                eprintln!("[hook-installer] {} repair install timed out", bin);
+            }
+            Err(e) => {
+                eprintln!("[hook-installer] {} repair install failed: {}", bin, e);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn process_is_running(image_name: &str) -> bool {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+    // tasklist filters by image name; the exe may be opencode.exe or
+    // mimo.exe. Match the bare name (tasklist matches case-insensitively
+    // and accepts with/without .exe).
+    let filter = format!("imagename eq {}*", image_name);
+    match Command::new("tasklist")
+        .args(["/fi", &filter, "/nh", "/fo", "csv"])
+        .creation_flags(0x08000000)
+        .output()
+    {
+        Ok(o) => {
+            let out = String::from_utf8_lossy(&o.stdout);
+            // CSV rows for running processes start with the quoted image name.
+            // No header (/nh), so any non-empty output line mentioning the
+            // name means it's running.
+            out.lines().any(|l| l.to_lowercase().contains(image_name))
+        }
+        Err(_) => false, // tasklist failed — assume not running so we still try
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn run_with_timeout(cmd: &mut std::process::Command, dur: std::time::Duration) -> std::io::Result<bool> {
+    // std::process::Command has no blocking-with-timeout; spawn and poll
+    // try_wait until the deadline. On timeout, kill the child so a hung npm
+    // doesn't stall boot. Returns Ok(true) if it exited, Ok(false) if killed.
+    use std::time::Instant;
+    let mut child = cmd.spawn()?;
+    let deadline = Instant::now() + dur;
+    loop {
+        if let Some(_status) = child.try_wait()? {
+            return Ok(true);
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Ok(false);
+        }
+        // Short sleep so we don't busy-wait; npm install is seconds-to-minutes,
+        // a 100ms poll is fine-grained enough.
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
