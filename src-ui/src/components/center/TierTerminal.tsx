@@ -10,7 +10,7 @@
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Terminal } from '@xterm/xterm';
+import { Terminal, type IBuffer } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { clipboardRead, clipboardWrite } from '../../lib/clipboard';
@@ -596,16 +596,34 @@ function TierTerminalImpl({
       // before xterm's own CompositionHelper runs; a setTimeout(0) re-applies so
       // xterm's subsequent re-position can't overwrite our anchor.
       //
-      // Generic version: anchor = buffer.cursorY/cursorX (the TUI's logical
-      // cursor). If Claude Code parks the cursor on a blank row like Cursor
-      // Agent does, precise input-box placement still drifts - scanning the
-      // buffer for Claude Code's input marker is the second step. On Linux the
-      // composition stopPropagation above blocks bubbling so this never fires
-      // (Linux IME takes the input path; its candidate placement is unchanged).
+      // Generic version: anchor on the LAST non-empty cell on screen, not the
+      // (stale) buffer cursor. Every TUI's input box sits at the last rendered
+      // glyph and tracks it live, so this is one level above orca's per-tool
+      // "Cursor Agent -> " sniff - no per-tool markup, works for Claude Code,
+      // Kimi, OpenCode, plain shell alike. Falls back to the buffer cursor
+      // only when the screen is entirely empty. On Linux the composition
+      // stopPropagation above blocks bubbling so this never fires (Linux IME
+      // takes the input path; its candidate placement is unchanged).
       const termEl = term.element;
       const helperTextarea = term.textarea;
       if (termEl && helperTextarea) {
         const imeScreen = termEl.querySelector<HTMLElement>('.xterm-screen');
+        const lastNonEmptyCell = (buf: IBuffer): { row: number; col: number } | null => {
+          for (let row = term.rows - 1; row >= 0; row--) {
+            const line = buf.getLine(buf.baseY + row);
+            if (!line) continue;
+            for (let col = term.cols - 1; col >= 0; col--) {
+              const cell = line.getCell(col);
+              if (!cell || cell.getWidth() === 0) continue;
+              const ch = cell.getChars();
+              if (ch && ch !== ' ' && ch !== ' ') {
+                // IME caret sits just after the last glyph the user typed.
+                return { row, col: Math.min(col + 1, term.cols - 1) };
+              }
+            }
+          }
+          return null;
+        };
         const syncImeAnchor = (): void => {
           if (!imeScreen) return;
           const rect = imeScreen.getBoundingClientRect();
@@ -613,8 +631,11 @@ function TierTerminalImpl({
           const cellH = rect.height / term.rows;
           if (!(cellW > 0) || !(cellH > 0)) return;
           const buf = term.buffer.active;
-          const top = `${buf.cursorY * cellH}px`;
-          const left = `${Math.min(buf.cursorX, term.cols - 1) * cellW}px`;
+          const anchor = lastNonEmptyCell(buf);
+          const row = anchor?.row ?? buf.cursorY;
+          const col = anchor?.col ?? Math.min(buf.cursorX, term.cols - 1);
+          const top = `${row * cellH}px`;
+          const left = `${col * cellW}px`;
           helperTextarea.style.top = top;
           helperTextarea.style.left = left;
           window.setTimeout(() => {
