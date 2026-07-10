@@ -103,6 +103,14 @@ pub fn install_all() {
         }
     }
 
+    // Grok was T1 (hook-wired) in unreleased test builds; now T2 (no island).
+    // Remove the stale ~/.grok/hooks/coffee-cli-status.json those builds wrote
+    // so grok stops firing the deleted `__grok-hook` forwarder (which would
+    // spawn the full Coffee CLI GUI and stall grok's TUI). One-time migration;
+    // no-op once the file is gone. Only deletes if it references __grok-hook
+    // (never clobber a user's same-named file).
+    cleanup_stale_grok_hook(&home);
+
     // Windows-only: opencode/mimocode's `opencode upgrade` (which re-runs
     // `npm install -g`) shatters the global bin links when the binary is
     // running — npm renames opencode.cmd → .opencode.cmd-<rand>, then the
@@ -912,6 +920,26 @@ fn is_coffee_codex_entry(entry: &Value) -> bool {
         .and_then(|c| c.as_str())
         .map(|s| s.split_whitespace().last() == Some(CODEX_HOOK_SUBCOMMAND))
         .unwrap_or(false)
+}
+
+/// Remove the stale Grok hook config that the T1 build (has_hook_surface:
+/// true) wrote to ~/.grok/hooks/coffee-cli-status.json. Grok is now T2 (no
+/// island) - if this file remains, grok fires `<exe> __grok-hook` on every
+/// event, but the forwarder was removed, so grok would spawn the full Coffee
+/// CLI GUI and stall its TUI. One-time migration; no-op once the file is gone.
+/// Only deletes if it references `__grok-hook` - never clobber a user's
+/// same-named file.
+fn cleanup_stale_grok_hook(home: &Path) {
+    let path = home.join(".grok").join("hooks").join("coffee-cli-status.json");
+    if !path.exists() {
+        return;
+    }
+    if let Ok(text) = fs::read_to_string(&path) {
+        if text.contains("__grok-hook") {
+            let _ = fs::remove_file(&path);
+            eprintln!("[hook-installer] removed stale grok hook config: {}", path.display());
+        }
+    }
 }
 
 /// Enable `[features].hooks = true` in ~/.codex/config.toml. Newer Codex uses

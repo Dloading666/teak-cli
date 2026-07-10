@@ -77,6 +77,17 @@ pub enum HistoryShape {
     /// generic mtime-then-parse pipeline and is emitted by a bespoke
     /// second pass (`find_kimi_sessions` + `collect_kimi_heatmap_entries`).
     KimiIndex { root_under_home: &'static str },
+
+    /// Grok Build (`grok` binary): per-session dirs at
+    /// `~/.grok/sessions/<url-encoded-cwd>/<uuid>/`, each holding a
+    /// `summary.json` index (title / cwd / timestamps / message counts)
+    /// and a `chat_history.jsonl` conversation log. `GROK_HOME` overrides
+    /// the base dir; see `grok_root` in server.rs. The session metadata
+    /// lives in `summary.json` (not the JSONL filename/mtime), so this
+    /// bypasses the generic mtime-then-parse pipeline and is emitted by a
+    /// bespoke second pass (`find_grok_sessions` +
+    /// `collect_grok_heatmap_entries`), mirroring `KimiIndex`.
+    GrokSessions { root_under_home: &'static str },
 }
 
 impl HistoryShape {
@@ -91,7 +102,8 @@ impl HistoryShape {
             | HistoryShape::QwenProjects { root_under_home, .. }
             | HistoryShape::AntigravityTmp { root_under_home, .. }
             | HistoryShape::OpenCodeMixed { root_under_home }
-            | HistoryShape::KimiIndex { root_under_home } => Some(root_under_home),
+            | HistoryShape::KimiIndex { root_under_home }
+            | HistoryShape::GrokSessions { root_under_home } => Some(root_under_home),
             HistoryShape::HermesFlatJson => None,
         }
     }
@@ -126,7 +138,8 @@ impl HistoryShape {
             | HistoryShape::AntigravityTmp { depth, .. } => Some(*depth),
             HistoryShape::HermesFlatJson
             | HistoryShape::OpenCodeMixed { .. }
-            | HistoryShape::KimiIndex { .. } => None,
+            | HistoryShape::KimiIndex { .. }
+            | HistoryShape::GrokSessions { .. } => None,
         }
     }
 }
@@ -233,6 +246,7 @@ impl ToolDescriptor {
 mod antigravity;
 mod claude;
 mod codex;
+mod grok;
 pub mod hermes;
 mod mimocode;
 mod openclaw;
@@ -254,6 +268,7 @@ mod pi;
 pub static TOOLS: &[&ToolDescriptor] = &[
     &claude::DESCRIPTOR,
     &codex::DESCRIPTOR,
+    &grok::DESCRIPTOR,
     &opencode::DESCRIPTOR,
     &antigravity::DESCRIPTOR,
     &qwen::DESCRIPTOR,

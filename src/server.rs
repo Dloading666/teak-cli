@@ -2036,6 +2036,177 @@ fn collect_kimi_heatmap_entries(
     }
 }
 
+// ── Grok Build (xAI `grok`) - per-session-dir second pass ──────────────
+// Sessions live under `~/.grok/sessions/<url-encoded-cwd>/<uuid>/`, each dir
+// holding a `summary.json` index (info.id / info.cwd / generated_title /
+// updated_at / created_at) and a `chat_history.jsonl` conversation log. The
+// metadata is in summary.json (not the JSONL filename/mtime), so this bypasses
+// the generic mtime-then-parse pipeline like Kimi/OpenCode - GrokSessions is
+// skipped in collect_registry_history_candidates and emitted here instead.
+// `GROK_HOME` overrides the `~/.grok` base (per Grok's data-locations doc).
+
+/// Resolve Grok Build's sessions root. `GROK_HOME` env (Grok's own override)
+/// wins so a user who moved ~/.grok doesn't also need a tools.json override;
+/// otherwise the registry-declared `~/.grok/sessions` (honoring any tools.json
+/// history-path override). `GROK_HOME` points at the base (~/.grok), so we
+/// append `sessions`.
+fn grok_root(home: &std::path::Path) -> Option<std::path::PathBuf> {
+    if let Ok(env_home) = std::env::var("GROK_HOME") {
+        if !env_home.is_empty() {
+            let p = std::path::PathBuf::from(env_home).join("sessions");
+            if p.is_dir() {
+                return Some(p);
+            }
+        }
+    }
+    let path = crate::tools::find("grok")
+        .and_then(|t| t.history_shape.as_ref())
+        .map(|s| crate::tool_config::history_path_for("grok", s.join_under(home)))?;
+    if path.is_dir() { Some(path) } else { None }
+}
+
+/// Grok Build history second pass. Walks `sessions/<encoded-cwd>/<uuid>/`,
+/// stats each `summary.json` for mtime to pre-select the newest 200 (mirrors
+/// the JSONL pipeline's stat-first/parse-top-N discipline), then reads each
+/// survivor's `summary.json` for title / cwd / timestamps. `summary.json`
+/// carries the real cwd in `info.cwd`, so the URL-encoded parent dir name
+/// never needs decoding.
+fn find_grok_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
+    let Some(root) = grok_root(home) else { return };
+
+    // (summary.json mtime, session_dir)
+    let mut candidates: Vec<(std::time::SystemTime, std::path::PathBuf)> = Vec::new();
+    let Ok(cwd_dirs) = std::fs::read_dir(&root) else { return };
+    for cwd_entry in cwd_dirs.flatten() {
+        let cwd_path = cwd_entry.path();
+        if !cwd_path.is_dir() { continue; }
+        let Ok(session_dirs) = std::fs::read_dir(&cwd_path) else { continue };
+        for session_entry in session_dirs.flatten() {
+            let session_dir = session_entry.path();
+            if !session_dir.is_dir() { continue; }
+            let summary = session_dir.join("summary.json");
+            let mtime = std::fs::metadata(&summary)
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            candidates.push((mtime, session_dir));
+        }
+    }
+    candidates.sort_by(|a, b| b.0.cmp(&a.0));
+    const GROK_HISTORY_LIMIT: usize = 200;
+    candidates.truncate(GROK_HISTORY_LIMIT);
+
+    for (_, session_dir) in &candidates {
+        let Ok(summary_bytes) = std::fs::read_to_string(session_dir.join("summary.json")) else { continue };
+        let Ok(s) = serde_json::from_str::<serde_json::Value>(&summary_bytes) else { continue };
+
+        let info = s.get("info");
+        let session_id = info
+            .and_then(|i| i.get("id")).and_then(|x| x.as_str())
+            .unwrap_or("").to_string();
+        // info.cwd is the real working directory - no URL-decode needed.
+        let work_dir = info
+            .and_then(|i| i.get("cwd")).and_then(|x| x.as_str())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+
+        let title = s.get("generated_title").and_then(|x| x.as_str()).filter(|s| !s.is_empty())
+            .or_else(|| s.get("session_summary").and_then(|x| x.as_str()))
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                let safe = s.replace('\n', " ");
+                let mut chars = safe.chars();
+                let chunk: String = chars.by_ref().take(40).collect();
+                if chars.next().is_some() { format!("{}...", chunk) } else { chunk }
+            })
+            .unwrap_or_else(|| "Grok Build Session".to_string());
+
+        // summary.json timestamps are ISO 8601 (e.g. "2026-07-09T23:20:36Z").
+        // Store the raw string - the frontend's Date.parse handles ISO, same
+        // as Kimi. Fall back to created_at, then summary.json mtime, then empty.
+        let saved_at = s.get("updated_at").or_else(|| s.get("created_at"))
+            .and_then(|x| x.as_str()).map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                std::fs::metadata(session_dir.join("summary.json"))
+                    .and_then(|m| m.modified()).ok()
+                    .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis().to_string())
+                    .unwrap_or_default()
+            });
+
+        result.push(SavedSession {
+            id: format!("grok_native_{}", session_id),
+            name: title,
+            tool: "grok".to_string(),
+            cwd: work_dir,
+            session_token: if session_id.is_empty() { None } else { Some(session_id.clone()) },
+            saved_at,
+            // session_dir exposes the on-disk location (holds summary.json +
+            // chat_history.jsonl). Mirrors OpenCode/Kimi's file_path surface.
+            file_path: Some(session_dir.to_string_lossy().into_owned()),
+            // turn_count deferred - counting chat_history.jsonl is extra I/O per
+            // session and the History board renders fine without it.
+            turn_count: None,
+        });
+    }
+}
+
+/// Grok Build heatmap second pass. For each session dir in the cutoff window,
+/// emits (ts=chat_history.jsonl mtime, count=chat_history.jsonl line count).
+/// chat_history.jsonl mtime ≈ last activity (Grok appends on every turn);
+/// line count = intensity. Shares the file-based heatmap count cache (keyed
+/// by chat_history.jsonl path + mtime) so warm starts skip the re-count -
+/// same optimization as the JSONL pipeline and Kimi's wire.jsonl pass.
+fn collect_grok_heatmap_entries(
+    home: &std::path::Path,
+    cutoff_secs: i64,
+    out: &mut Vec<HeatmapEntry>,
+    count_cache: &mut std::collections::HashMap<String, CachedCount>,
+    cache_dirty: &mut bool,
+    keep_paths: &mut std::collections::HashSet<String>,
+) {
+    let Some(root) = grok_root(home) else { return };
+    let Ok(cwd_dirs) = std::fs::read_dir(&root) else { return };
+    for cwd_entry in cwd_dirs.flatten() {
+        let cwd_path = cwd_entry.path();
+        if !cwd_path.is_dir() { continue; }
+        let Ok(session_dirs) = std::fs::read_dir(&cwd_path) else { continue };
+        for session_entry in session_dirs.flatten() {
+            let session_dir = session_entry.path();
+            if !session_dir.is_dir() { continue; }
+            let chat_path = session_dir.join("chat_history.jsonl");
+            let Ok(meta) = std::fs::metadata(&chat_path) else { continue };
+            let Ok(mtime) = meta.modified() else { continue };
+            let ts = mtime
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            if ts < cutoff_secs { continue; }
+
+            let path_key = chat_path.to_string_lossy().into_owned();
+            keep_paths.insert(path_key.clone());
+            let count = if let Some(entry) = count_cache.get(&path_key) {
+                if entry.mtime == ts {
+                    entry.count
+                } else {
+                    let c = count_jsonl_message_lines(&chat_path);
+                    count_cache.insert(path_key.clone(), CachedCount { mtime: ts, count: c });
+                    *cache_dirty = true;
+                    c
+                }
+            } else {
+                let c = count_jsonl_message_lines(&chat_path);
+                count_cache.insert(path_key.clone(), CachedCount { mtime: ts, count: c });
+                *cache_dirty = true;
+                c
+            };
+            if count > 0 {
+                out.push(HeatmapEntry { ts, count });
+            }
+        }
+    }
+}
+
 fn collect_jsonl_paths_with_mtime(
     dir: std::path::PathBuf,
     depth: u8,
@@ -2637,6 +2808,15 @@ fn load_native_history_blocking() -> Result<Vec<SavedSession>, String> {
         find_kimi_sessions(home, &mut result);
     }
 
+    // Grok Build second pass - per-session-dir store (summary.json index +
+    // chat_history.jsonl under sessions/<encoded-cwd>/<uuid>/). find_grok_sessions
+    // walks the two-level tree, stats summary.json for mtime to pre-select the
+    // newest 200, then reads each survivor's summary.json for title / cwd /
+    // timestamps. Pushes finished SavedSessions directly.
+    if let Some(home) = home.as_ref() {
+        find_grok_sessions(home, &mut result);
+    }
+
     // Collapse any Claude-worktree cwd to its project root, for every tool's
     // sessions (a session launched from <project>/.claude/worktrees/<x> should
     // resume in <project>, not the ephemeral worktree). No-op for normal dirs;
@@ -2677,7 +2857,8 @@ fn collect_registry_history_candidates(
             // Index/DB-backed shapes bypass the file-walk pipeline — their
             // bespoke second passes emit finished SavedSessions / HeatmapEntries.
             crate::tools::HistoryShape::OpenCodeMixed { .. }
-            | crate::tools::HistoryShape::KimiIndex { .. } => {}
+            | crate::tools::HistoryShape::KimiIndex { .. }
+            | crate::tools::HistoryShape::GrokSessions { .. } => {}
             _ => {
                 if let Some(depth) = shape.jsonl_depth() {
                     collect_jsonl_paths_with_mtime(scan_dir, depth, tool.id, out);
@@ -2827,6 +3008,22 @@ fn load_message_heatmap_blocking() -> Result<Vec<HeatmapEntry>, String> {
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
         collect_kimi_heatmap_entries(
+            home, cutoff_secs, &mut out, &mut count_cache, &mut cache_dirty, &mut keep_paths,
+        );
+    }
+
+    // Grok Build heatmap second pass - runs BEFORE the cache prune/write below
+    // so its chat_history.jsonl paths join keep_paths (retained by the retain()
+    // below) and their counts land in count_cache (persisted by write_count_cache).
+    // Shares the file-based cache (keyed by chat_history.jsonl path + mtime) for
+    // warm-start re-count avoidance. chat_history.jsonl mtime = ts, line count =
+    // intensity.
+    if let Some(home) = home.as_ref() {
+        let cutoff_secs = cutoff
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        collect_grok_heatmap_entries(
             home, cutoff_secs, &mut out, &mut count_cache, &mut cache_dirty, &mut keep_paths,
         );
     }

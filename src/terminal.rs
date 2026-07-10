@@ -367,6 +367,24 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         token_format: Some(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
         prompt_markers: &["▌"],
     },
+    // Grok Build (xAI) - `grok` binary. Resume via `grok --resume <uuid>`
+    // (verified against `grok --help`: `-r, --resume <ID>` resumes by ID,
+    // errors if not found). Token is the UUIDv7 session id from summary.json
+    // (`info.id`), sourced by find_grok_sessions (Grok doesn't echo the id to
+    // stdout on launch, so session_id_pattern is None). Grok is T2 (no island -
+    // a T1 hook forwarder stalled its TUI on startup, rolled back). The prompt
+    // marker only feeds the settle-silence fallback; `❯` is a guess pending
+    // real-TUI verification. Coffee CLI launches grok raw (native OAuth via
+    // ~/.grok/auth.json, no auth injection).
+    AgentPreset {
+        tool_name: "grok",
+        resume_program: Some("grok"),
+        resume_args_before: &["--resume"],
+        resume_args_after: &[],
+        session_id_pattern: None,
+        token_format: Some(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
+        prompt_markers: &["❯"],
+    },
     // Qwen Code is a Gemini-CLI fork — same `--resume <uuid>` flag and
     // UUID token format inherited from upstream. Upstream Gemini CLI
     // is retired (Google transitioned consumers to Antigravity CLI on
@@ -599,7 +617,7 @@ pub fn spawn(
     // it — maximum benefit, zero risk for those that do.
     let is_ai_cli = matches!(
         tool_name.as_deref(),
-        Some("claude") | Some("qwen") | Some("opencode") | Some("mimocode") | Some("hermes") | Some("codex") | Some("antigravity")
+        Some("claude") | Some("qwen") | Some("opencode") | Some("mimocode") | Some("hermes") | Some("codex") | Some("grok") | Some("antigravity")
     );
 
     if is_ai_cli {

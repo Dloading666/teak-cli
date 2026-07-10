@@ -124,6 +124,7 @@ import TERMINAL_PWSH_SVG from '../../icons-inline/terminal-powershell.svg?raw';
 // SVG → ?raw, PNG → ?inline, same pipeline as the tools above.
 import PI_SVG from '../../icons-inline/pi.svg?raw';
 import COPILOT_SVG from '../../icons-inline/copilot.svg?raw';
+import GROK_SVG from '../../icons-inline/grok.svg?raw';
 import AIDER_DATA_URL from '../../icons-inline/aider.png?inline';
 import KIMICODE_DATA_URL from '../../icons-inline/kimicode.png?inline';
 import CRUSH_DATA_URL from '../../icons-inline/crush.png?inline';
@@ -241,6 +242,7 @@ const SvgHermes      = () => bgIcon(HERMES_DATA_URL, '1em', { borderRadius: 'var
 // bgIcon with a rounded square to match the other PNG-backed icons.
 const SvgPi        = () => inlineSvgIcon(PI_SVG);
 const SvgCopilot   = () => inlineSvgIcon(COPILOT_SVG);
+const SvgGrok       = () => inlineSvgIcon(GROK_SVG);
 const SvgAider     = () => bgIcon(AIDER_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
 const SvgKimi      = () => bgIcon(KIMICODE_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
 const SvgCrush     = () => bgIcon(CRUSH_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
@@ -414,7 +416,7 @@ const SvgPlus = ({ active }: { active: boolean }) => (
 // still count. Update this set when adding or removing AGENT_CATALOG
 // entries below.
 const VALID_PIN_KEYS = new Set<string>([
-  'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes', 'terminal',
+  'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen', 'hermes', 'terminal',
   'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
   'installer', 'four-split', 'three-split', 'two-split',
 ]);
@@ -425,7 +427,7 @@ const VALID_PIN_KEYS = new Set<string>([
 // green — the "fake island" baseline so every AI-CLI tab reads consistently.
 // Non-CLI tabs (terminal/remote/history/splits/installer) get no indicator.
 const TAB_STATUS_TOOLS = new Set<string>([
-  'claude', 'codex', 'opencode', 'mimocode', 'hermes',
+  'claude', 'codex', 'grok', 'opencode', 'mimocode', 'hermes',
   'antigravity', 'qwen', 'openclaw',
   'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
 ]);
@@ -523,6 +525,7 @@ export function CenterPanel() {
     mimocode: <SvgMimo />,
     openclaw: <SvgOpenClaw />,
     codex: <SvgCodex />,
+    grok: <SvgGrok />,
     antigravity: <SvgAntigravity />,
     qwen: <SvgQwen />,
     hermes: <SvgHermes />,
@@ -538,7 +541,7 @@ export function CenterPanel() {
   // names are sourced from the Rust registry (see lib/tool-info.ts);
   // the order here is the launchpad's preferred presentation order.
   const BUILTIN_AI_CLI_FALLBACK: { key: ToolType; label: string }[] = [
-    'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'antigravity', 'qwen', 'hermes',
+    'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen', 'hermes',
     // Pi & Kimi Code (T2) + Crush/Aider/Goose/Copilot (T3 launch-only).
     'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
   ].map((key) => ({ key: key as ToolType, label: getToolDisplayName(key) }));
@@ -1128,6 +1131,7 @@ export function CenterPanel() {
       case 'mimocode': return { icon: <SvgMimo />, title: cwd ?? getToolDisplayName('mimocode'), tooltip: pathTip };
       case 'openclaw': return { icon: <SvgOpenClaw />, title: getToolDisplayName('openclaw'), tooltip: undefined };
       case 'codex': return { icon: <SvgCodex />, title: cwd ?? getToolDisplayName('codex'), tooltip: pathTip };
+      case 'grok': return { icon: <SvgGrok />, title: cwd ?? getToolDisplayName('grok'), tooltip: pathTip };
       case 'antigravity': return { icon: <SvgAntigravity />, title: cwd ?? getToolDisplayName('antigravity'), tooltip: pathTip };
       // Hookless CLIs (Pi/Kimi Code T2 + Crush/Aider/Goose/Copilot T3) —
       // directory-aware tab like the AI CLIs above (icon + cwd basename).
@@ -1729,7 +1733,7 @@ export function CenterPanel() {
                           {AGENT_CATALOG.filter(item => item.type === 'ai-cli').map(item => {
                             const pinId = `agent:${item.key}`;
                             const isPinned = pinnedItems.includes(pinId);
-                            const hasGear = (['claude', 'codex', 'antigravity', 'qwen', 'opencode', 'mimocode', 'openclaw', 'hermes', 'pi', 'kimicode'] as const).includes(item.key as any);
+                            const hasGear = (['claude', 'codex', 'grok', 'antigravity', 'qwen', 'opencode', 'mimocode', 'openclaw', 'hermes', 'pi', 'kimicode'] as const).includes(item.key as any);
                             return (
                               <div
                                 key={item.key}
