@@ -79,6 +79,14 @@
    multi-monitor IME positioning.
    DO NOT add overflow:hidden to .xterm-helpers — it is a 0×0 abs-pos
    container; clipping it prevents the OS from reading textarea coords. */
+/* Orca: xterm.css sets position:absolute;top:0 on .xterm-helpers but omits
+   left, leaving left:auto. In Blink (WebView2) left:auto can resolve non-zero
+   and offset the IME candidate window off the cursor. Pin it. (The textarea
+   rule below is the child; this fixes the parent it's positioned against.) */
+.tier-xterm .xterm .xterm-helpers {
+    left: 0;
+}
+
 .tier-xterm .xterm .xterm-helper-textarea {
     left: 0;
     min-width: 1px;  /* some CJK IMEs (QQ Pinyin, Rime) fail on a 0-width textarea */
@@ -117,12 +125,18 @@
     opacity: 0.7;
 }
 
-/* Completely hide native xterm cursor */
+/* Native xterm cursor now VISIBLE (test: orca parity). The cursor-blink
+   heartbeat drives xterm's _syncTextArea, keeping the IME helper textarea
+   glued to the live buffer cursor at the input box. Hiding the cursor +
+   cursorBlink:false starved that heartbeat -> IME candidate drifted.
+   Re-enable the block below to hide again once the root cause is confirmed
+   and a non-heartbeat-killing fix is found.
 .tier-xterm .xterm-cursor,
 .tier-xterm .xterm-cursor-layer {
     display: none !important;
     opacity: 0 !important;
 }
+*/
 
 /* ─── Startup Loading Splash ───────────────────────────────── */
 .tier-loading-splash {

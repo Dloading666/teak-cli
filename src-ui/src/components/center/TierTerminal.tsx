@@ -10,7 +10,7 @@
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Terminal, type IBuffer } from '@xterm/xterm';
+import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { clipboardRead, clipboardWrite } from '../../lib/clipboard';
@@ -189,8 +189,8 @@ function buildXtermTheme(themeName: string, hasBg: boolean | undefined, schemeId
     ...base,
     background: bg,
     foreground: fg,
-    cursor: bgOpaque,
-    cursorAccent: bgOpaque,
+    cursor: fg,
+    cursorAccent: bg,
   };
 }
 
@@ -527,7 +527,7 @@ function TierTerminalImpl({
       // that's a constant power draw users feel as warmth. Off by default —
       // also redundant since the cursor itself is invisible (theme.cursor =
       // bg color), but kept for renderer paths that ignore the color trick.
-      cursorBlink: false,
+      cursorBlink: true,
       // Default `cursorInactiveStyle: 'outline'` makes xterm flip the
       // cursor presentation on blur, which dirties the WebGL buffer and
       // re-composites the whole canvas — visible as a one-frame flicker
@@ -536,7 +536,7 @@ function TierTerminalImpl({
       // 'none' suppresses the inactive cursor entirely so blur is a
       // no-op for the renderer. Cursor is already hidden via theme +
       // CSS, so this is double-belt; the win is that the redraw stops.
-      cursorInactiveStyle: 'none',
+      cursorInactiveStyle: 'outline',
       scrollback: 5000,
       theme: buildXtermTheme(theme, hasBg, termColorScheme),
     });
@@ -608,22 +608,6 @@ function TierTerminalImpl({
       const helperTextarea = term.textarea;
       if (termEl && helperTextarea) {
         const imeScreen = termEl.querySelector<HTMLElement>('.xterm-screen');
-        const lastNonEmptyCell = (buf: IBuffer): { row: number; col: number } | null => {
-          for (let row = term.rows - 1; row >= 0; row--) {
-            const line = buf.getLine(buf.baseY + row);
-            if (!line) continue;
-            for (let col = term.cols - 1; col >= 0; col--) {
-              const cell = line.getCell(col);
-              if (!cell || cell.getWidth() === 0) continue;
-              const ch = cell.getChars();
-              if (ch && ch !== ' ' && ch !== ' ') {
-                // IME caret sits just after the last glyph the user typed.
-                return { row, col: Math.min(col + 1, term.cols - 1) };
-              }
-            }
-          }
-          return null;
-        };
         const syncImeAnchor = (): void => {
           if (!imeScreen) return;
           const rect = imeScreen.getBoundingClientRect();
@@ -631,19 +615,17 @@ function TierTerminalImpl({
           const cellH = rect.height / term.rows;
           if (!(cellW > 0) || !(cellH > 0)) return;
           const buf = term.buffer.active;
-          const anchor = lastNonEmptyCell(buf);
-          const row = anchor?.row ?? buf.cursorY;
-          const col = anchor?.col ?? Math.min(buf.cursorX, term.cols - 1);
-          const top = `${row * cellH}px`;
-          const left = `${col * cellW}px`;
+          // Orca fallback for non-Cursor-Agent TUIs (Claude Code, Kimi, ...):
+          // anchor on the buffer cursor and let xterm own the position - NO
+          // setTimeout re-apply. With the cursor now visible + blinking, the
+          // blink heartbeat keeps the xterm _syncTextArea firing, so it tracks
+          // the live cursor itself; a setTimeout(0) re-apply would race the
+          // xterm rAF and lose. (Orca gates its re-apply on the Cursor-Agent
+          // anchor, i.e. skips it for Claude Code.)
+          const top = `${buf.cursorY * cellH}px`;
+          const left = `${Math.min(buf.cursorX, term.cols - 1) * cellW}px`;
           helperTextarea.style.top = top;
           helperTextarea.style.left = left;
-          window.setTimeout(() => {
-            if (helperTextarea.isConnected) {
-              helperTextarea.style.top = top;
-              helperTextarea.style.left = left;
-            }
-          }, 0);
         };
         termEl.addEventListener('compositionstart', syncImeAnchor);
         termEl.addEventListener('compositionupdate', syncImeAnchor);
