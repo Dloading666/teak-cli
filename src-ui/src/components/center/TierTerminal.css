@@ -125,18 +125,12 @@
     opacity: 0.7;
 }
 
-/* Native xterm cursor now VISIBLE (test: orca parity). The cursor-blink
-   heartbeat drives xterm's _syncTextArea, keeping the IME helper textarea
-   glued to the live buffer cursor at the input box. Hiding the cursor +
-   cursorBlink:false starved that heartbeat -> IME candidate drifted.
-   Re-enable the block below to hide again once the root cause is confirmed
-   and a non-heartbeat-killing fix is found.
+/* Completely hide native xterm cursor */
 .tier-xterm .xterm-cursor,
 .tier-xterm .xterm-cursor-layer {
     display: none !important;
     opacity: 0 !important;
 }
-*/
 
 /* ─── Startup Loading Splash ───────────────────────────────── */
 .tier-loading-splash {

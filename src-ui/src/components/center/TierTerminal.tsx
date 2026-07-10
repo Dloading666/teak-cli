@@ -189,8 +189,8 @@ function buildXtermTheme(themeName: string, hasBg: boolean | undefined, schemeId
     ...base,
     background: bg,
     foreground: fg,
-    cursor: fg,
-    cursorAccent: bg,
+    cursor: bgOpaque,
+    cursorAccent: bgOpaque,
   };
 }
 
@@ -527,7 +527,7 @@ function TierTerminalImpl({
       // that's a constant power draw users feel as warmth. Off by default —
       // also redundant since the cursor itself is invisible (theme.cursor =
       // bg color), but kept for renderer paths that ignore the color trick.
-      cursorBlink: true,
+      cursorBlink: false,
       // Default `cursorInactiveStyle: 'outline'` makes xterm flip the
       // cursor presentation on blur, which dirties the WebGL buffer and
       // re-composites the whole canvas — visible as a one-frame flicker
@@ -536,7 +536,7 @@ function TierTerminalImpl({
       // 'none' suppresses the inactive cursor entirely so blur is a
       // no-op for the renderer. Cursor is already hidden via theme +
       // CSS, so this is double-belt; the win is that the redraw stops.
-      cursorInactiveStyle: 'outline',
+      cursorInactiveStyle: 'none',
       scrollback: 5000,
       theme: buildXtermTheme(theme, hasBg, termColorScheme),
     });
