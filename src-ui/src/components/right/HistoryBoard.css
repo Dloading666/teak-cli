@@ -61,8 +61,9 @@
    destructive. Click marks the session hidden (see lib/hidden-sessions.ts) -
    data isn't deleted, just filtered out. */
 .history-card-delete {
-  font-size: 10.5px;
-  color: var(--text-3);
+  font-size: 12.5px;
+  line-height: 1;
+  color: var(--accent);
   opacity: 0;
   cursor: pointer;
   user-select: none;
@@ -75,7 +76,7 @@
 }
 
 .history-card-delete:hover {
-  color: var(--red);
+  color: var(--accent-hover);
 }
 /* ── Loading Skeleton ──
    Shimmer driven by --text-3 so the skeleton bars are visible against
