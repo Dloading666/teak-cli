@@ -9,6 +9,7 @@ import {
   subscribeHistory,
   getHistorySnapshot,
 } from '../../lib/history-cache';
+import { hideSession, subscribeHidden, getHiddenSnapshot } from '../../lib/hidden-sessions';
 // hermes/opencode PNG assets live in src/icons-inline/ so the Launchpad
 // can `?inline`-import them as data URIs and bypass the <img> async-decode
 // flash. We pull the same data URIs here so HistoryBoard doesn't need a
@@ -103,6 +104,9 @@ export function HistoryBoard() {
     getHistorySnapshot,
     getHistorySnapshot,
   );
+  // Soft-delete (hide) markers from localStorage - re-renders the list the
+  // instant a user hides a session, no refresh needed.
+  const hidden = useSyncExternalStore(subscribeHidden, getHiddenSnapshot);
   useEffect(() => { prefetchHistory(); }, []);
   const isLoading = isTauri && (status === 'idle' || status === 'loading') && cachedSessions.length === 0;
 
@@ -137,14 +141,20 @@ export function HistoryBoard() {
   // falls back to the tool display name, which is still a useful match — e.g.
   // typing "claude" surfaces all Claude sessions).
   const matchedSessions = useMemo(() => {
+    // Hide filter first so soft-deleted sessions never take a visible slot or
+    // count toward load-more paging.
+    let list = baseSessions;
+    if (hidden.size > 0) {
+      list = list.filter(s => !hidden.has(`${s.tool ?? ''}:${s.id}`));
+    }
     const q = debouncedQuery.trim().replace(/\s+/g, ' ').toLowerCase();
-    if (!q) return baseSessions;
-    return baseSessions.filter(s => {
+    if (!q) return list;
+    return list.filter(s => {
       const name = (s.name ?? '').toLowerCase();
       const proj = projectName(s.cwd ?? '', s.tool ?? '').toLowerCase();
       return name.includes(q) || proj.includes(q);
     });
-  }, [baseSessions, debouncedQuery]);
+  }, [baseSessions, debouncedQuery, hidden]);
 
   // Progressive render: data is already fully in memory (history-cache reads
   // every jsonl on startup), so "load more" is just rendering more rows.
@@ -259,6 +269,15 @@ export function HistoryBoard() {
                 <span className="history-card-tool-wrap">
                   {getToolIcon(session.tool)}
                   <span>{projectName(session.cwd, session.tool)} &middot; {dateStr} {session.turn_count ? ` \u00B7 ${(t('task.messages' as any) || '{count} messages').replace('{count}', session.turn_count.toString())}` : ''}</span>
+                </span>
+                <span
+                  className="history-card-delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hideSession(session.tool ?? '', session.id);
+                  }}
+                >
+                  {t('menu.delete' as any)}
                 </span>
               </div>
             </div>

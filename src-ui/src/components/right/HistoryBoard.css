@@ -54,6 +54,29 @@
   font-weight: 500;
   letter-spacing: 0.02em;
 }
+
+/* Soft-delete affordance - plain text (not a button), pinned to the right of
+   the meta row by the existing flex space-between. Hidden until card hover so
+   it doesn't clutter the list; turns red on its own hover to read as
+   destructive. Click marks the session hidden (see lib/hidden-sessions.ts) -
+   data isn't deleted, just filtered out. */
+.history-card-delete {
+  font-size: 10.5px;
+  color: var(--text-3);
+  opacity: 0;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.history-card:hover .history-card-delete {
+  opacity: 1;
+}
+
+.history-card-delete:hover {
+  color: var(--red);
+}
 /* ── Loading Skeleton ──
    Shimmer driven by --text-3 so the skeleton bars are visible against
    light AND dark cards. Pure white-rgba was invisible on the light theme. */
