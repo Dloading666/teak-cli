@@ -1,44 +1,39 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-- 新增:支持 **Grok Build**(xAI 的 grok CLI)。启动台一键启动,自动扫到会话记录、贡献热力图,点历史行即可 `grok --resume` 恢复。Grok 用自己的账号登录(Coffee CLI 不接管认证),原生体验不变。
-- 优化:会话记录搜索更稳了——加了防抖(快速打字不再逐键全量扫描卡顿)、空白归一(多余空格不再漏匹配)、还能直接按文件夹名搜。记录多的时候体感最明显。
-- 修复:会话记录列表悬停时不再整体位移——之前那点 translateY 上跳读起来像廉价动效,现在只留背景高亮,更干净。
+- 修复:Glass / Carbon 主题下终端滚动条几乎看不见(透明背景下滑块太淡),现在这两个主题的滚动条更亮、带描边,任何壁纸上都看得清。
+- 新增:会话记录卡片右键菜单--置顶/取消置顶、复制会话 ID、复制恢复命令、复制完整路径、打开文件管理器、删除。置顶会话排到顶部并显示按钉图标;路径按工具自动适配(Claude 的 jsonl 文件、OpenCode/MiMo 的数据库、Kimi/Grok 的会话目录)。卡片点击/右键不再有缩放位移。
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-- 新增:支援 **Grok Build**(xAI 的 grok CLI)。啟動台一鍵啟動,自動掃到對話記錄、貢獻熱力圖,點歷史行即可 `grok --resume` 恢復。Grok 用自己的帳號登入(Coffee CLI 不接管認證),原生體驗不變。
-- 優化:對話記錄搜尋更穩了——加了防抖(快速打字不再逐鍵全量掃描卡頓)、空白歸一(多餘空格不再漏匹配),還能直接按資料夾名搜。記錄多的時候體感最明顯。
-- 修復:對話記錄清單懸停時不再整體位移——之前那點 translateY 上跳讀起來像廉價動效,現在只留背景高亮,更乾淨。
+- 修復:Glass / Carbon 主題下終端捲軸幾乎看不到(透明背景下滑桿太淡),現在這兩個主題的捲軸更亮、帶描邊,任何桌布上都看得清。
+- 新增:對話記錄卡片右鍵選單--置頂/取消置頂、複製對話 ID、複製復原指令、複製完整路徑、開啟檔案管理員、刪除。置頂對話排到頂部並顯示圖釘圖示;路徑按工具自動適配(Claude 的 jsonl 檔案、OpenCode/MiMo 的資料庫、Kimi/Grok 的對話目錄)。卡片點擊/右鍵不再有縮放位移。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-- New: **Grok Build** (xAI's `grok` CLI) is now supported. One-click launch from the launchpad; session history and the contribution heatmap are scanned automatically; click any history row to `grok --resume`. Grok keeps its own account login (Coffee CLI doesn't touch auth) so the native experience is unchanged.
-- Improved: Session-record search is more robust — added debounce (fast typing no longer triggers a full re-scan per keystroke), whitespace normalization (stray spaces no longer cause missed matches), and folder-name matching. Most noticeable when you have a lot of sessions.
-- Fixed: Hovering a session-record card no longer shifts the whole row — the old translateY jump read as a cheap effect; now only the background highlight remains, cleaner.
+- Fixed: The terminal scrollbar was nearly invisible under Glass / Carbon themes (the slider was too faint against the transparent background). These themes now get a brighter, outlined, theme-colored slider (plus a faint track) so it reads on any wallpaper.
+- New: Right-click context menu on session-history cards - Pin/Unpin, Copy session ID, Copy resume command, Copy full path, Open in file manager, Delete. Pinned sessions sort to the top with a pushpin marker; paths adapt per tool (Claude's jsonl file, OpenCode/MiMo's database, Kimi/Grok's session directory). Cards no longer scale/shift on click or right-click.
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-- 新機能:**Grok Build**(xAI の grok CLI)に対応しました。ランチパッドからワンクリック起動、セッション履歴と貢献ヒートマップを自動スキャン、履歴行をクリックすれば `grok --resume` で復元できます。Grok は自身のアカウントログインを維持(Coffee CLI は認証を一切接管せず)、ネイティブ体験はそのままです。
-- 改善:セッション履歴の検索がより安定しました——デバウンス追加(高速タイピングでキーごとの全件スキャンによる卡頓が解消)、空白の正規化(余分なスペースでマッチ漏れしなくなった)、フォルダ名でも検索可能に。レコードが多いほど体感できます。
-- 修正:セッション履歴リストのホバー時の全体シフトを廃止——以前の translateY の跳ね上がりは安っぽい動作に見えていたのを、背景ハイライトのみにしてよりすっきりさせました。
+- 修正:Glass / Carbon テーマでターミナルのスクロールバーがほぼ見えなかった問題(透明背景にスライダーが薄すぎた)を修正。この2テーマはより明るく輪郭付きのテーマ色スライダー(+薄いトラック)になり、どんな壁紙でも見えます。
+- 新機能:セッション履歴カードの右クリックメニュー--ピン留め/解除、セッションIDコピー、再開コマンドコピー、フルパスコピー、ファイルマネージャーで開く、削除。ピン留めしたセッションは先頭に並びピンアイコン表示。パスはツール別に自動適応(Claude の jsonl ファイル、OpenCode/MiMo のデータベース、Kimi/Grok のセッションディレクトリ)。カードのクリック/右クリックでの縮小・移動を廃止。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-- 신규:**Grok Build**(xAI의 grok CLI)를 지원합니다. 런치패드에서 원클릭 실행, 세션 기록과 기여 히트맵을 자동 스캔, 기록 행을 클릭하면 `grok --resume`으로 복원할 수 있습니다. Grok은 자체 계정 로그인을 유지(Coffee CLI가 인증을 대신하지 않음)하여 네이티브 경험 그대로입니다.
-- 개선:세션 기록 검색이 더 안정되었습니다——디바운스 추가(빠른 타이핑 시 키마다 전체 재스캔하던 버벅임 해소), 공백 정규화(여분 공백으로 인한 매치 누락 제거), 폴더명으로도 검색 가능. 기록이 많을 때 체감이 가장 큽니다.
-- 수정:세션 기록 목록 호버 시 전체 이동을 제거——기존 translateY 점프는 값싼 효과처럼 보였고, 이제 배경 하이라이트만 남아 더 깔끔합니다.
+- 수정:Glass / Carbon 테마에서 터미널 스크롤바가 거의 보이지 않던 문제(투명 배경에 슬라이더가 너무 흐릿함)를 해결했습니다. 이 두 테마는 더 밝고 테두리가 있는 테마색 슬라이더(+흐린 트랙)로 어떤 배경화면에서도 보입니다.
+- 신규:세션 기록 카드 우클릭 메뉴--고정/해제, 세션 ID 복사, 재개 명령 복사, 전체 경로 복사, 파일 관리자에서 열기, 삭제. 고정된 세션은 상단에 정렬되고 압정 아이콘이 표시됩니다. 경로는 도구별로 자동 적용(Claude의 jsonl 파일, OpenCode/MiMo의 데이터베이스, Kimi/Grok의 세션 디렉토리). 카드 클릭/우클릭 시 축소/이동 애니메이션을 제거했습니다.
 
 </details>
