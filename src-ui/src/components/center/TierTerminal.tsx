@@ -585,56 +585,6 @@ function TierTerminalImpl({
         }
       }
 
-      // ── IME candidate-window anchor fix (generic, after orca pane-lifecycle.ts:75-129) ──
-      // The OS reads the focused textarea's screen rect at compositionstart to
-      // decide where to pop the IME candidate window. xterm pins that textarea
-      // to its own buffer cursor, which a TUI (Claude Code, Cursor Agent) moves
-      // around or parks off its real input caret while rendering - so the
-      // candidate window jumps to wherever text just appeared instead of
-      // staying at the input box. On compositionstart/update we reposition the
-      // textarea ourselves, using the public .xterm-screen rect for cell size,
-      // before xterm's own CompositionHelper runs; a setTimeout(0) re-applies so
-      // xterm's subsequent re-position can't overwrite our anchor.
-      //
-      // Generic version: anchor on the LAST non-empty cell on screen, not the
-      // (stale) buffer cursor. Every TUI's input box sits at the last rendered
-      // glyph and tracks it live, so this is one level above orca's per-tool
-      // "Cursor Agent -> " sniff - no per-tool markup, works for Claude Code,
-      // Kimi, OpenCode, plain shell alike. Falls back to the buffer cursor
-      // only when the screen is entirely empty. On Linux the composition
-      // stopPropagation above blocks bubbling so this never fires (Linux IME
-      // takes the input path; its candidate placement is unchanged).
-      const termEl = term.element;
-      const helperTextarea = term.textarea;
-      if (termEl && helperTextarea) {
-        const imeScreen = termEl.querySelector<HTMLElement>('.xterm-screen');
-        const syncImeAnchor = (): void => {
-          if (!imeScreen) return;
-          const rect = imeScreen.getBoundingClientRect();
-          const cellW = rect.width / term.cols;
-          const cellH = rect.height / term.rows;
-          if (!(cellW > 0) || !(cellH > 0)) return;
-          const buf = term.buffer.active;
-          // Orca fallback for non-Cursor-Agent TUIs (Claude Code, Kimi, ...):
-          // anchor on the buffer cursor and let xterm own the position - NO
-          // setTimeout re-apply. With the cursor now visible + blinking, the
-          // blink heartbeat keeps the xterm _syncTextArea firing, so it tracks
-          // the live cursor itself; a setTimeout(0) re-apply would race the
-          // xterm rAF and lose. (Orca gates its re-apply on the Cursor-Agent
-          // anchor, i.e. skips it for Claude Code.)
-          const top = `${buf.cursorY * cellH}px`;
-          const left = `${Math.min(buf.cursorX, term.cols - 1) * cellW}px`;
-          helperTextarea.style.top = top;
-          helperTextarea.style.left = left;
-        };
-        termEl.addEventListener('compositionstart', syncImeAnchor);
-        termEl.addEventListener('compositionupdate', syncImeAnchor);
-        unlisteners.push(() => {
-          termEl.removeEventListener('compositionstart', syncImeAnchor);
-          termEl.removeEventListener('compositionupdate', syncImeAnchor);
-        });
-      }
-
       // Disable font ligatures on the DOM renderer rows to prevent
       // box-drawing characters from being merged into ligature glyphs.
       const xtermRows = termRef.current.querySelector('.xterm-rows') as HTMLElement | null;

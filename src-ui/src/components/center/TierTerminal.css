@@ -79,14 +79,6 @@
    multi-monitor IME positioning.
    DO NOT add overflow:hidden to .xterm-helpers — it is a 0×0 abs-pos
    container; clipping it prevents the OS from reading textarea coords. */
-/* Orca: xterm.css sets position:absolute;top:0 on .xterm-helpers but omits
-   left, leaving left:auto. In Blink (WebView2) left:auto can resolve non-zero
-   and offset the IME candidate window off the cursor. Pin it. (The textarea
-   rule below is the child; this fixes the parent it's positioned against.) */
-.tier-xterm .xterm .xterm-helpers {
-    left: 0;
-}
-
 .tier-xterm .xterm .xterm-helper-textarea {
     left: 0;
     min-width: 1px;  /* some CJK IMEs (QQ Pinyin, Rime) fail on a 0-width textarea */
