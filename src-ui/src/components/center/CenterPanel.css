@@ -359,6 +359,57 @@
   width: 100%;
 }
 
+/* "Can't detect?" - plain small text hugging the bottom-right corner of
+   the pinned cards. No pill / icon / border (per design feedback): just
+   muted right-aligned text with a dotted underline. Negative margin-bottom
+   cancels this line's own height so the grid->heatmap gap stays at the
+   heatmap-card's built-in 24px (this line lives inside that gap, adding
+   ~zero net height). Tooltip is a themed data-tip ::after (NOT native
+   title=); width is fixed at 340px + right-anchored so CJK wraps normally
+   instead of one-char-per-line (width:auto + left:center shrank the
+   available width to the tiny trigger). span so the Glass/Carbon nuclear
+   :not() rule (targets div/...) leaves it alone. */
+.detect-help {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+  margin-bottom: -20px;
+}
+.detect-help-trigger {
+  position: relative;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-2);
+  cursor: help;
+  user-select: none;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+.detect-help-trigger:hover {
+  color: var(--text-1);
+}
+.detect-help-trigger[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 340px;
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-line;
+  word-break: break-word;
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20), 0 6px 20px rgba(0, 0, 0, 0.22);
+  z-index: 100;
+}
+
 /* Card + folder button share a group wrapper */
 .launchpad-card-group {
   display: flex;

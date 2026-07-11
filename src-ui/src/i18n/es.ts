@@ -64,6 +64,8 @@ export const es = {
   'task.tab.changes': 'Historial',
   'changes.empty': 'Aún no hay cambios.',
   'launchpad.open_folder': 'Abrir carpeta',
+  'launchpad.detect_help_trigger': "¿No se detecta?",
+  'launchpad.detect_help_tip': "Si has usado una herramienta de terminal de IA hecha por desarrolladores anglófonos, puede haber corrompido los segmentos de PATH con CJK u otros caracteres no ASCII (mojibake), por lo que ningún terminal logra detectar tus herramientas. 3 soluciones: ① Reinstalar la herramienta de IA ② Arreglar el PATH manualmente ③ Dejar que la IA arregle el PATH",
   'changes.clean': 'Sin cambios — el árbol de trabajo está limpio.',
   'changes.no_git': 'Git no está instalado — la comparación de código, las ramas y otras funciones de Git no están disponibles.',
   'changes.not_repo': 'Esta carpeta no es un repositorio Git.',

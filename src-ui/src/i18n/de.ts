@@ -65,6 +65,8 @@ export const de = {
   'task.tab.changes': 'Änderungsverlauf',
   'changes.empty': 'Noch keine Änderungen.',
   'launchpad.open_folder': 'Ordner öffnen',
+  'launchpad.detect_help_trigger': "Nicht erkannt?",
+  'launchpad.detect_help_tip': "Falls Sie ein von englischsprachigen Entwicklern erstelltes KI-Terminal-Tool genutzt haben, könnte es PATH-Segmente mit CJK- oder anderen Nicht-ASCII-Zeichen verstümmelt haben (Mojibake), sodass kein Terminal Ihre Tools mehr erkennt. 3 Lösungswege: ① KI-Tool neu installieren ② PATH manuell korrigieren ③ PATH von der KI korrigieren lassen",
   'changes.clean': 'Keine Änderungen — Arbeitsverzeichnis ist sauber.',
   'changes.no_git': 'Git ist nicht installiert — Code-Diff, Branches und andere Git-Funktionen sind nicht verfügbar.',
   'changes.not_repo': 'Dieser Ordner ist kein Git-Repository.',

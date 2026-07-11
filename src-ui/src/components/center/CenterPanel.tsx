@@ -1560,6 +1560,24 @@ export function CenterPanel() {
                       );
                     })()}
 
+                    {/* "Can't detect?" help link - for users whose PATH was
+                        garbled by an English-only AI terminal tool: CJK /
+                        non-ASCII path segments become mojibake so `where`
+                        can't resolve the binary and the card stays greyed.
+                        Hover reveals the cause + 3 fixes. Sits between the
+                        pinned cards and the heatmap; tiny + muted so it
+                        doesn't compete with the cards. Tooltip is a themed
+                        data-tip pill (same pattern as the heatmap / commit
+                        subject tooltips), not a native title=. */}
+                    <div className="detect-help">
+                      <span
+                        className="detect-help-trigger"
+                        data-tip={t('launchpad.detect_help_tip' as any)}
+                      >
+                        {t('launchpad.detect_help_trigger' as any)}
+                      </span>
+                    </div>
+
                     {/* Activity heatmap — sits below the pinned cards so
                         when Gambit's input panel grows from the bottom and
                         squeezes available height, the heatmap (decorative)
