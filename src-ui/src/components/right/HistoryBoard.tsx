@@ -9,7 +9,9 @@ import {
   subscribeHistory,
   getHistorySnapshot,
 } from '../../lib/history-cache';
-import { hideSession, subscribeHidden, getHiddenSnapshot } from '../../lib/hidden-sessions';
+import { subscribeHidden, getHiddenSnapshot } from '../../lib/hidden-sessions';
+import { subscribePinned, getPinnedSnapshot } from '../../lib/pinned-sessions';
+import { SessionContextMenu, type SessionCtxMenuState } from './SessionContextMenu';
 // hermes/opencode PNG assets live in src/icons-inline/ so the Launchpad
 // can `?inline`-import them as data URIs and bypass the <img> async-decode
 // flash. We pull the same data URIs here so HistoryBoard doesn't need a
@@ -107,6 +109,10 @@ export function HistoryBoard() {
   // Soft-delete (hide) markers from localStorage - re-renders the list the
   // instant a user hides a session, no refresh needed.
   const hidden = useSyncExternalStore(subscribeHidden, getHiddenSnapshot);
+  // Pinned (置顶) markers from localStorage - re-renders + re-sorts the list
+  // the instant a pin toggles from the context menu.
+  const pinned = useSyncExternalStore(subscribePinned, getPinnedSnapshot);
+  const [ctxMenu, setCtxMenu] = useState<SessionCtxMenuState | null>(null);
   useEffect(() => { prefetchHistory(); }, []);
   const isLoading = isTauri && (status === 'idle' || status === 'loading') && cachedSessions.length === 0;
 
@@ -148,13 +154,25 @@ export function HistoryBoard() {
       list = list.filter(s => !hidden.has(`${s.tool ?? ''}:${s.id}`));
     }
     const q = debouncedQuery.trim().replace(/\s+/g, ' ').toLowerCase();
-    if (!q) return list;
-    return list.filter(s => {
-      const name = (s.name ?? '').toLowerCase();
-      const proj = projectName(s.cwd ?? '', s.tool ?? '').toLowerCase();
-      return name.includes(q) || proj.includes(q);
-    });
-  }, [baseSessions, debouncedQuery, hidden]);
+    if (q) {
+      list = list.filter(s => {
+        const name = (s.name ?? '').toLowerCase();
+        const proj = projectName(s.cwd ?? '', s.tool ?? '').toLowerCase();
+        return name.includes(q) || proj.includes(q);
+      });
+    }
+    // Pinned (置顶) sessions sort to the top. history-cache already returns
+    // saved_at desc, so a stable sort on the pinned flag keeps that order
+    // within each group. Skipped entirely when nothing is pinned.
+    if (pinned.size > 0) {
+      list = [...list].sort((a, b) => {
+        const pa = pinned.has(`${a.tool ?? ''}:${a.id}`) ? 1 : 0;
+        const pb = pinned.has(`${b.tool ?? ''}:${b.id}`) ? 1 : 0;
+        return pb - pa;
+      });
+    }
+    return list;
+  }, [baseSessions, debouncedQuery, hidden, pinned]);
 
   // Progressive render: data is already fully in memory (history-cache reads
   // every jsonl on startup), so "load more" is just rendering more rows.
@@ -261,8 +279,18 @@ export function HistoryBoard() {
           }
         }
 
+        const isPinnedSession = pinned.has(`${session.tool ?? ''}:${session.id}`);
         return (
-          <div key={session.id} className="history-card" onClick={() => handleViewHistory(session)}>
+          <div
+            key={session.id}
+            className="history-card"
+            onClick={() => handleViewHistory(session)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setCtxMenu({ session, x: e.clientX, y: e.clientY });
+            }}
+          >
             <div className="history-card-content">
               <span className="history-card-title">{session.name}</span>
               <div className="history-card-meta">
@@ -270,15 +298,14 @@ export function HistoryBoard() {
                   {getToolIcon(session.tool)}
                   <span>{projectName(session.cwd, session.tool)} &middot; {dateStr} {session.turn_count ? ` \u00B7 ${(t('task.messages' as any) || '{count} messages').replace('{count}', session.turn_count.toString())}` : ''}</span>
                 </span>
-                <span
-                  className="history-card-delete"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideSession(session.tool ?? '', session.id);
-                  }}
-                >
-                  {t('menu.delete' as any)}
-                </span>
+                {isPinnedSession && (
+                  <span className="history-card-pin" aria-hidden="true">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 17v5"/>
+                      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>
+                    </svg>
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -313,6 +340,7 @@ export function HistoryBoard() {
         </div>
       )}
     </div>
+    {ctxMenu && <SessionContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />}
   </>
   );
 }

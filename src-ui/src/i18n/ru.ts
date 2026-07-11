@@ -16,6 +16,11 @@ export const ru = {
   'menu.delete': 'Удалить',
   'menu.show_in_folder': 'Показать в проводнике',
   'menu.open': 'Открыть',
+  'menu.pin': 'Закрепить',
+  'menu.unpin': 'Открепить',
+  'menu.copy_session_id': 'Копировать ID сессии',
+  'menu.copy_resume_command': 'Копировать команду возобновления',
+  'menu.copy_full_path': 'Копировать полный путь',
 
 
   // Tools

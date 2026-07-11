@@ -16,6 +16,11 @@ export const ko = {
   'menu.delete': '삭제',
   'menu.show_in_folder': '파일 탐색기에서 열기',
   'menu.open': '열기',
+  'menu.pin': '고정',
+  'menu.unpin': '고정 해제',
+  'menu.copy_session_id': '세션 ID 복사',
+  'menu.copy_resume_command': '재개 명령 복사',
+  'menu.copy_full_path': '전체 경로 복사',
 
 
   // Tools

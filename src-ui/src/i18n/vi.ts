@@ -17,6 +17,11 @@ export const vi = {
   'menu.delete': 'Xóa',
   'menu.show_in_folder': 'Hiển thị trong File Explorer',
   'menu.open': 'Mở',
+  'menu.pin': 'Ghim',
+  'menu.unpin': 'Bỏ ghim',
+  'menu.copy_session_id': 'Sao chép ID phiên',
+  'menu.copy_resume_command': 'Sao chép lệnh tiếp tục',
+  'menu.copy_full_path': 'Sao chép đường dẫn đầy đủ',
 
 
   // Tools

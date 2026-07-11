@@ -16,6 +16,11 @@ export const de = {
   'menu.delete': 'Löschen',
   'menu.show_in_folder': 'Im Explorer anzeigen',
   'menu.open': 'Öffnen',
+  'menu.pin': 'Anheften',
+  'menu.unpin': 'Lösen',
+  'menu.copy_session_id': 'Sitzungs-ID kopieren',
+  'menu.copy_resume_command': 'Befehl zum Fortsetzen kopieren',
+  'menu.copy_full_path': 'Vollständigen Pfad kopieren',
 
 
   // Tools

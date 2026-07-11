@@ -11,15 +11,11 @@
   cursor: default !important;
   background: var(--bg-card);
   border-radius: var(--radius-sm);
-  transition: background 0.2s, transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: background 0.2s;
 }
 
 .history-card:hover {
   background: var(--bg-hover);
-}
-
-.history-card:active {
-  transform: scale(0.98);
 }
 
 .history-card-content {
@@ -55,28 +51,16 @@
   letter-spacing: 0.02em;
 }
 
-/* Soft-delete affordance - plain text (not a button), pinned to the right of
-   the meta row by the existing flex space-between. Hidden until card hover so
-   it doesn't clutter the list; turns red on its own hover to read as
-   destructive. Click marks the session hidden (see lib/hidden-sessions.ts) -
-   data isn't deleted, just filtered out. */
-.history-card-delete {
-  font-size: 12.5px;
-  line-height: 1;
-  color: var(--accent);
-  opacity: 0;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-  transition: opacity 0.15s, color 0.15s;
-}
-
-.history-card:hover .history-card-delete {
-  opacity: 1;
-}
-
-.history-card-delete:hover {
-  color: var(--accent-hover);
+/* Pinned (置顶) marker - a static pushpin icon on the right of the meta row,
+   shown only on pinned cards. Non-interactive (pin/unpin lives in the right-
+   click context menu); styled to match the meta row text so it reads as an
+   indicator, not a button. No hover/cursor - pure marker. */
+.history-card-pin {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+  opacity: 0.7;
 }
 /* ── Loading Skeleton ──
    Shimmer driven by --text-3 so the skeleton bars are visible against

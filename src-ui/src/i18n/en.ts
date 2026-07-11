@@ -17,6 +17,11 @@ export const en = {
   'menu.delete': 'Delete',
   'menu.show_in_folder': 'Reveal in File Explorer',
   'menu.open': 'Open',
+  'menu.pin': 'Pin',
+  'menu.unpin': 'Unpin',
+  'menu.copy_session_id': 'Copy session ID',
+  'menu.copy_resume_command': 'Copy resume command',
+  'menu.copy_full_path': 'Copy full path',
 
 
   // Tools

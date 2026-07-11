@@ -16,6 +16,11 @@ export const zhTW = {
   'menu.delete': '刪除',
   'menu.show_in_folder': '在檔案總管中顯示',
   'menu.open': '開啟',
+  'menu.pin': '置頂',
+  'menu.unpin': '取消置頂',
+  'menu.copy_session_id': '複製會話ID',
+  'menu.copy_resume_command': '複製恢復命令',
+  'menu.copy_full_path': '複製完整路徑',
 
 
   // Tools

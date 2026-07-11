@@ -16,6 +16,11 @@ export const ja = {
   'menu.delete': '削除',
   'menu.show_in_folder': 'エクスプローラーで表示',
   'menu.open': '開く',
+  'menu.pin': 'ピン留め',
+  'menu.unpin': 'ピン留めを解除',
+  'menu.copy_session_id': 'セッションIDをコピー',
+  'menu.copy_resume_command': '再開コマンドをコピー',
+  'menu.copy_full_path': '完全パスをコピー',
 
 
   // Tools

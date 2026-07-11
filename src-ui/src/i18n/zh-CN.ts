@@ -16,6 +16,11 @@ export const zhCN = {
   'menu.delete': '删除',
   'menu.show_in_folder': '在文件管理器中显示',
   'menu.open': '打开',
+  'menu.pin': '置顶',
+  'menu.unpin': '取消置顶',
+  'menu.copy_session_id': '复制会话ID',
+  'menu.copy_resume_command': '复制恢复命令',
+  'menu.copy_full_path': '复制完整路径',
 
 
   // Tools
