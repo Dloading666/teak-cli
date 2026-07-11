@@ -168,7 +168,7 @@ Xóa tờ ghi chú này khi bạn sẵn sàng và bắt đầu tác vụ đầu 
 
   // Gambit · Nước cờ
   'gambit.title': 'Nước cờ',
-  'gambit.placeholder': 'Cân nhắc nước cờ... ({send} để gửi, {newline} xuống dòng, dán ảnh được)',
+  'gambit.placeholder': 'Cân nhắc nước cờ... ({send} để gửi, {newline} xuống dòng, dán ảnh được, Alt+↑↓ xem lịch sử)',
   'gambit.send_failed_hint': 'Hãy mở một phiên hoạt động trước',
   'gambit.send_empty_hint': 'Nhập nội dung hoặc dán ảnh trước (Ctrl+V)',
 

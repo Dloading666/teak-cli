@@ -166,7 +166,7 @@ export const zhTW = {
 
   // Gambit · 妙手
   'gambit.title': '妙手',
-  'gambit.placeholder': '靜心琢磨，再落子... ({send} 發送, {newline} 換行, 可貼上圖片)',
+  'gambit.placeholder': '靜心琢磨，再落子... ({send} 發送, {newline} 換行, 可貼上圖片, Alt+↑↓ 翻歷史)',
   'gambit.send_failed_hint': '請先開啟活動工作階段',
   'gambit.send_empty_hint': '先輸入內容或貼上圖片 (Ctrl+V)',
 

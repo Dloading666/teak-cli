@@ -165,7 +165,7 @@ export const ja = {
 
   // Gambit · 一手
   'gambit.title': '一手',
-  'gambit.placeholder': '静かに一手を思案... ({send}で送信、{newline}で改行、画像貼付可)',
+  'gambit.placeholder': '静かに一手を思案... ({send}で送信、{newline}で改行、画像貼付可、Alt+↑↓で履歴)',
   'gambit.send_failed_hint': 'アクティブなセッションを先に開いてください',
   'gambit.send_empty_hint': 'メッセージを入力するか画像を貼り付けてください (Ctrl+V)',
 

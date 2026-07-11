@@ -653,26 +653,15 @@ function GambitImpl({
     // IME composition in progress — let the IME keep Enter for confirming
     // candidates. nativeEvent.isComposing is the canonical flag.
     if (e.nativeEvent.isComposing) return;
-    // ↑/↓ history recall — only at the top / bottom line of the textarea so
-    // multi-line caret movement stays intact in the middle of a long draft.
-    // The textarea is rows=1 with auto-grow, so an unedited single-line
-    // draft always qualifies; a multi-line draft only recalls when the
-    // caret sits on the edge line. This mirrors shells, Python REPL, and
-    // the fzf-style prompt navigation users already expect.
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      const ta = e.currentTarget;
-      const value = ta.value;
-      const pos = ta.selectionStart ?? 0;
-      // Selection (non-collapsed) → let the browser adjust it natively;
-      // intercepting would break shift+arrow selection across lines.
-      const isCaret = ta.selectionStart === ta.selectionEnd;
-      const onFirstLine = isCaret && !value.slice(0, pos).includes('\n');
-      const onLastLine = isCaret && !value.slice(pos).includes('\n');
-      if ((e.key === 'ArrowUp' && onFirstLine) || (e.key === 'ArrowDown' && onLastLine)) {
-        if (navigateHistory(e.key === 'ArrowUp' ? -1 : 1)) e.preventDefault();
-        return;
-      }
-      // Fall through: native caret movement within / between lines.
+    // History recall is gated behind Alt+↑/↓. Bare ↑/↓ stays native caret
+    // movement — users complained that hijacking them stole vertical caret
+    // positioning inside a multi-line draft. Alt+arrow has no native
+    // behavior in a textarea, so it's a conflict-free dedicated gesture
+    // (Shift+arrow is off-limits — that's the browser's vertical text
+    // selection). The placeholder advertises "Alt+↑↓ 翻历史".
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.altKey) {
+      if (navigateHistory(e.key === 'ArrowUp' ? -1 : 1)) e.preventDefault();
+      return;
     }
     // Backspace at the very start of an empty draft pops the last skill
     // pill — mirrors how chip inputs let you delete attachments with ⌫.

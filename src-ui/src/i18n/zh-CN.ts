@@ -166,7 +166,7 @@ export const zhCN = {
 
   // Gambit · 妙手
   'gambit.title': '妙手',
-  'gambit.placeholder': '静心琢磨，再落子... ({send} 发送, {newline} 换行, 可粘贴图片)',
+  'gambit.placeholder': '静心琢磨，再落子... ({send} 发送, {newline} 换行, 可粘贴图片, Alt+↑↓ 翻历史)',
   'gambit.send_failed_hint': '请先打开活动会话',
   'gambit.send_empty_hint': '先输入内容或粘贴图片 (Ctrl+V)',
 

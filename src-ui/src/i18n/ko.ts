@@ -165,7 +165,7 @@ export const ko = {
 
   // Gambit · 한 수
   'gambit.title': '한 수',
-  'gambit.placeholder': '한 수를 고르는 중... ({send} 전송, {newline} 줄바꿈, 이미지 붙여넣기)',
+  'gambit.placeholder': '한 수를 고르는 중... ({send} 전송, {newline} 줄바꿈, 이미지 붙여넣기, Alt+↑↓ 기록)',
   'gambit.send_failed_hint': '활성 세션을 먼저 여세요',
   'gambit.send_empty_hint': '내용을 입력하거나 이미지를 붙여넣으세요 (Ctrl+V)',
 
