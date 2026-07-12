@@ -250,7 +250,7 @@
 
 .task-prompt-body {
   width: 100%;
-  min-height: 78px;
+  min-height: 84px;
   resize: none;
   overflow: hidden;
   border: none;
@@ -304,6 +304,10 @@
 .task-prompt-actions .task-prompt-tick {
   width: 18px;
   height: 18px;
+  /* Don't let the rail compress the icons when the card is at its min
+     height - the body's min-height is sized to fit them, but flex-shrink:0
+     guarantees they keep their 18px even at the resize floor. */
+  flex-shrink: 0;
 }
 
 .task-prompt-btn {

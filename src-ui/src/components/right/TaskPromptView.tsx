@@ -552,7 +552,7 @@ interface PromptBodyProps {
   onDone: () => void;
 }
 
-const BODY_MIN_HEIGHT = 78;
+const BODY_MIN_HEIGHT = 84;
 const BODY_MAX_HEIGHT = 600;
 
 function PromptBody({ value, placeholder, editable, height, onChange, onDone }: PromptBodyProps) {
