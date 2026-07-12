@@ -135,7 +135,6 @@ export const zhCN = {
   'task.prompt.new_category': '新分类',
   'task.prompt.category_placeholder': '分类名（选已有或输入新的）',
   'task.prompt.body_placeholder': '写提示词，整段发给 AI…',
-  'task.prompt.empty': '点 + 新建一个分类',
   'task.note_placeholder': '写点什么，整段发给 AI…',
   'task.welcome_note': `欢迎来到 Coffee CLI ☕
 

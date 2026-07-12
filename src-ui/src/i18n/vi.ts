@@ -137,7 +137,6 @@ export const vi = {
   'task.prompt.new_category': 'Phân loại mới',
   'task.prompt.category_placeholder': 'Tên phân loại (chọn sẵn hoặc gõ mới)',
   'task.prompt.body_placeholder': 'Viết prompt, gửi cho AI…',
-  'task.prompt.empty': 'Bấm + để tạo phân loại',
   'task.note_placeholder': 'Ghi vài dòng rồi gửi cả đoạn cho agent…',
   'task.welcome_note': `Chào mừng đến với Coffee CLI ☕
 

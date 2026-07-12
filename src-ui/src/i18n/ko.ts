@@ -134,7 +134,6 @@ export const ko = {
   'task.prompt.new_category': '새 분류',
   'task.prompt.category_placeholder': '분류명 (기존 선택 또는 새로 입력)',
   'task.prompt.body_placeholder': '프롬프트를 적어 AI에게 전송…',
-  'task.prompt.empty': '+ 를 눌러 분류 만들기',
   'task.note_placeholder': '메모를 적어 에이전트로 한 번에 보내기…',
   'task.welcome_note': `Coffee CLI에 오신 것을 환영합니다 ☕
 

@@ -135,7 +135,6 @@ export const zhTW = {
   'task.prompt.new_category': '新分類',
   'task.prompt.category_placeholder': '分類名（選已有或輸入新的）',
   'task.prompt.body_placeholder': '寫提示詞，整段發給 AI…',
-  'task.prompt.empty': '點 + 新建一個分類',
   'task.note_placeholder': '寫點什麼，整段發給 AI…',
   'task.welcome_note': `歡迎來到 Coffee CLI ☕
 

@@ -135,7 +135,6 @@ export const ru = {
   'task.prompt.new_category': 'Новая категория',
   'task.prompt.category_placeholder': 'Название категории (выбрать или ввести новое)',
   'task.prompt.body_placeholder': 'Напишите промпт, отправьте ИИ…',
-  'task.prompt.empty': 'Нажмите + для создания категории',
   'task.note_placeholder': 'Запишите что-нибудь и отправьте целиком агенту…',
   'task.welcome_note': `Добро пожаловать в Coffee CLI ☕
 

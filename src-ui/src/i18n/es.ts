@@ -134,7 +134,6 @@ export const es = {
   'task.prompt.new_category': 'Nueva categoría',
   'task.prompt.category_placeholder': 'Nombre de categoría (elige o crea una)',
   'task.prompt.body_placeholder': 'Escribe un prompt, envíalo a la IA…',
-  'task.prompt.empty': 'Clic en + para crear una categoría',
   'task.note_placeholder': 'Anota algo y envíalo entero a tu agente…',
   'task.welcome_note': `Te damos la bienvenida a Coffee CLI ☕
 
