@@ -2000,6 +2000,13 @@ body.gambit-docked .multi-agent-grid-standalone {
 /* Layer 1 (bottom): cold dark base + soft accent wash + edge vignette. */
 [data-shape="carbon"] #root {
     position: relative;
+    /* Establish a stacking context so the ::before (hex mesh, z-index:-2) and
+       ::after (veil, z-index:-1) paint ABOVE #root's own background instead
+       of escaping behind it. On Windows clip-path already creates one; macOS
+       drops the clip (html.is-macos #root { clip-path:none }), which left the
+       mesh hidden behind the solid base -> carbon read as a flat solid on
+       macOS. isolation:isolate creates the context without side effects. */
+    isolation: isolate;
     background:
         radial-gradient(130% 100% at 50% 36%,
             color-mix(in oklab, var(--accent) 7%, transparent), transparent 52%),
