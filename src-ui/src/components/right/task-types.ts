@@ -41,3 +41,21 @@ export const NEXT_STATUS: Record<TaskStatus, TaskStatus> = {
 // The sticky-note view renders this same order with no section headers — the
 // per-card status dots carry the grouping signal instead.
 export const STATUS_ORDER: TaskStatus[] = ['working', 'todo', 'done'];
+
+// Builds a blank prompt-library entry for the "prompt" view mode. In that
+// mode `title` is repurposed as the CATEGORY name (same-title items group
+// together via 100% string match) and `description` holds the prompt body.
+// A freshly created category is just one of these with an empty body - it
+// keeps the category alive until the user writes a body or deletes it; when
+// the last item sharing a title is removed, the category vanishes naturally
+// (no separate "delete category" affordance). `status` is unused by this
+// view but kept populated so the same TaskItem reads correctly in list/note.
+export function makePromptItem(category: string): TaskItem {
+  return {
+    id: crypto.randomUUID(),
+    title: category,
+    description: '',
+    status: 'todo',
+    createdAt: Date.now(),
+  };
+}

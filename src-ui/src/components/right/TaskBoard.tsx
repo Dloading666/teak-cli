@@ -6,8 +6,10 @@ import { getTabActions } from '../../lib/tab-actions';
 import './TaskBoard.css';
 import { ChangesBoard } from './ChangesBoard';
 import { TaskNoteView } from './TaskNoteView';
+import { TaskPromptView } from './TaskPromptView';
 import { TaskEmptyState } from './TaskEmptyState';
-import { makeWelcomeNote, NEXT_STATUS, STATUS_ORDER, type TaskItem, type TaskStatus } from './task-types';
+import { makeWelcomeNote, makePromptItem, NEXT_STATUS, STATUS_ORDER, type TaskItem, type TaskStatus } from './task-types';
+import { useTextContextMenu } from '../../lib/use-text-context-menu';
 
 // ─── Persistence (Rust file backend with localStorage fallback) ──────────────
 
@@ -71,6 +73,9 @@ const SECTION_LABEL_KEYS: Record<TaskStatus, 'task.section.working' | 'task.sect
 export function TaskBoard() {
   const t = useT();
   const { state, dispatch } = useAppState();
+  // Right-click cut/copy/paste/select menu, shared by the to-do list's title
+  // editor and per-card description textarea (same menu Gambit/terminal use).
+  const { menu: ctxMenuEl, openMenu: openCtxMenu } = useTextContextMenu();
   const viewMode = state.taskViewMode;
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -224,6 +229,26 @@ export function TaskBoard() {
     }, 50);
   }, [t]);
 
+  // Prompt-view: create a blank category. One {title:'', description:''}
+  // item is the category's first member - its empty title puts it in the
+  // unnamed group, and TaskPromptView kicks that group's header into edit
+  // mode (via addingId) so the user names it immediately. Naming it
+  // (renameCategory '' -> '翻译类') is what makes the category real; leaving
+  // it unnamed and committing empty removes the phantom (handled in the view).
+  const handleAddPrompt = useCallback(() => {
+    const item = makePromptItem('');
+    setAddingId(item.id);
+    setTasks(prev => [item, ...prev]);
+    setTimeout(() => setAddingId(null), 400);
+  }, []);
+
+  // Rename a category = retitle EVERY item sharing `oldTitle` (the whole
+  // group moves together). '' -> name is the "name a new category" case;
+  // renaming to an existing title merges into that group (pick-existing).
+  const renameCategory = useCallback((oldTitle: string, newTitle: string) => {
+    setTasks(prev => prev.map(t => t.title === oldTitle ? { ...t, title: newTitle } : t));
+  }, []);
+
   // Duplicate a note — spawns an identical sticky right AFTER the original
   // (same title/description/status/height, fresh id) so a long note can be
   // reused as a template without retyping. Deliberately does NOT set addingId:
@@ -259,6 +284,19 @@ export function TaskBoard() {
     if (task.status !== 'working') {
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'working' } : t));
     }
+  }, [state.activeTerminalId]);
+
+  // Prompt-view send: paste ONLY the description (the prompt body) into the
+  // active terminal. The title is just the category name there - sending it
+  // would be noise. No status promotion: prompt mode has no priority concept.
+  const sendPromptToAgent = useCallback((task: TaskItem) => {
+    const activeId = state.activeTerminalId;
+    if (!activeId) return;
+    const actions = getTabActions(activeId);
+    if (!actions) return;
+    const body = task.description && task.description.trim();
+    if (!body) return;
+    actions.paste(body);
   }, [state.activeTerminalId]);
 
   const handleToggle = useCallback((id: string) => {
@@ -616,6 +654,19 @@ export function TaskBoard() {
               onReorder={setTasks}
               onShowGuide={handleShowGuide}
             />
+          ) : viewMode === 'prompt' ? (
+            <TaskPromptView
+              tasks={tasks}
+              addingId={addingId}
+              removingId={removingId}
+              canSend={!!state.activeTerminalId}
+              onRenameCategory={renameCategory}
+              onUpdateDesc={handleDescChange}
+              onRemove={handleRemove}
+              onSend={sendPromptToAgent}
+              onReorder={setTasks}
+              onSetHeight={setHeight}
+            />
           ) : (
           <div ref={listRef} className="task-list" style={{ paddingBottom: '80px' }}>
         {STATUS_ORDER.map(status => {
@@ -696,6 +747,7 @@ export function TaskBoard() {
                               if (e.key === 'Escape') cancelEdit();
                             }}
                             onBlur={commitEdit}
+                            onContextMenu={(e) => openCtxMenu(e, setEditingTitle)}
                           />
                         ) : (
                           <span className={[
@@ -771,6 +823,7 @@ export function TaskBoard() {
                             onChange={e => handleDescChange(task.id, e.target.value)}
                             rows={2}
                             onClick={e => e.stopPropagation()}
+                            onContextMenu={(e) => openCtxMenu(e, (v) => handleDescChange(task.id, v))}
                           />
                         </div>
                       </div>
@@ -790,7 +843,7 @@ export function TaskBoard() {
       <div className="task-fab-container">
         <button 
           className="task-fab-simple" 
-          onClick={handleAdd}
+          onClick={viewMode === 'prompt' ? handleAddPrompt : handleAdd}
         >
           <div className="task-fab-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -811,6 +864,7 @@ export function TaskBoard() {
       />
     )}
 
+    {ctxMenuEl}
     </div>
   );
 }

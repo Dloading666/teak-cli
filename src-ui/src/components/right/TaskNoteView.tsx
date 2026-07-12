@@ -19,6 +19,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n/useT';
 import { TaskEmptyState } from './TaskEmptyState';
 import { STATUS_ORDER, type TaskItem, type TaskStatus } from './task-types';
+import { useTextContextMenu } from '../../lib/use-text-context-menu';
 import './TaskNoteView.css';
 
 // Traffic-light dots, top-to-bottom priority. Colors are deliberately the
@@ -127,6 +128,14 @@ export function TaskNoteView({
         const srcBody = cardEl.querySelector('textarea');
         const ghostBody = ghost.querySelector('textarea');
         if (srcBody && ghostBody) ghostBody.value = srcBody.value;
+        // Cap the ghost's body to ~2 lines so a long note's drag preview
+        // stays compact and easy to place (the full text isn't needed while
+        // dragging - the drop target is what matters).
+        if (ghostBody) {
+          ghostBody.style.height = '42px';
+          ghostBody.style.maxHeight = '42px';
+          ghostBody.style.overflow = 'hidden';
+        }
         ghost.style.width = `${rect.width}px`;
         ghost.style.left = `${me.clientX - offsetX}px`;
         ghost.style.top = `${me.clientY - offsetY}px`;
@@ -348,6 +357,8 @@ interface NoteBodyProps {
 
 function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  // Right-click cut/copy/paste/select menu (same one Gambit/terminal use).
+  const { menu: ctxMenu, openMenu: openCtxMenu } = useTextContextMenu();
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -368,9 +379,15 @@ function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyP
     let lastW = -1;
     const fit = () => {
       if (el.offsetWidth === 0) return; // collapsed / not laid out — wait for width
-      el.style.height = 'auto';
-      const floor = height ?? DEFAULT_NOTE_HEIGHT;
-      el.style.height = `${Math.max(floor, el.scrollHeight)}px`;
+      if (height != null) {
+        // Manually resized: a FIXED height, not a floor. Text clips (overflow
+        // hidden) when the user dragged smaller than the content - the size
+        // they chose wins over auto-fit.
+        el.style.height = `${Math.max(NOTE_MIN_HEIGHT, height)}px`;
+      } else {
+        el.style.height = 'auto';
+        el.style.height = `${Math.max(DEFAULT_NOTE_HEIGHT, el.scrollHeight)}px`;
+      }
       lastW = el.offsetWidth;
     };
     fit();
@@ -391,14 +408,18 @@ function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyP
   }, [autoFocus]);
 
   return (
-    <textarea
-      ref={ref}
-      className="task-note-body"
-      value={value}
-      placeholder={placeholder}
-      rows={2}
-      onChange={e => onChange(e.target.value)}
-      onPointerDown={e => e.stopPropagation()}
-    />
+    <>
+      <textarea
+        ref={ref}
+        className="task-note-body"
+        value={value}
+        placeholder={placeholder}
+        rows={2}
+        onChange={e => onChange(e.target.value)}
+        onPointerDown={e => e.stopPropagation()}
+        onContextMenu={(e) => openCtxMenu(e, onChange)}
+      />
+      {ctxMenu}
+    </>
   );
 }

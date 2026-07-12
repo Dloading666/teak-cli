@@ -129,6 +129,12 @@ export const ko = {
   'task.view.note': '메모지',
   'task.view.list.sub': '간결한 체크리스트, 하나씩 체크',
   'task.view.note.sub': '큰 메모지에 자유롭게 적어 한 번에 전송',
+  'task.view.prompt': '프롬프트 모음',
+  'task.view.prompt.sub': 'AI 프롬프트 분류, 한 번에 전송',
+  'task.prompt.new_category': '새 분류',
+  'task.prompt.category_placeholder': '분류명 (기존 선택 또는 새로 입력)',
+  'task.prompt.body_placeholder': '프롬프트를 적어 AI에게 전송…',
+  'task.prompt.empty': '+ 를 눌러 분류 만들기',
   'task.note_placeholder': '메모를 적어 에이전트로 한 번에 보내기…',
   'task.welcome_note': `Coffee CLI에 오신 것을 환영합니다 ☕
 

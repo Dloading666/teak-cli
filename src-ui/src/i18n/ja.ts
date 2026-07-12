@@ -129,6 +129,12 @@ export const ja = {
   'task.view.note': '付箋',
   'task.view.list.sub': 'コンパクトな一覧、ひとつずつチェック',
   'task.view.note.sub': '大きな付箋にまとめて書いて送信',
+  'task.view.prompt': 'プロンプト集',
+  'task.view.prompt.sub': 'AIプロンプトを分類、一括送信',
+  'task.prompt.new_category': '新規カテゴリ',
+  'task.prompt.category_placeholder': 'カテゴリ名（既存を選ぶか新規入力）',
+  'task.prompt.body_placeholder': 'プロンプトを書いてAIに送信…',
+  'task.prompt.empty': '+ を押してカテゴリを作成',
   'task.note_placeholder': 'メモを書いて、まとめて送信…',
   'task.welcome_note': `Coffee CLI へようこそ ☕
 

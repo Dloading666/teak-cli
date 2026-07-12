@@ -130,6 +130,12 @@ export const de = {
   'task.view.note': 'Notizzettel',
   'task.view.list.sub': 'Kompakte Liste, einzeln abhaken',
   'task.view.note.sub': 'Große Zettel – frei schreiben, alles senden',
+  'task.view.prompt': 'Prompt-Bibliothek',
+  'task.view.prompt.sub': 'KI-Prompts kategorisieren, mit einem Klick senden',
+  'task.prompt.new_category': 'Neue Kategorie',
+  'task.prompt.category_placeholder': 'Kategoriename (vorhanden wählen oder neu eingeben)',
+  'task.prompt.body_placeholder': 'Prompt schreiben, an KI senden…',
+  'task.prompt.empty': 'Auf + klicken für neue Kategorie',
   'task.note_placeholder': 'Schreib etwas auf und sende alles an deinen Agenten…',
   'task.welcome_note': `Willkommen bei Coffee CLI ☕
 

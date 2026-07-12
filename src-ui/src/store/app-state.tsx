@@ -220,7 +220,7 @@ export interface AppState {
   // 'note' = big sticky-note cards (traffic-light status + timestamp + roomy
   // text area). Same task data either way — purely a presentation choice made
   // in the settings modal. Default 'list' so existing users see no change.
-  taskViewMode: 'list' | 'note';
+  taskViewMode: 'list' | 'note' | 'prompt';
 
   // ── Diff view (修改记录 → click a file) ─────────────────────────────────
   // The right-side Changes tab shows a half-height bottom overlay (DiffPanel)
@@ -335,7 +335,7 @@ type Action =
   | { type: 'TOGGLE_LEFT_PANEL' }
   | { type: 'TOGGLE_RIGHT_PANEL' }
   | { type: 'SET_MULTI_AGENT_LAYOUT'; layout: 'grid' | 'columns' }
-  | { type: 'SET_TASK_VIEW_MODE'; mode: 'list' | 'note' }
+  | { type: 'SET_TASK_VIEW_MODE'; mode: 'list' | 'note' | 'prompt' }
   | { type: 'SET_TAB_TITLE'; id: string; title: string }
   | { type: 'SET_DIFF_SELECTION'; selection: DiffSelection }
   | { type: 'CLEAR_DIFF' }
@@ -724,7 +724,7 @@ function getInitialState(): AppState {
   // the SET_TASK_VIEW_MODE toggle) still wins for returning users. Previously
   // 'list', only flipped to 'note' by the TaskBoard first-launch seed — which
   // was fragile (cleared localStorage or a removed seed fell back to list).
-  let taskViewMode: 'list' | 'note' = 'note';
+  let taskViewMode: 'list' | 'note' | 'prompt' = 'note';
   // Default 'overlay' (the gentle half-height panel) — existing users see no
   // change. Only flips to 'tab' if the user explicitly expanded-to-tab before.
   let diffMode: 'overlay' | 'tab' = 'overlay';
@@ -734,7 +734,7 @@ function getInitialState(): AppState {
     const savedLayout = localStorage.getItem('cc-ma-layout');
     if (savedLayout === 'columns' || savedLayout === 'grid') multiAgentLayout = savedLayout;
     const savedTaskView = localStorage.getItem('cc-task-view');
-    if (savedTaskView === 'list' || savedTaskView === 'note') taskViewMode = savedTaskView;
+    if (savedTaskView === 'list' || savedTaskView === 'note' || savedTaskView === 'prompt') taskViewMode = savedTaskView;
     const savedDiffMode = localStorage.getItem('cc-diff-mode');
     if (savedDiffMode === 'tab' || savedDiffMode === 'overlay') diffMode = savedDiffMode;
   } catch {}

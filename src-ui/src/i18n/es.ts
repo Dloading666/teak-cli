@@ -129,6 +129,12 @@ export const es = {
   'task.view.note': 'Notas adhesivas',
   'task.view.list.sub': 'Lista compacta, marca una a una',
   'task.view.note.sub': 'Notas amplias: escribe y envía todo',
+  'task.view.prompt': 'Biblioteca de prompts',
+  'task.view.prompt.sub': 'Categoriza prompts de IA, envía con un clic',
+  'task.prompt.new_category': 'Nueva categoría',
+  'task.prompt.category_placeholder': 'Nombre de categoría (elige o crea una)',
+  'task.prompt.body_placeholder': 'Escribe un prompt, envíalo a la IA…',
+  'task.prompt.empty': 'Clic en + para crear una categoría',
   'task.note_placeholder': 'Anota algo y envíalo entero a tu agente…',
   'task.welcome_note': `Te damos la bienvenida a Coffee CLI ☕
 

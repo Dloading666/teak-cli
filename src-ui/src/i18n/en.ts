@@ -131,6 +131,12 @@ export const en = {
   'task.view.note': 'Sticky Notes',
   'task.view.list.sub': 'Compact checklist, tick off one by one',
   'task.view.note.sub': 'Roomy notes — jot freely, send the whole thing',
+  'task.view.prompt': 'Prompt library',
+  'task.view.prompt.sub': 'Categorize AI prompts, send in one click',
+  'task.prompt.new_category': 'New category',
+  'task.prompt.category_placeholder': 'Category (pick existing or type new)',
+  'task.prompt.body_placeholder': 'Write a prompt, send it to AI…',
+  'task.prompt.empty': 'Click + to create a category',
   'task.note_placeholder': 'Jot something down, send it all to your agent…',
   // Seeded once for brand-new users as a roomy welcome note (sticky-note view).
   'task.welcome_note': `Welcome to Coffee CLI ☕

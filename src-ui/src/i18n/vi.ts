@@ -132,6 +132,12 @@ export const vi = {
   'task.view.note': 'Ghi chú dán',
   'task.view.list.sub': 'Danh sách gọn, tick từng mục',
   'task.view.note.sub': 'Ghi chú lớn — viết thoải mái, gửi cả đoạn',
+  'task.view.prompt': 'Thư viện prompt',
+  'task.view.prompt.sub': 'Phân loại prompt AI, gửi một chạm',
+  'task.prompt.new_category': 'Phân loại mới',
+  'task.prompt.category_placeholder': 'Tên phân loại (chọn sẵn hoặc gõ mới)',
+  'task.prompt.body_placeholder': 'Viết prompt, gửi cho AI…',
+  'task.prompt.empty': 'Bấm + để tạo phân loại',
   'task.note_placeholder': 'Ghi vài dòng rồi gửi cả đoạn cho agent…',
   'task.welcome_note': `Chào mừng đến với Coffee CLI ☕
 

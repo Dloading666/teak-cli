@@ -32,7 +32,7 @@ const ExternalLinkArrow = () => (
 );
 
 // Per-mode preview glyphs for the Tasks section (checklist vs sticky note).
-const TASK_VIEW_ICONS: Record<'list' | 'note', ReactNode> = {
+const TASK_VIEW_ICONS: Record<'list' | 'note' | 'prompt', ReactNode> = {
   list: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 6h11" /><path d="M9 12h11" /><path d="M9 18h11" />
@@ -43,6 +43,12 @@ const TASK_VIEW_ICONS: Record<'list' | 'note', ReactNode> = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10l6-6V5a2 2 0 0 0-2-2Z" />
       <path d="M15 21v-5a1 1 0 0 1 1-1h5" />
+    </svg>
+  ),
+  prompt: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 11V5a2 2 0 0 1 2-2h6l9 9-8 8-9-9Z" />
+      <circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
     </svg>
   ),
 };
@@ -195,7 +201,7 @@ export function SettingsModal() {
     dispatch({ type: 'SET_DEFAULT_SHELL', shell });
   };
   const setOpacity = (n: number) => dispatch({ type: 'SET_WALLPAPER_OPACITY', opacity: n });
-  const setTaskView = (mode: 'list' | 'note') => dispatch({ type: 'SET_TASK_VIEW_MODE', mode });
+  const setTaskView = (mode: 'list' | 'note' | 'prompt') => dispatch({ type: 'SET_TASK_VIEW_MODE', mode });
   const setEnterToSend = (value: boolean) => {
     dispatch({ type: 'SET_GAMBIT_ENTER_TO_SEND', value });
     try { localStorage.setItem('cc-gambit-enter-send', String(value)); } catch {}

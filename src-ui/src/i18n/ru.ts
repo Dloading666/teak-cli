@@ -130,6 +130,12 @@ export const ru = {
   'task.view.note': 'Стикеры',
   'task.view.list.sub': 'Компактный список, отмечайте по одному',
   'task.view.note.sub': 'Большие стикеры — пишите и отправляйте целиком',
+  'task.view.prompt': 'Библиотека промптов',
+  'task.view.prompt.sub': 'Категории AI-промптов, отправка в один клик',
+  'task.prompt.new_category': 'Новая категория',
+  'task.prompt.category_placeholder': 'Название категории (выбрать или ввести новое)',
+  'task.prompt.body_placeholder': 'Напишите промпт, отправьте ИИ…',
+  'task.prompt.empty': 'Нажмите + для создания категории',
   'task.note_placeholder': 'Запишите что-нибудь и отправьте целиком агенту…',
   'task.welcome_note': `Добро пожаловать в Coffee CLI ☕
 

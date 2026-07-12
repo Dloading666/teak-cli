@@ -52,14 +52,15 @@
 .task-note-card.drop-after::after {
   content: '';
   position: absolute;
-  left: 6px;
-  right: 6px;
+  left: 4px;
+  right: 4px;
   height: 2px;
   border-radius: 2px;
   background: var(--accent, #c4956a);
+  z-index: 3;
 }
-.task-note-card.drop-before::before { top: -6px; }
-.task-note-card.drop-after::after { bottom: -6px; }
+.task-note-card.drop-before::before { top: -4px; }
+.task-note-card.drop-after::after { bottom: -4px; }
 
 /* ─── Header band — the strip that makes it read as a sticky note ────────────── */
 /* A shade lighter than the body + a hairline divider. Whitelisted in global.css
@@ -191,7 +192,14 @@
   right: 0;
   bottom: 0;
   height: 11px;
-  cursor: ns-resize;
+  /* Match the card's bottom corners and clip the ::after bar to the rounded
+     shape (like Gambit's dock-resize), so the highlight follows the radius. */
+  border-radius: 0 0 var(--radius-md, 12px) var(--radius-md, 12px);
+  overflow: hidden;
+  /* !important: global.css sets `* { cursor: default !important }`. The
+     ::after has pointer-events:none so the parent stays the hit target and
+     this cursor shows across the whole handle (same pattern as Gambit). */
+  cursor: ns-resize !important;
   touch-action: none;
   z-index: 2;
 }
@@ -199,22 +207,24 @@
 .task-note-resize::after {
   content: '';
   position: absolute;
-  left: 50%;
-  bottom: 3px;
-  transform: translateX(-50%);
-  width: 28px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   height: 2px;
-  border-radius: 2px;
   background: transparent;
   transition: background 0.15s;
+  /* Transparent to pointer events so the parent stays the hit target. */
+  pointer-events: none;
 }
 
+/* Faint edge on card hover so the handle is discoverable; solid accent line
+   when hovering the handle (matching Gambit's dock-resize hairline). */
 .task-note-card:hover .task-note-resize::after {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .task-note-resize:hover::after {
-  background: rgba(255, 255, 255, 0.38);
+  background: var(--accent, #c4956a) !important;
 }
 
 /* ─── Floating ghost (drag clone) ───────────────────────────────────────────── */

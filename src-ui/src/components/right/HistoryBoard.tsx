@@ -12,6 +12,7 @@ import {
 import { subscribeHidden, getHiddenSnapshot } from '../../lib/hidden-sessions';
 import { subscribePinned, getPinnedSnapshot } from '../../lib/pinned-sessions';
 import { SessionContextMenu, type SessionCtxMenuState } from './SessionContextMenu';
+import { useTextContextMenu } from '../../lib/use-text-context-menu';
 // hermes/opencode PNG assets live in src/icons-inline/ so the Launchpad
 // can `?inline`-import them as data URIs and bypass the <img> async-decode
 // flash. We pull the same data URIs here so HistoryBoard doesn't need a
@@ -117,6 +118,9 @@ export function HistoryBoard() {
   const isLoading = isTauri && (status === 'idle' || status === 'loading') && cachedSessions.length === 0;
 
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
+  // Right-click cut/copy/paste/select menu for the search box (same one
+  // Gambit/terminal/task-list use).
+  const { menu: ctxMenuEl, openMenu: openCtxMenu } = useTextContextMenu();
 
   // Memoize baseSessions on cachedSessions so the filter useMemo below doesn't
   // re-run every render (the isTauri? ternary otherwise rebuilds a fresh array
@@ -232,6 +236,7 @@ export function HistoryBoard() {
           placeholder={t('task.search_sessions' as any) || 'Search sessions...'}
           value={sessionSearchQuery}
           onChange={e => setSessionSearchQuery(e.target.value)}
+          onContextMenu={(e) => openCtxMenu(e, setSessionSearchQuery)}
         />
       </div>
       <div className="task-list" style={{ marginTop: '0', paddingBottom: '20px' }}>
@@ -341,6 +346,7 @@ export function HistoryBoard() {
       )}
     </div>
     {ctxMenu && <SessionContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />}
+    {ctxMenuEl}
   </>
   );
 }

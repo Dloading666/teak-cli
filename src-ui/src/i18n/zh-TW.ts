@@ -130,6 +130,12 @@ export const zhTW = {
   'task.view.note': '便籤式',
   'task.view.list.sub': '緊湊清單，逐條勾選',
   'task.view.note.sub': '大便籤，隨手寫、整段發給 AI',
+  'task.view.prompt': '提示詞式',
+  'task.view.prompt.sub': '按分類攢 AI 提示詞，一鍵發送',
+  'task.prompt.new_category': '新分類',
+  'task.prompt.category_placeholder': '分類名（選已有或輸入新的）',
+  'task.prompt.body_placeholder': '寫提示詞，整段發給 AI…',
+  'task.prompt.empty': '點 + 新建一個分類',
   'task.note_placeholder': '寫點什麼，整段發給 AI…',
   'task.welcome_note': `歡迎來到 Coffee CLI ☕
 
