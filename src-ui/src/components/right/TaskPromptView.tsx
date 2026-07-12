@@ -41,6 +41,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useT } from '../../i18n/useT';
 import type { TaskItem } from './task-types';
+import { TaskEmptyState } from './TaskEmptyState';
 import { useTextContextMenu } from '../../lib/use-text-context-menu';
 import './TaskPromptView.css';
 
@@ -356,7 +357,7 @@ export function TaskPromptView({
   if (tasks.length === 0) {
     return (
       <div className="task-prompt-list task-prompt-list--empty">
-        <div className="task-prompt-empty">{t('task.prompt.empty')}</div>
+        <TaskEmptyState />
       </div>
     );
   }
