@@ -668,7 +668,7 @@ export function TaskBoard() {
               onSetHeight={setHeight}
             />
           ) : (
-          <div ref={listRef} className="task-list" style={{ paddingBottom: '80px' }}>
+          <div ref={listRef} className="task-list" style={{ paddingBottom: tasks.length === 0 ? '0px' : '80px' }}>
         {STATUS_ORDER.map(status => {
           const sectionTasks = tasks.filter(t => t.status === status);
           if (sectionTasks.length === 0 && !dragId) return null;
