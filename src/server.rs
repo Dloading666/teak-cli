@@ -1246,10 +1246,51 @@ fn parse_pi_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession> {
     })
 }
 
+/// Strip Codex Desktop's synthetic "Files mentioned by the user"
+/// preamble from a user `input_text` block, returning the user's real
+/// request text for title display.
+///
+/// Codex Desktop (the ChatGPT desktop app's Codex/agent mode;
+/// `session_meta.originator == "Codex Desktop"`) packs attached-file
+/// references and the user's actual question into a single block:
+///
+/// ```text
+/// \n# Files mentioned by the user:\n\n## <file>: <path>\n...\n\n## My request for Codex:\n<real text>
+/// ```
+///
+/// Without stripping, the history title becomes the meaningless
+/// "# Files mentioned by the user: ## <file>..." preamble instead of
+/// the user's real first question. We split on the `## My request for`
+/// marker and return what follows it (after the product name + colon);
+/// if the block has the preamble but no request marker (user attached
+/// files with no accompanying text), we return empty so the caller
+/// treats it like any other system injection and keeps scanning.
+/// Blocks without the preamble are returned unchanged.
+fn strip_codex_desktop_file_preamble(text: &str) -> &str {
+    const PREAMBLE: &str = "# Files mentioned by the user";
+    if !text.contains(PREAMBLE) {
+        return text;
+    }
+    const MARKER: &str = "## My request for";
+    let Some(idx) = text.find(MARKER) else {
+        return ""; // files-only message, no real text -> skip
+    };
+    let after_marker = &text[idx + MARKER.len()..];
+    // Skip the product name (e.g. "Codex") and the colon that ends
+    // the marker, then any leading whitespace.
+    match after_marker.find(':') {
+        Some(colon) => after_marker[colon + 1..].trim_start(),
+        None => after_marker.trim_start(),
+    }
+}
+
 /// Codex CLI sessions live at
 /// `~/.codex/sessions/<YYYY>/<MM>/<DD>/rollout-<ts>-<uuid>.jsonl`.
 /// Schema:
-///   - first row: `{type: "session_meta", payload: {id, cwd, originator: "codex-tui", ...}}`
+///   - first row: `{type: "session_meta", payload: {id, cwd, originator, ...}}`
+///     (`originator` is `"Codex Desktop"` for the ChatGPT desktop app's
+///     Codex/agent mode, `"codex-tui"` for the terminal CLI; both share
+///     the same row schema and are parsed here uniformly)
 ///   - subsequent rows: `{type: "response_item", payload: {type: "message", role, content: [{type: "input_text", text}]}}`
 ///     (also `user_message`, `event_msg`, `turn_context`, etc. — we ignore the non-message ones)
 fn parse_codex_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession> {
@@ -1275,6 +1316,17 @@ fn parse_codex_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession
 
         // Session meta: pull id + cwd off the first row.
         if row_type == "session_meta" {
+            // Codex (incl. Codex Desktop) writes a separate rollout JSONL for
+            // every sub-agent it spawns, alongside the user's main session.
+            // Sub-agent rollouts inherit the parent's first user message, so
+            // without filtering they surface as duplicate top-level cards that
+            // multiply as the main session runs. See `is_codex_subagent_session`
+            // for the marker rationale. `forked_from_id` is deliberately NOT a
+            // marker: it identifies user-initiated fork/resume sessions, which
+            // are legitimate top-level user sessions and must stay visible.
+            if is_codex_subagent_session(payload) {
+                return None;
+            }
             if let Some(id) = payload.get("id").and_then(|v| v.as_str()) {
                 if !id.is_empty() {
                     session_id = id.to_string();
@@ -1312,10 +1364,16 @@ fn parse_codex_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession
             if block_type != "input_text" && block_type != "text" {
                 continue;
             }
-            let Some(text) = block.get("text").and_then(|v| v.as_str()) else {
+            let Some(raw) = block.get("text").and_then(|v| v.as_str()) else {
                 continue;
             };
-            if is_system_injected(text) {
+            // Codex Desktop packs attached files + the real question
+            // into one `input_text` block prefixed with
+            // "# Files mentioned by the user"; strip that preamble so
+            // the title is the user's actual request, not the file
+            // list. Returns "" for files-only blocks (no text).
+            let text = strip_codex_desktop_file_preamble(raw);
+            if text.is_empty() || is_system_injected(text) {
                 continue; // skip AGENTS.md / environment_context wrappers
             }
             let safe = text.replace('\n', " ");
@@ -1348,6 +1406,43 @@ fn parse_codex_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
     })
+}
+
+/// Whether a Codex `session_meta` payload describes an internal sub-agent
+/// rollout rather than a user-created top-level session. Codex (incl. Codex
+/// Desktop) writes one rollout JSONL per spawned sub-agent, which re-inherits
+/// the parent's first user message and would otherwise show up as a duplicate
+/// top-level card. Two conclusive markers (see Codex's `SessionMeta` in
+/// codex-rs/protocol/src/protocol.rs):
+///
+///   - `source` is an object `{"subagent": ...}`. This is `SessionSource::SubAgent`
+///     serialized - the structural source-of-truth. User sessions serialize
+///     `source` as a string ("cli", "vscode", ...), so the object-shape check
+///     alone separates the two. The parent thread id lives nested under
+///     `source.subagent.thread_spawn.parent_thread_id`, NOT as a top-level
+///     field, so a top-level `parent_thread_id` lookup would miss real
+///     sub-agent rollouts. This signal also catches older rollouts that
+///     predate the `thread_source` field.
+///   - `thread_source == "subagent"` (`ThreadSource::Subagent`).
+///
+/// Mirrors orca's `isCodexWorkerSession` and cc-switch's `is_subagent_source`,
+/// both validated against real Codex Desktop data.
+fn is_codex_subagent_session(payload: &serde_json::Value) -> bool {
+    // Primary: the `source` enum. `contains_key("subagent")` matches regardless
+    // of which `SubAgentSource` variant is nested (thread_spawn object, "review"
+    // unit variant, etc.).
+    if payload
+        .get("source")
+        .and_then(|v| v.as_object())
+        .map_or(false, |obj| obj.contains_key("subagent"))
+    {
+        return true;
+    }
+    // Secondary: the analytics `thread_source` classification.
+    payload
+        .get("thread_source")
+        .and_then(|v| v.as_str())
+        .map_or(false, |s| s == "subagent")
 }
 
 /// Reader for `~/.gemini/tmp/<project>/chats/session-*.jsonl`.
@@ -3940,5 +4035,163 @@ mod tests {
             "expected only the root parent session, got {ids:?}"
         );
         assert_eq!(result[0].session_token.as_deref(), Some("ses_parent"));
+    }
+
+    /// Write a Codex-style rollout JSONL with the given `session_meta` payload
+    /// fields and one user message, returning the temp file path. Mirrors the
+    /// real `~/.codex/sessions/.../rollout-*.jsonl` shape. `case` is a unique
+    /// discriminator so parallel tests don't race on the same temp filename.
+    /// `source` is passed as a `Value` so callers can exercise both the string
+    /// form ("vscode"/"cli" - user sessions) and the object form
+    /// (`{"subagent": ...}` - sub-agents) that real Codex rollouts use.
+    fn write_codex_rollout(
+        case: &str,
+        source: serde_json::Value,
+        thread_source: Option<&str>,
+        forked_from_id: Option<&str>,
+    ) -> std::path::PathBuf {
+        use std::io::Write;
+        let mut payload = serde_json::json!({
+            "timestamp": "2026-07-12T10:48:37.000Z",
+            "type": "session_meta",
+            "payload": {
+                "id": "019f55f1-7c10-75f2-b536-84009ee1d4dc",
+                "timestamp": "2026-07-12T10:48:37.000Z",
+                "cwd": "E:\\test",
+                "originator": "Codex Desktop",
+                "cli_version": "0.144.1",
+                "source": source,
+                "model_provider": "OpenAI",
+            },
+        });
+        let inner = payload.get_mut("payload").unwrap().as_object_mut().unwrap();
+        if let Some(ts) = thread_source {
+            inner.insert("thread_source".to_string(), serde_json::Value::String(ts.to_string()));
+        }
+        if let Some(fid) = forked_from_id {
+            inner.insert("forked_from_id".to_string(), serde_json::Value::String(fid.to_string()));
+        }
+        let msg = serde_json::json!({
+            "timestamp": "2026-07-12T10:48:38.000Z",
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "refactor the auth module"}],
+            },
+        });
+        let path = std::env::temp_dir().join(format!(
+            "coffee-cli-codex-test-{}-{}.jsonl",
+            std::process::id(),
+            case
+        ));
+        let mut f = std::fs::File::create(&path).unwrap();
+        f.write_all(format!("{}\n{}\n", payload, msg).as_bytes()).unwrap();
+        path
+    }
+
+    /// A normal user-created main session stays visible.
+    #[test]
+    fn codex_parser_keeps_user_main_session() {
+        let path = write_codex_rollout("user-main", serde_json::json!("vscode"), Some("user"), None);
+        let session = parse_codex_session_jsonl(&path).expect("user session should be kept");
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(session.tool, "codex");
+        assert_eq!(session.name, "refactor the auth module");
+    }
+
+    /// `thread_source == "subagent"` rollouts are dropped entirely.
+    #[test]
+    fn codex_parser_drops_subagent_thread_source() {
+        let path = write_codex_rollout("subagent-ts", serde_json::json!("vscode"), Some("subagent"), None);
+        let session = parse_codex_session_jsonl(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(session.is_none(), "subagent rollout must be hidden");
+    }
+
+    /// A sub-agent rollout identified by `source: {"subagent": ...}` is
+    /// dropped even with no `thread_source` (older rollouts). Uses the real
+    /// Codex Desktop shape, where `parent_thread_id` is nested under
+    /// `source.subagent.thread_spawn` - not a top-level field.
+    #[test]
+    fn codex_parser_drops_subagent_source_object() {
+        let source = serde_json::json!({
+            "subagent": {"thread_spawn": {"parent_thread_id": "019e6d80-aaaa-bbbb-cccc-dddddddddddd", "depth": 1, "agent_role": "explorer"}}
+        });
+        let path = write_codex_rollout("subagent-src", source, None, None);
+        let session = parse_codex_session_jsonl(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(session.is_none(), "subagent source-object rollout must be hidden");
+    }
+
+    /// A sub-agent whose `SubAgentSource` is a unit variant (e.g. "review")
+    /// still serializes `source` with a `subagent` key - caught by the
+    /// `contains_key` check regardless of the nested variant shape.
+    #[test]
+    fn codex_parser_drops_subagent_source_unit_variant() {
+        let path = write_codex_rollout("subagent-review", serde_json::json!({"subagent": "review"}), None, None);
+        let session = parse_codex_session_jsonl(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(session.is_none(), "review subagent rollout must be hidden");
+    }
+
+    /// `forked_from_id` marks a user-initiated fork/resume - a legitimate
+    /// top-level session that must stay visible despite carrying a parent
+    /// pointer. Regression guard: do NOT treat forked_from_id as a sub-agent.
+    #[test]
+    fn codex_parser_keeps_user_fork_session() {
+        let path = write_codex_rollout(
+            "user-fork",
+            serde_json::json!("vscode"),
+            Some("user"),
+            Some("019e6d80-300a-7161-ac25-4c3dbab35498"),
+        );
+        let session = parse_codex_session_jsonl(&path).expect("forked user session should be kept");
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(session.name, "refactor the auth module");
+    }
+
+    /// A legacy rollout with neither `thread_source` nor a `source.subagent`
+    /// object is a plain user session and stays visible.
+    #[test]
+    fn codex_parser_keeps_legacy_session_without_thread_source() {
+        let path = write_codex_rollout("legacy", serde_json::json!("cli"), None, None);
+        let session = parse_codex_session_jsonl(&path).expect("legacy user session should be kept");
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(session.name, "refactor the auth module");
+    }
+
+    // Real Codex Desktop block observed in the wild: the ChatGPT desktop
+    // app's Codex mode packs attached-file references and the user's real
+    // question into one input_text block. Without stripping, the history
+    // title became the meaningless "# Files mentioned by the user: ## ..."
+    // preamble instead of the user's actual first question.
+    #[test]
+    fn strips_codex_desktop_file_preamble_to_real_request() {
+        let block = "\n# Files mentioned by the user:\n\n\
+            ## EchoBird.png: C:/Users/祈羽/Desktop/EchoBird.png\n\n\
+            ## My request for Codex:\n\
+            这是我们的的官网https://echobird.ai/，本地文件在 C:\\EchoBird\\docs目录下。";
+        assert_eq!(
+            strip_codex_desktop_file_preamble(block),
+            "这是我们的的官网https://echobird.ai/，本地文件在 C:\\EchoBird\\docs目录下。"
+        );
+    }
+
+    // Files-only block (user dropped in attachments with no text) has the
+    // preamble but no `## My request for` marker -> empty, so the parser
+    // skips it like any other system injection and keeps scanning.
+    #[test]
+    fn codex_desktop_files_only_block_returns_empty() {
+        let block = "\n# Files mentioned by the user:\n\n\
+            ## EchoBird.png: C:/Users/祈羽/Desktop/EchoBird.png\n";
+        assert_eq!(strip_codex_desktop_file_preamble(block), "");
+    }
+
+    // A plain user message with no preamble passes through unchanged.
+    #[test]
+    fn codex_desktop_plain_block_passes_through_unchanged() {
+        let block = "新网站保存到 C:\\EchoBird\\new-web 如何\n";
+        assert_eq!(strip_codex_desktop_file_preamble(block), block);
     }
 }
