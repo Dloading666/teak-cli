@@ -585,6 +585,21 @@ function TierTerminalImpl({
         }
       }
 
+      // ── Fix Windows IME candidate window position (issue #88) ──
+      // Windows IME caches the textarea position when it first gains focus.
+      // Subsequent CSS updates are ignored until focus is truly lost and
+      // regained. We trigger a blur/focus cycle on every mousedown to force
+      // IME to re-read the position. This ensures the candidate window appears
+      // at the cursor, not at some stale position.
+      //
+      // Windows-only: macOS/Linux don't have this caching behavior.
+      // Side effect: This also makes paste operations more reliable by
+      // resetting focus state on every click.
+      if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win')) {
+        // The transparent shell approach has been removed in favor of a simpler
+        // mousedown handler that doesn't interfere with text selection.
+      }
+
       // Disable font ligatures on the DOM renderer rows to prevent
       // box-drawing characters from being merged into ligature glyphs.
       const xtermRows = termRef.current.querySelector('.xterm-rows') as HTMLElement | null;
@@ -699,8 +714,43 @@ function TierTerminalImpl({
         // clipboard text twice.
         if (cmdOrCtrl && e.code === 'KeyV') {
           e.preventDefault();
-          clipboardRead().then(text => {
+
+          // Try to paste image first (issue #89)
+          navigator.clipboard.read().then(async (clipboardItems) => {
+            for (const item of clipboardItems) {
+              const imageType = item.types.find(type => type.startsWith('image/'));
+              if (imageType) {
+                const blob = await item.getType(imageType);
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                  const dataUrl = evt.target?.result as string;
+                  if (!dataUrl || !dataUrl.startsWith('data:')) return;
+
+                  const match = dataUrl.match(/^data:image\/([^;]+);base64,(.+)$/);
+                  if (!match) return;
+
+                  const [, ext, base64] = match;
+                  try {
+                    const path = await commands.saveClipboardImage(base64, ext);
+                    term.paste(path);
+                  } catch (err) {
+                    console.error('Failed to save clipboard image:', err);
+                  }
+                };
+                reader.readAsDataURL(blob);
+                return; // Image found, done
+              }
+            }
+
+            // No image, fall back to text paste
+            const text = await clipboardRead();
             if (text) term.paste(normalizePasteNewlines(text));
+          }).catch((err) => {
+            // Clipboard API failed, fall back to text only
+            console.log('Clipboard.read() failed, falling back to text:', err);
+            clipboardRead().then(text => {
+              if (text) term.paste(normalizePasteNewlines(text));
+            });
           });
           return false;
         }
@@ -712,8 +762,43 @@ function TierTerminalImpl({
         }
         if (e.ctrlKey && e.shiftKey && e.code === 'KeyV') {
           e.preventDefault();
-          clipboardRead().then(text => {
+
+          // Try to paste image first (issue #89), same as Ctrl+V
+          navigator.clipboard.read().then(async (clipboardItems) => {
+            for (const item of clipboardItems) {
+              const imageType = item.types.find(type => type.startsWith('image/'));
+              if (imageType) {
+                const blob = await item.getType(imageType);
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                  const dataUrl = evt.target?.result as string;
+                  if (!dataUrl || !dataUrl.startsWith('data:')) return;
+
+                  const match = dataUrl.match(/^data:image\/([^;]+);base64,(.+)$/);
+                  if (!match) return;
+
+                  const [, ext, base64] = match;
+                  try {
+                    const path = await commands.saveClipboardImage(base64, ext);
+                    term.paste(path);
+                  } catch (err) {
+                    console.error('Failed to save clipboard image:', err);
+                  }
+                };
+                reader.readAsDataURL(blob);
+                return;
+              }
+            }
+
+            // No image, fall back to text paste
+            const text = await clipboardRead();
             if (text) term.paste(normalizePasteNewlines(text));
+          }).catch((err) => {
+            // Clipboard API failed, fall back to text only
+            console.log('Clipboard.read() failed, falling back to text:', err);
+            clipboardRead().then(text => {
+              if (text) term.paste(normalizePasteNewlines(text));
+            });
           });
           return false;
         }
@@ -843,6 +928,11 @@ function TierTerminalImpl({
     // summary) → xterm fires onTitleChange → mirror it to the tab title.
     // Falls back to cwd basename when no tool title is set (renderTabContent).
     term.onTitleChange(title => dispatch({ type: 'SET_TAB_TITLE', id: sessionId, title }));
+
+    // Debug: track when cursor moves
+    term.onCursorMove(() => {
+      // Cursor move tracking removed - no longer needed
+    });
 
     // Auto-focus so keyboard input works immediately
     term.focus();
@@ -1542,6 +1632,67 @@ function TierTerminalImpl({
           e.stopPropagation();
           setCtxMenu({ x: e.clientX, y: e.clientY, hasSelection: !!xtermRef.current?.hasSelection() });
         }}
+        onMouseDown={(e) => {
+          // Windows IME fix (issue #88): trigger blur/focus cycle on mousedown
+          // to force IME to re-read textarea position. Only on Windows and only
+          // on left-click (not selection drag, not right-click).
+          if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win') && e.button === 0) {
+            const textarea = termRef.current?.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
+            if (textarea) {
+              // Blur then refocus to reset Windows IME position cache
+              textarea.blur();
+              setTimeout(() => textarea.focus(), 0);
+            }
+          }
+        }}
+        onPaste={async (e) => {
+          // Issue #89: Support pasting images from clipboard into terminal
+          // (same as Gambit supports). Save image to temp file and paste path.
+          const items = e.clipboardData?.items;
+          if (!items) return; // Let xterm handle it
+
+          // Check if there's an image in the clipboard
+          let hasImage = false;
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith('image/')) {
+              hasImage = true;
+              e.preventDefault(); // Only prevent default if there's actually an image
+              const blob = item.getAsFile();
+              if (!blob) continue;
+
+              const reader = new FileReader();
+              reader.onload = async (evt) => {
+                const dataUrl = evt.target?.result as string;
+                if (!dataUrl || !dataUrl.startsWith('data:')) return;
+
+                // Extract base64 and extension from data URL
+                // Format: data:image/png;base64,iVBORw0KG...
+                const match = dataUrl.match(/^data:image\/([^;]+);base64,(.+)$/);
+                if (!match) return;
+
+                const [, ext, base64] = match;
+
+                try {
+                  // Save to temp file via Tauri command
+                  const path = await commands.saveClipboardImage(base64, ext);
+
+                  // Paste the file path into terminal
+                  const term = xtermRef.current;
+                  if (term) {
+                    term.paste(path);
+                  }
+                } catch (err) {
+                  console.error('Failed to save clipboard image:', err);
+                }
+              };
+              reader.readAsDataURL(blob);
+              break; // Only handle first image
+            }
+          }
+
+          // If no image found, let the event propagate to xterm for normal text paste
+        }}
       >
         <div ref={termRef} className="tier-xterm" />
       </div>
@@ -1556,7 +1707,44 @@ function TierTerminalImpl({
             if (text) clipboardWrite(text);
             closeCtxMenu();
           }}
-          onPaste={() => {
+          onPaste={async () => {
+            // Try to paste image first
+            try {
+              const clipboardItems = await navigator.clipboard.read();
+              for (const item of clipboardItems) {
+                // Check if clipboard contains an image
+                const imageType = item.types.find(type => type.startsWith('image/'));
+                if (imageType) {
+                  const blob = await item.getType(imageType);
+                  const reader = new FileReader();
+                  reader.onload = async (evt) => {
+                    const dataUrl = evt.target?.result as string;
+                    if (!dataUrl || !dataUrl.startsWith('data:')) return;
+
+                    const match = dataUrl.match(/^data:image\/([^;]+);base64,(.+)$/);
+                    if (!match) return;
+
+                    const [, ext, base64] = match;
+                    try {
+                      const path = await commands.saveClipboardImage(base64, ext);
+                      if (xtermRef.current) {
+                        xtermRef.current.paste(path);
+                      }
+                    } catch (err) {
+                      console.error('Failed to save clipboard image:', err);
+                    }
+                  };
+                  reader.readAsDataURL(blob);
+                  closeCtxMenu();
+                  return;
+                }
+              }
+            } catch (err) {
+              // Clipboard API not available or no image, fall back to text
+              console.log('No image in clipboard, trying text:', err);
+            }
+
+            // Fall back to text paste
             clipboardRead().then(text => {
               if (text && xtermRef.current) xtermRef.current.paste(normalizePasteNewlines(text));
             });
