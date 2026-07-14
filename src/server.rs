@@ -3758,6 +3758,28 @@ pub fn start_ui() -> anyhow::Result<()> {
 
             Ok(())
         })
+        .on_window_event(|window, event| {
+            // Issue #87: on macOS a reflexive Cmd+W / red traffic-light
+            // click should hide the main window to the Dock instead of
+            // quitting the app (standard Mac convention - Safari, VS Code,
+            // etc. all keep running). The app stays alive; clicking the
+            // Dock icon restores it via the Reopen event in `.run()` below.
+            // Cmd+Q still terminates normally because NSApplication
+            // terminate does not dispatch CloseRequested, so this prevent is
+            // never reached on a real quit. Only the main window hides -
+            // detached windows close normally.
+            #[cfg(target_os = "macos")]
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = (window, event);
+            }
+        })
         .build(tauri::generate_context!())
         .map_err(|e| anyhow::anyhow!("Error while building tauri application: {}", e))?
         .run(|app_handle, event| {
@@ -3775,6 +3797,22 @@ pub fn start_ui() -> anyhow::Result<()> {
             //   2. Job Object (crash-proof path, see terminal.rs): every
             //      child is bound to a kill-on-close job so even a hard
             //      crash / force-quit takes them with us.
+            // ── macOS: restore the hidden main window on Dock click ──────
+            // Pairs with the CloseRequested handler in `.on_window_event`:
+            // Cmd+W hides the main window rather than quitting, so on
+            // applicationShouldHandleReopen (Dock icon click) we must bring
+            // it back ourselves - macOS does not auto-unhide a hidden window
+            // on reopen. Issue #87.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = &event {
+                use tauri::Manager;
+                if let Some(w) = app_handle.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.unminimize();
+                    let _ = w.set_focus();
+                }
+            }
+
             if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
                 let state = app_handle.state::<AppState>();
                 let mut n = 0usize;
