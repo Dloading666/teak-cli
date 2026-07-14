@@ -1652,11 +1652,9 @@ function TierTerminalImpl({
           if (!items) return; // Let xterm handle it
 
           // Check if there's an image in the clipboard
-          let hasImage = false;
           for (let i = 0; i < items.length; i++) {
             const item = items[i];
             if (item.type.startsWith('image/')) {
-              hasImage = true;
               e.preventDefault(); // Only prevent default if there's actually an image
               const blob = item.getAsFile();
               if (!blob) continue;
