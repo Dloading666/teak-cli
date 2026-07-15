@@ -1633,13 +1633,27 @@ function TierTerminalImpl({
           setCtxMenu({ x: e.clientX, y: e.clientY, hasSelection: !!xtermRef.current?.hasSelection() });
         }}
         onMouseDown={(e) => {
-          // Windows IME fix (issue #88): trigger blur/focus cycle on mousedown
-          // to force IME to re-read textarea position. Only on Windows and only
-          // on left-click (not selection drag, not right-click).
+          // Windows IME fix (issue #88): on left-click, re-anchor the hidden
+          // .xterm-helper-textarea to the buffer cursor (the TUI input box)
+          // BEFORE the blur/focus cycle, so Windows IME re-reads the input-box
+          // position instead of landing on the click point. Without this, the
+          // candidate window follows the mouse: correct when you click the
+          // input box (mouse == input box), wrong when you click elsewhere.
+          // Coordinate formula matches xterm's own _syncTextArea
+          // (left = cursorX * cellW, top = cursorY * cellH, relative to
+          // .xterm-screen). Left-click only; middle/right have their own paths.
           if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win') && e.button === 0) {
+            const term = xtermRef.current;
             const textarea = termRef.current?.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
-            if (textarea) {
-              // Blur then refocus to reset Windows IME position cache
+            const screenEl = termRef.current?.querySelector('.xterm-screen') as HTMLElement | null;
+            if (term && textarea && screenEl) {
+              const cellW = term.cols > 0 ? screenEl.clientWidth / term.cols : 8;
+              const cellH = term.rows > 0 ? screenEl.clientHeight / term.rows : 17;
+              const cx = Math.min(term.buffer.active.cursorX, term.cols - 1);
+              const cy = term.buffer.active.cursorY;
+              textarea.style.left = `${cx * cellW}px`;
+              textarea.style.top = `${cy * cellH}px`;
+              // Blur then refocus to force Windows IME to re-read the position
               textarea.blur();
               setTimeout(() => textarea.focus(), 0);
             }
