@@ -448,6 +448,10 @@ function TierTerminalImpl({
   useEffect(() => { appStateRef.current = _appState; }, [_appState]);
 
   const termRef  = useRef<HTMLDivElement>(null);
+  // Frozen helper-textarea position held for the lifetime of an IME
+  // composition (Windows) — see the compositionstart/end wiring in the
+  // init effect. Null when no composition is active.
+  const imeFrozenRef = useRef<{ left: string; top: string } | null>(null);
   const wrapRef  = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitRef   = useRef<FitAddon | null>(null);
@@ -603,6 +607,41 @@ function TierTerminalImpl({
       // onMouseDown/onClick handlers below — deliberately split across the
       // gesture, because cycling focus on mousedown breaks xterm drag
       // selection (issue #92).
+      //
+      // Freeze during composition: a TUI redraws on every keystroke and its
+      // buffer cursor can hop between the input box and the output region
+      // mid-composition; xterm's own _syncTextArea drags the helper textarea
+      // (and the IME candidate window with it) along every hop — the "jumpy
+      // candidate" users feel as 乱跳. We pin the textarea at compositionstart
+      // and hold it until compositionend, so the candidate stays put for the
+      // whole word/phrase. Clicks still re-anchor between compositions.
+      if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win')) {
+        const imeTextarea = termRef.current.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
+        if (imeTextarea) {
+          const freeze = () => {
+            imeFrozenRef.current = { left: imeTextarea.style.left, top: imeTextarea.style.top };
+          };
+          const unfreeze = () => { imeFrozenRef.current = null; };
+          imeTextarea.addEventListener('compositionstart', freeze, { capture: true });
+          imeTextarea.addEventListener('compositionend', unfreeze, { capture: true });
+          unlisteners.push(() => {
+            imeTextarea.removeEventListener('compositionstart', freeze, { capture: true });
+            imeTextarea.removeEventListener('compositionend', unfreeze, { capture: true });
+          });
+          // xterm's internal _syncTextArea runs off its own cursor-move
+          // listener (registered at open, before ours), so writing the frozen
+          // spot back here wins within the same synchronous dispatch — no
+          // intermediate paint, no visible jitter.
+          const cursorMoveListener = term.onCursorMove(() => {
+            const f = imeFrozenRef.current;
+            if (f) {
+              imeTextarea.style.left = f.left;
+              imeTextarea.style.top = f.top;
+            }
+          });
+          unlisteners.push(() => cursorMoveListener.dispose());
+        }
+      }
 
       // Disable font ligatures on the DOM renderer rows to prevent
       // box-drawing characters from being merged into ligature glyphs.
@@ -1650,6 +1689,9 @@ function TierTerminalImpl({
           // the in-progress mouse gesture and breaks xterm drag selection
           // (issue #92). It runs in onClick, once the gesture is over.
           if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win') && e.button === 0) {
+            // Never move the textarea mid-composition — the candidate window
+            // is pinned for the composition's lifetime (see init effect).
+            if (imeFrozenRef.current) return;
             const term = xtermRef.current;
             const textarea = termRef.current?.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
             const screenEl = termRef.current?.querySelector('.xterm-screen') as HTMLElement | null;
@@ -1671,6 +1713,9 @@ function TierTerminalImpl({
           // intent to type, and cycling focus there serves no purpose
           // (issue #92).
           if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win')) {
+            // Blurring now would cancel an in-flight composition — let it
+            // finish; the next click re-anchors.
+            if (imeFrozenRef.current) return;
             if (xtermRef.current?.hasSelection()) return;
             const textarea = termRef.current?.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
             if (textarea) {
