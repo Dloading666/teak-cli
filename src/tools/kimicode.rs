@@ -1,5 +1,5 @@
-//! Kimi Code — second-class (T2) integration: brand icon + one-click
-//! launch + session-history scanning + auto-resume.
+//! Kimi Code — first-class (T1) integration: brand icon + one-click
+//! launch + session-history scanning + auto-resume + live tab status.
 //!
 //! Moonshot AI's `kimi` binary (npm `@moonshot-ai/kimi-code`). Sessions
 //! live under a flat `~/.kimi-code/` root (same path on every OS; override
@@ -21,7 +21,10 @@
 //! Resume: `kimi --session <sessionId>` (canonical `-S, --session` flag,
 //! verified against `kimi --help`). Token shape `session_<uuid>`.
 //!
-//! No hook surface (no live Dynamic Island — static "fake island" green).
+//! Hook surface (T1): `[[hooks]]` entries in `~/.kimi-code/config.toml`
+//! (written by hook_installer's `install_kimi`) point at `<exe> __kimi-hook`;
+//! the forwarder (hook_forwarder.rs `run_kimi_hook`) maps Kimi's
+//! Claude-shaped stdin events to the 3-state tab status bus.
 //! Registered in `TOOLS` for display name + PATH probe + launch binary +
 //! history. Launchpad tile is the frontend's hardcoded AGENT_CATALOG.
 
@@ -32,7 +35,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     display_name: "Kimi Code",
     binary_name: "kimi",
     skill_dir_relative: None,
-    has_hook_surface: false,
+    has_hook_surface: true,
     // ~/.kimi-code/ — flat on all OS (override KIMI_CODE_HOME). Bypasses
     // the file-walk pipeline; server.rs `kimi_root` + `find_kimi_sessions`
     // read session_index.jsonl + state.json.

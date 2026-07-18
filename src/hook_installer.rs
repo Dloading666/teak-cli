@@ -1,7 +1,7 @@
 // Coffee CLI Hook Installer
 //
-// At app launch, ensure all three integrated CLIs are wired to the dynamic
-// island status bus:
+// At app launch, ensure the hook-capable integrated CLIs are wired to the
+// dynamic island status bus:
 //
 // The forwarder is the Coffee CLI binary itself (`<exe> __hook` /
 // `<exe> __codex-notify`, implemented in hook_forwarder.rs) — NOT a Python
@@ -37,6 +37,12 @@
 //        gate (third-party plugins don't load until allow-listed in
 //        <HERMES_HOME>/config.yaml). We let Hermes' own command do the
 //        YAML edit so we don't have to YAML-round-trip user config.
+//
+//   Kimi Code
+//     1. ~/.kimi-code/config.toml — 9 `[[hooks]]` array-of-tables entries
+//        pointing at `<exe> __kimi-hook` (see install_kimi). Kimi's stdin
+//        hook protocol is Claude-shaped (`hook_event_name` JSON on stdin),
+//        so the same native-forwarder pattern drives the 3-color bus.
 //
 // IMPORTANT — Claude event list discipline:
 // Claude Code rejects the *entire* hooks block if it contains an unknown
@@ -166,6 +172,7 @@ fn dispatch_install(tool: &crate::tools::ToolDescriptor, home: &Path) {
             ensure_opencode_tui_theme_default(home, "mimocode");
         }
         "hermes" => install_hermes(home),
+        "kimicode" => install_kimi(home),
         other => {
             eprintln!(
                 "[hook-installer] tool '{}' declares a hook surface but has no installer — \
@@ -1034,6 +1041,156 @@ fn patch_codex_features(path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+// ─── Kimi Code hooks (config.toml [[hooks]]) ─────────────────────────────────
+//
+// Kimi Code reads `[[hooks]]` array-of-tables entries from
+// ~/.kimi-code/config.toml and pipes a Claude-shaped JSON payload
+// (`hook_event_name`, `session_id`, `cwd`, …) to the hook command's stdin —
+// so the forwarder is the same native-subcommand pattern as Claude/Codex:
+// `<exe> __kimi-hook` (hook_forwarder.rs::run_kimi_hook).
+//
+// STRICT config constraint (high risk): Kimi Code rejects the *entire*
+// config.toml if a `[[hooks]]` table carries any key other than
+// event / matcher / command / timeout. We therefore emit exactly
+// event + command + timeout per block (matcher omitted = match all) and
+// nothing else — no extra keys, ever.
+//
+// Merge discipline mirrors patch_codex_config: line-edited (not parsed) so
+// the user's comments, key order, and [providers.*] / [models.*] tables
+// survive verbatim. `[[hooks]]` blocks append cleanly at EOF in TOML
+// array-of-tables syntax, so appending ours after user content is safe.
+
+/// Kimi hooks subcommand — stdin protocol (Claude-shaped JSON), installed
+/// into ~/.kimi-code/config.toml `[[hooks]]` entries.
+const KIMI_HOOK_SUBCOMMAND: &str = "__kimi-hook";
+
+/// The 9 Kimi events we register — all matcher-less (match every tool) with
+/// the default 30s timeout. SessionStart / Subagent* / Notification /
+/// PreCompact / PostCompact are deliberately excluded: pure status noise for
+/// the tab dot, and the frontend's 30s auto-idle covers a missed Stop.
+const KIMI_HOOK_EVENTS: &[&str] = &[
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PostToolUse",
+    "PermissionRequest",
+    "PermissionResult",
+    "Stop",
+    "StopFailure",
+    "Interrupt",
+    "SessionEnd",
+];
+
+/// Kimi Code hooks — merge our `[[hooks]]` entries into
+/// ~/.kimi-code/config.toml. Errors are logged, never fatal.
+fn install_kimi(home: &Path) {
+    let cmd = match hook_command(KIMI_HOOK_SUBCOMMAND) {
+        Some(c) => c,
+        None => {
+            eprintln!("[hook-installer] current_exe() failed — cannot install kimi hooks");
+            return;
+        }
+    };
+    let config_path = home.join(".kimi-code").join("config.toml");
+    if let Err(e) = patch_kimi_config(&config_path, &cmd) {
+        eprintln!(
+            "[hook-installer] failed to patch {}: {}",
+            config_path.display(),
+            e
+        );
+    }
+}
+
+/// Merge our 9 `[[hooks]]` entries into ~/.kimi-code/config.toml. Creates the
+/// file (and parent dir) if missing; preserves all existing content verbatim
+/// otherwise. Idempotent: any prior `[[hooks]]` block whose command ends in
+/// our `__kimi-hook` token (stale exe paths included) is stripped — header
+/// and its field lines together — before the fresh set is appended. User-
+/// written `[[hooks]]` entries (other commands, any event) are kept.
+fn patch_kimi_config(path: &Path, command: &str) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let existing = if path.exists() {
+        fs::read_to_string(path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    // Strip our prior entries. A "block" is a `[[...]]` array-of-tables
+    // header line plus the lines up to (not including) the next table
+    // header; it's ours iff it contains a `command` line whose last token
+    // is `__kimi-hook` (same last-token discipline as is_coffee_entry, so a
+    // user hook whose path merely *contains* the token is never stripped).
+    let lines: Vec<&str> = existing.lines().collect();
+    let mut kept: Vec<&str> = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        if lines[i].trim_start().starts_with("[[") {
+            let mut j = i + 1;
+            while j < lines.len() && !lines[j].trim_start().starts_with('[') {
+                j += 1;
+            }
+            if !lines[i..j].iter().any(|l| is_coffee_kimi_command_line(l)) {
+                kept.extend(&lines[i..j]);
+            }
+            i = j;
+        } else {
+            kept.push(lines[i]);
+            i += 1;
+        }
+    }
+    // Drop trailing blank lines left behind by the strip so the re-appended
+    // block doesn't drift further down the file on every reinstall.
+    while kept.last().map(|l| l.trim().is_empty()).unwrap_or(false) {
+        kept.pop();
+    }
+
+    // TOML basic strings escape backslashes and quotes — the hook command is
+    // `"<exe>" __kimi-hook` with literal quotes around the exe path.
+    let escaped = command.replace('\\', "\\\\").replace('"', "\\\"");
+
+    let mut out = String::new();
+    if existing.trim().is_empty() {
+        out.push_str("# Coffee CLI registered these hooks for the dynamic-island status\n# indicator. Safe to remove if you don't use Coffee CLI — the command\n# no-ops when COFFEE_CLI_* env vars aren't set.\n");
+    } else {
+        for l in &kept {
+            out.push_str(l);
+            out.push('\n');
+        }
+        out.push('\n');
+    }
+    for (idx, event) in KIMI_HOOK_EVENTS.iter().enumerate() {
+        if idx > 0 {
+            out.push('\n');
+        }
+        out.push_str("[[hooks]]\n");
+        out.push_str(&format!("event = \"{}\"\n", event));
+        out.push_str(&format!("command = \"{}\"\n", escaped));
+        out.push_str("timeout = 30\n");
+    }
+
+    fs::write(path, out)?;
+    Ok(())
+}
+
+/// Text-level sentinel for patch_kimi_config: a `command = "..."` line is
+/// ours iff the last whitespace-delimited token inside the quotes is
+/// `__kimi-hook`. Mirrors is_coffee_entry's last-token discipline so a user
+/// hook whose path merely *contains* "__kimi-hook" (e.g.
+/// /home/u/.__kimi-hooks/lint.sh) is never misclassified as ours.
+fn is_coffee_kimi_command_line(line: &str) -> bool {
+    let t = line.trim();
+    let Some(rest) = t.strip_prefix("command") else {
+        return false;
+    };
+    let Some(value) = rest.trim_start().strip_prefix('=') else {
+        return false;
+    };
+    let value = value.trim().trim_end_matches('"');
+    value.split_whitespace().last() == Some(KIMI_HOOK_SUBCOMMAND)
+}
+
 // ─── Broken-bin repair (Windows) ────────────────────────────────────────────
 //
 // `opencode upgrade` re-runs `npm install -g opencode-ai` to rewrite the
@@ -1370,5 +1527,125 @@ mod tests {
         assert!(after.contains("hooks = true"));
         let _ = fs::remove_dir_all(&dir);
     }
-}
 
+    // ─── Kimi Code config.toml `[[hooks]]` ──────────────────────────────────
+    // Cargo.toml has no toml/toml_edit dependency, so these are text-level
+    // assertions (per the line-editing design — a parsed round-trip would
+    // defeat the comment-preservation goal anyway).
+
+    fn fresh_kimi_dir(name: &str) -> PathBuf {
+        let mut p = std::env::temp_dir();
+        p.push(format!("coffee-kimi-test-{}-{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&p);
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    #[test]
+    fn kimi_config_creates_with_9_events() {
+        let dir = fresh_kimi_dir("create");
+        let cfg = dir.join("config.toml");
+        patch_kimi_config(&cfg, "\"/fake/exe\" __kimi-hook").unwrap();
+
+        let text = fs::read_to_string(&cfg).unwrap();
+        assert_eq!(text.matches("[[hooks]]").count(), 9, "one block per event: {}", text);
+        assert_eq!(text.matches("__kimi-hook").count(), 9, "one command per block: {}", text);
+        for ev in [
+            "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest",
+            "PermissionResult", "Stop", "StopFailure", "Interrupt", "SessionEnd",
+        ] {
+            assert!(text.contains(&format!("event = \"{}\"", ev)), "missing event {}: {}", ev, text);
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn kimi_config_preserves_existing_content() {
+        let dir = fresh_kimi_dir("preserve");
+        let cfg = dir.join("config.toml");
+        // User config: comments, a top-level key, a regular table, and their
+        // own hand-written [[hooks]] entry — all must survive verbatim.
+        let original = "# my kimi config\nmodel = \"k2\"\n\n[providers.foo]\nbase_url = \"https://x\"\n\n[[hooks]]\nevent = \"Stop\"\ncommand = \"echo user\"\ntimeout = 5\n";
+        fs::write(&cfg, original).unwrap();
+        patch_kimi_config(&cfg, "\"/fake/exe\" __kimi-hook").unwrap();
+
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(after.contains("# my kimi config"), "comment preserved: {}", after);
+        assert!(after.contains("model = \"k2\""), "top-level key preserved: {}", after);
+        assert!(after.contains("[providers.foo]\nbase_url = \"https://x\""), "user table preserved: {}", after);
+        assert!(after.contains("command = \"echo user\""), "user's own hook preserved: {}", after);
+        assert!(after.contains("timeout = 5"), "user hook fields preserved: {}", after);
+        // Our blocks append AFTER the user's content.
+        let pos_user = after.find("command = \"echo user\"").unwrap();
+        let pos_ours = after.find("__kimi-hook").unwrap();
+        assert!(pos_user < pos_ours, "ours appended at end: {}", after);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn kimi_config_idempotent_no_duplicates() {
+        let dir = fresh_kimi_dir("idempotent");
+        let cfg = dir.join("config.toml");
+        // Install 3x — each should strip the prior entries and add one fresh
+        // set, never accumulating duplicates.
+        for _ in 0..3 {
+            patch_kimi_config(&cfg, "\"/fake/exe\" __kimi-hook").unwrap();
+        }
+        let text = fs::read_to_string(&cfg).unwrap();
+        assert_eq!(text.matches("[[hooks]]").count(), 9, "reinstall accumulated blocks: {}", text);
+        assert_eq!(text.matches("__kimi-hook").count(), 9, "reinstall accumulated commands: {}", text);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn kimi_config_reinstall_strips_stale_keeps_user_hooks() {
+        let dir = fresh_kimi_dir("stale");
+        let cfg = dir.join("config.toml");
+        // Seed a stale coffee entry (old exe path — e.g. pre-upgrade) next to
+        // a user's own hook on the same event.
+        let seeded = "[[hooks]]\nevent = \"Stop\"\ncommand = \"\\\"/old/path/coffee-cli.exe\\\" __kimi-hook\"\ntimeout = 30\n\n[[hooks]]\nevent = \"Stop\"\ncommand = \"echo user\"\ntimeout = 5\n";
+        fs::write(&cfg, seeded).unwrap();
+        patch_kimi_config(&cfg, "\"/new/exe\" __kimi-hook").unwrap();
+
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(!after.contains("/old/path"), "stale coffee entry stripped: {}", after);
+        assert_eq!(after.matches("__kimi-hook").count(), 9, "exactly one fresh set: {}", after);
+        assert!(after.contains("command = \"echo user\""), "user hook kept: {}", after);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn kimi_config_blocks_have_only_allowed_fields() {
+        // Kimi rejects the ENTIRE config.toml if a [[hooks]] table carries
+        // any key beyond event/matcher/command/timeout. Verify every line
+        // inside our generated blocks is one of the three we intend (matcher
+        // omitted by design) — no stray keys can sneak in.
+        let dir = fresh_kimi_dir("fields");
+        let cfg = dir.join("config.toml");
+        patch_kimi_config(&cfg, "\"/fake/exe\" __kimi-hook").unwrap();
+
+        let text = fs::read_to_string(&cfg).unwrap();
+        assert!(!text.contains("matcher"), "no matcher keys: {}", text);
+        let mut in_block = false;
+        for line in text.lines() {
+            let t = line.trim();
+            if t.starts_with("[[hooks]]") {
+                in_block = true;
+                continue;
+            }
+            if t.starts_with('[') {
+                in_block = false;
+                continue;
+            }
+            if !in_block || t.is_empty() || t.starts_with('#') {
+                continue;
+            }
+            assert!(
+                t.starts_with("event = ") || t.starts_with("command = ") || t.starts_with("timeout = "),
+                "unexpected field in [[hooks]] block: {:?}",
+                line
+            );
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+}

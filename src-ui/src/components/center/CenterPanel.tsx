@@ -422,9 +422,10 @@ const VALID_PIN_KEYS = new Set<string>([
 ]);
 
 // Tabs that show the status-grid ("Dynamic Island") indicator: every AI CLI.
-// Hook-wired tools (claude/codex/opencode/mimocode/hermes) drive it live off
-// session.agentStatus; the rest have no status bus and sit at static 'idle'
-// green — the "fake island" baseline so every AI-CLI tab reads consistently.
+// Hook-wired tools (claude/codex/opencode/mimocode/hermes/kimicode) drive it
+// live off session.agentStatus; the rest have no status bus and sit at
+// static 'idle' green — the "fake island" baseline so every AI-CLI tab reads
+// consistently.
 // Non-CLI tabs (terminal/remote/history/splits/installer) get no indicator.
 const TAB_STATUS_TOOLS = new Set<string>([
   'claude', 'codex', 'grok', 'opencode', 'mimocode', 'hermes',
@@ -542,7 +543,7 @@ export function CenterPanel() {
   // the order here is the launchpad's preferred presentation order.
   const BUILTIN_AI_CLI_FALLBACK: { key: ToolType; label: string }[] = [
     'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen', 'hermes',
-    // Pi & Kimi Code (T2) + Crush/Aider/Goose/Copilot (T3 launch-only).
+    // Pi (T2) + Crush/Aider/Goose/Copilot (T3 launch-only). Kimi Code is T1.
     'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
   ].map((key) => ({ key: key as ToolType, label: getToolDisplayName(key) }));
 
@@ -1133,10 +1134,11 @@ export function CenterPanel() {
       case 'codex': return { icon: <SvgCodex />, title: cwd ?? getToolDisplayName('codex'), tooltip: pathTip };
       case 'grok': return { icon: <SvgGrok />, title: cwd ?? getToolDisplayName('grok'), tooltip: pathTip };
       case 'antigravity': return { icon: <SvgAntigravity />, title: cwd ?? getToolDisplayName('antigravity'), tooltip: pathTip };
-      // Hookless CLIs (Pi/Kimi Code T2 + Crush/Aider/Goose/Copilot T3) —
-      // directory-aware tab like the AI CLIs above (icon + cwd basename).
-      // No real status bus, so they get the static "fake" island via
-      // TAB_STATUS_TOOLS below.
+      // Directory-aware tabs (icon + cwd basename). Pi and the T3 set
+      // (Crush/Aider/Goose/Copilot) are hookless — no real status bus, so
+      // they get the static "fake" island via TAB_STATUS_TOOLS below.
+      // Kimi Code renders the same shape but is hook-wired (T1): its
+      // island is live off session.agentStatus.
       case 'pi': return { icon: <SvgPi />, title: cwd ?? getToolDisplayName('pi'), tooltip: pathTip };
       case 'crush': return { icon: <SvgCrush />, title: cwd ?? getToolDisplayName('crush'), tooltip: pathTip };
       case 'aider': return { icon: <SvgAider />, title: cwd ?? getToolDisplayName('aider'), tooltip: pathTip };
@@ -1289,8 +1291,8 @@ export function CenterPanel() {
                 {/* Indicator gate — every AI CLI gets the island (see
                     TAB_STATUS_TOOLS). Hook-wired tools (claude/codex/opencode
                     via forwarders, mimocode via its preset-driven status
-                    ticker, hermes) drive color off session.agentStatus.
-                    Hookless CLIs (antigravity/qwen/openclaw/pi/kimicode, plus
+                    ticker, hermes, kimicode) drive color off session.agentStatus.
+                    Hookless CLIs (antigravity/qwen/openclaw/pi, plus
                     the T3 set crush/aider/goose/copilot) have no agentStatus,
                     so the grid sits at
                     static 'idle' green — the "fake island" baseline. Non-CLI

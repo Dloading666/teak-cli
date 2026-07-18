@@ -22,8 +22,9 @@ use anyhow::Result;
 fn main() -> Result<()> {
     // ── Native hook forwarder (fast path) ───────────────────────────────
     // Invoked by Claude Code (`<exe> __hook`), Codex hooks (`<exe>
-    // __codex-hook`, stdin JSON), and Codex legacy notify (`<exe>
-    // __codex-notify <json>`) to forward agent status to the dynamic
+    // __codex-hook`, stdin JSON), Codex legacy notify (`<exe>
+    // __codex-notify <json>`), and Kimi Code hooks (`<exe> __kimi-hook`,
+    // Claude-shaped stdin JSON) to forward agent status to the dynamic
     // island. This MUST run before any GUI / Linux-backend / PATH-inherit
     // setup below — the PATH fix spawns a login shell, which we don't want
     // firing on every tool-call hook. Each arm calls process::exit and
@@ -35,6 +36,7 @@ fn main() -> Result<()> {
             Some("__hook") => hook_forwarder::run_claude_hook(),
             Some("__codex-hook") => hook_forwarder::run_codex_hook(),
             Some("__codex-notify") => hook_forwarder::run_codex_notify(&argv),
+            Some("__kimi-hook") => hook_forwarder::run_kimi_hook(),
             _ => {}
         }
     }

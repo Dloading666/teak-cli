@@ -252,9 +252,9 @@ mod mimocode;
 mod openclaw;
 mod opencode;
 mod qwen;
-// Lower-tier tools — see each module's doc comment for its tier (Pi &
-// Kimi Code are T2 with history; Aider/Crush/Goose/Copilot are T3
-// launch-only, no history/hook surface).
+// Lower-tier tools — see each module's doc comment for its tier (Pi is T2
+// with history; Aider/Crush/Goose/Copilot are T3 launch-only, no
+// history/hook surface). Kimi Code was promoted to T1 (hook-wired).
 mod aider;
 mod copilot;
 mod crush;
@@ -279,10 +279,12 @@ pub static TOOLS: &[&ToolDescriptor] = &[
     // Order here doesn't affect the launchpad (that list is hardcoded in the
     // frontend); it only needs to be in the registry for list_tools + scanning.
     &mimocode::DESCRIPTOR,
-    // Pi & Kimi Code are T2 (history + heatmap + changes + resume; see their
-    // module docs). The other four — Crush / Aider / Goose / Copilot — are T3
-    // launch-only: display name + PATH probe + launch binary, history_shape:
-    // None and has_hook_surface: false.
+    // Pi is T2 (history + heatmap + changes + resume; see its module doc).
+    // Kimi Code is T1 — hook-wired via ~/.kimi-code/config.toml `[[hooks]]`
+    // (install_kimi), same T2 features as Pi otherwise. The other four —
+    // Crush / Aider / Goose / Copilot — are T3 launch-only: display name +
+    // PATH probe + launch binary, history_shape: None and
+    // has_hook_surface: false.
     &pi::DESCRIPTOR,
     &crush::DESCRIPTOR,
     &aider::DESCRIPTOR,

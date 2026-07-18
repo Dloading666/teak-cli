@@ -1,7 +1,9 @@
 // Coffee CLI — native hook forwarder
 //
-// Invoked as a Claude Code hook (`<exe> __hook`, event JSON on stdin) or a
-// Codex `notify` target (`<exe> __codex-notify <json>`, payload as final
+// Invoked as a Claude Code hook (`<exe> __hook`, event JSON on stdin), a
+// Kimi Code hook (`<exe> __kimi-hook`, same Claude-shaped stdin JSON), a
+// Codex hooks-system target (`<exe> __codex-hook`, stdin JSON), or a Codex
+// `notify` target (`<exe> __codex-notify <json>`, payload as final
 // argv). Maps the event to Coffee CLI's 3-state agent status and forwards a
 // compact JSON line to the Rust hook server over loopback TCP.
 //
@@ -73,6 +75,16 @@ pub fn run_codex_notify(args: &[String]) -> ! {
 /// / Stop. Never returns.
 pub fn run_codex_hook() -> ! {
     let _ = forward_codex_hook();
+    std::process::exit(0);
+}
+
+/// `<exe> __kimi-hook` — Kimi Code hooks (stdin protocol, Claude-shaped JSON
+/// with `hook_event_name`). Installed by `install_kimi` as `[[hooks]]`
+/// entries in ~/.kimi-code/config.toml. Kimi may append a hook's stdout to
+/// the model context, so this path must stay stdout-silent — we only ever
+/// write to the loopback socket. Never returns.
+pub fn run_kimi_hook() -> ! {
+    let _ = forward_kimi();
     std::process::exit(0);
 }
 
@@ -150,6 +162,48 @@ fn forward_codex_hook() -> Option<()> {
 
     post(ctx.port, &ctx.tab_id, &ctx.tool, &status, &event);
     Some(())
+}
+
+/// stdin hook path for Kimi Code (9 events installed as `[[hooks]]` in
+/// ~/.kimi-code/config.toml). Reads the payload the same way Claude's
+/// `__hook` does — Kimi's hook JSON is Claude-shaped, with
+/// `hook_event_name` naming the event. No tool gate needed beyond
+/// HookCtx::from_env: kimi sessions started outside Coffee CLI don't carry
+/// the COFFEE_CLI_* env vars, so the forwarder no-ops there (same as
+/// Claude).
+fn forward_kimi() -> Option<()> {
+    let ctx = HookCtx::from_env()?;
+
+    let mut buf = String::new();
+    std::io::stdin().read_to_string(&mut buf).ok()?;
+    // Tolerate a leading UTF-8 BOM (see forward_claude).
+    let buf = buf.trim_start_matches('\u{feff}');
+    let data: Value = serde_json::from_str(buf).ok()?;
+
+    let event = data
+        .get("hook_event_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let status = map_kimi_status(&event);
+
+    post(ctx.port, &ctx.tab_id, &ctx.tool, status, &event);
+    Some(())
+}
+
+/// Map a Kimi Code hook event to a tab status. Same bucketing strategy as
+/// map_claude_status: known-idle and permission-prompt events get their own
+/// color, everything else — including unknown or missing event names — is
+/// busy (working). Never returns None: a recognized hook firing at all means
+/// the agent is alive and doing something.
+fn map_kimi_status(event: &str) -> &'static str {
+    match event {
+        "Stop" | "StopFailure" | "Interrupt" | "SessionEnd" => "idle",
+        "PermissionRequest" => "wait_input",
+        // UserPromptSubmit / PreToolUse / PostToolUse / PermissionResult,
+        // plus anything unrecognized → busy.
+        _ => "working",
+    }
 }
 
 /// Map a Codex hooks-system event to a tab status. Covers the 4 events we

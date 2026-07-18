@@ -446,8 +446,9 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
     // (canonical `-S, --session`, verified against `kimi --help`). Token is
     // `session_<uuid>` from session_index.jsonl, sourced by find_kimi_sessions
     // (Kimi doesn't echo the id to stdout, so session_id_pattern is None).
-    // prompt_markers `❯` is a guess — Kimi is hook-less (static fake-island
-    // green); settle-silence fallback covers a wrong marker.
+    // prompt_markers `❯` is a guess — the settle-silence fallback covers a
+    // wrong marker; the live status dot comes from the `__kimi-hook`
+    // forwarder (hook_installer.rs::install_kimi), not these markers.
     AgentPreset {
         tool_name: "kimicode",
         resume_program: Some("kimi"),
@@ -731,12 +732,12 @@ pub fn spawn(
         cmd.env("COFFEE_CODE_LOCALE", loc);
     }
 
-    // ── Hook status injection (claude / codex / opencode / hermes) ───────
+    // ── Hook status injection (claude / codex / opencode / hermes / kimi) ──
     // Each integrated CLI has its own forwarder, but they all share the same
     // env-var contract:
     //   COFFEE_CLI_TAB_ID    — which tab status events should route to
     //   COFFEE_CLI_HOOK_PORT — loopback port of the Rust hook server
-    //   COFFEE_CLI_TOOL      — "claude" | "codex" | "opencode" | "mimocode" | "hermes"
+    //   COFFEE_CLI_TOOL      — "claude" | "codex" | "opencode" | "mimocode" | "hermes" | "kimicode"
     // Forwarders:
     //   claude    — coffee-cli-hook.py (Claude Code stdin hook protocol)
     //   codex     — coffee-cli-codex-notify.py (Codex `notify` config, JSON
@@ -748,10 +749,13 @@ pub fn spawn(
     //               `hermes plugins enable coffee-cli-status`. HERMES_HOME
     //               is `%LOCALAPPDATA%\hermes` on Windows, `~/.hermes`
     //               elsewhere — see tools/hermes.rs::hermes_home.)
+    //   kimicode  — `<exe> __kimi-hook` native forwarder (Kimi Code
+    //               [[hooks]] in ~/.kimi-code/config.toml, Claude-shaped
+    //               stdin JSON — see hook_installer.rs::install_kimi)
     // Forwarders no-op if any of these env vars are missing — they're safe to
     // leave installed even when Coffee CLI isn't the launcher.
     if let Some(tname) = tool_name.as_deref() {
-        if matches!(tname, "claude" | "codex" | "opencode" | "hermes" | "mimocode") {
+        if matches!(tname, "claude" | "codex" | "opencode" | "hermes" | "mimocode" | "kimicode") {
             use tauri::Manager;
             let port = app
                 .state::<crate::server::AppState>()

@@ -6,6 +6,7 @@
 //   - scripts/coffee-cli-hook.py            — Claude Code stdin hooks
 //   - scripts/coffee-cli-codex-notify.py    — Codex `notify` argv-tail
 //   - scripts/coffee-cli-opencode-plugin.js — OpenCode plugin events
+//   - `<exe> __kimi-hook` (hook_forwarder.rs) — Kimi Code [[hooks]] events
 //
 // Single payload kind:
 //
