@@ -185,24 +185,36 @@ fn forward_kimi() -> Option<()> {
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let status = map_kimi_status(&event);
-
-    post(ctx.port, &ctx.tab_id, &ctx.tool, status, &event);
+    // Stop is step-level in Kimi, not turn-level: the loop fires `Stop` on
+    // any step whose finishReason isn't tool_calls/filtered with no pending
+    // request — i.e. the model produced plain text and isn't calling another
+    // tool *this step*, but the turn may well continue. Mapping Stop→idle
+    // here lit the dot green mid-turn (visible as "Using Write" → green).
+    // v2 doesn't fire SessionStart/SessionEnd, so there is no reliable
+    // turn-end idle signal — we keep the dot on its last known status when
+    // Stop/StopFailure fire, and let the frontend 30s auto-idle cover a
+    // real turn end. mid-turn green is worse than a late green.
+    if let Some(status) = map_kimi_status(&event) {
+        post(ctx.port, &ctx.tab_id, &ctx.tool, status, &event);
+    }
     Some(())
 }
 
 /// Map a Kimi Code hook event to a tab status. Same bucketing strategy as
-/// map_claude_status: known-idle and permission-prompt events get their own
-/// color, everything else — including unknown or missing event names — is
-/// busy (working). Never returns None: a recognized hook firing at all means
-/// the agent is alive and doing something.
-fn map_kimi_status(event: &str) -> &'static str {
+/// map_claude_status, except `Stop`/`StopFailure` map to None (no update):
+/// Kimi fires Stop per step, not per turn, so it is NOT a reliable turn-end
+/// idle signal (see forward_kimi). `Interrupt` (user Ctrl-C) and `SessionEnd`
+/// are real terminations → idle. PermissionRequest → wait_input; everything
+/// else, including unknown/missing event names, is busy (working). Returns
+/// None to mean "don't post — keep the last status".
+fn map_kimi_status(event: &str) -> Option<&'static str> {
     match event {
-        "Stop" | "StopFailure" | "Interrupt" | "SessionEnd" => "idle",
-        "PermissionRequest" => "wait_input",
+        "Interrupt" | "SessionEnd" => Some("idle"),
+        "Stop" | "StopFailure" => None,
+        "PermissionRequest" => Some("wait_input"),
         // UserPromptSubmit / PreToolUse / PostToolUse / PermissionResult,
         // plus anything unrecognized → busy.
-        _ => "working",
+        _ => Some("working"),
     }
 }
 
