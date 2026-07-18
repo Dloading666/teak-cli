@@ -121,22 +121,27 @@ function normalizePasteNewlines(text: string): string {
 // Derive a slightly-darker, alpha-blended selection background from the
 // scheme's fg (or the warm coffee fallback). Multiplying RGB by 0.8 first
 // gives the "比主题色深点" feel before xterm composites it over the bg.
+// Alpha stays deliberately high: at 0.3-0.4 the highlight was effectively
+// invisible against dark backgrounds, so users concluded drag selection
+// was broken when it was actually working (issue #92).
 function deriveSelectionBg(hex: string, isDark: boolean): string {
   const m = /^#([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return isDark ? 'rgba(196,149,106,0.3)' : 'rgba(196,149,106,0.25)';
+  if (!m) return isDark ? 'rgba(196,149,106,0.55)' : 'rgba(196,149,106,0.45)';
   const n = parseInt(m[1], 16);
   const r = Math.round(((n >> 16) & 0xff) * 0.8);
   const g = Math.round(((n >> 8) & 0xff) * 0.8);
   const b = Math.round((n & 0xff) * 0.8);
-  return `rgba(${r},${g},${b},${isDark ? 0.4 : 0.3})`;
+  return `rgba(${r},${g},${b},${isDark ? 0.55 : 0.45})`;
 }
 
-// xterm's caret was a leftover from raw-shell mode (terminal / remote) — every
-// other surface the user touches (each AI agent's input box, the Compose
-// textarea) paints its own caret, so xterm's was either redundant or a
-// stranded artifact. Always paint the cursor in the background color so the
-// WebGL renderer effectively erases it; the DOM renderer is also covered by
-// `.xterm-cursor { display: none }` in TierTerminal.css.
+// In AI-agent tabs the upstream TUI (each agent's input box, the Compose
+// textarea) paints its own caret, so xterm's cursor is either redundant or a
+// stranded artifact — paint it in the background color so the WebGL renderer
+// effectively erases it (the DOM renderer is covered by
+// `.xterm-cursor { display: none }` in TierTerminal.css).
+// Raw-shell tabs (local terminal / remote SSH) are the exception: no TUI
+// draws a caret there, so the xterm cursor is the only input-position
+// indicator — keep it visible with the foreground color (issue #95).
 // Build the xterm fontFamily stack. `userFont` (from Settings) is prepended
 // so it wins for the glyphs it has; the bundled CascadiaMono + Nerd Fonts +
 // platform monospace faces follow, and the CJK cascade backstops Chinese/
@@ -157,7 +162,7 @@ export function buildFontFamily(userFont?: string): string {
   return userFont ? `"${userFont}", ${base}` : base;
 }
 
-function buildXtermTheme(themeName: string, hasBg: boolean | undefined, schemeId?: string) {
+function buildXtermTheme(themeName: string, hasBg: boolean | undefined, schemeId?: string, rawShell = false) {
   const isDark = themeName !== 'light';
   const scheme = schemeId ? TERM_COLOR_SCHEMES.find(s => s.id === schemeId) : undefined;
   const bgOpaque = THEME_TERMINAL_BG[themeName] || (isDark ? '#0c0c0c' : '#eeebe2');
@@ -189,7 +194,9 @@ function buildXtermTheme(themeName: string, hasBg: boolean | undefined, schemeId
     ...base,
     background: bg,
     foreground: fg,
-    cursor: bgOpaque,
+    // AI-agent tabs: cursor painted in bg color = invisible (see comment at
+    // the top of this section). Raw shells get a real, visible caret.
+    cursor: rawShell ? fg : bgOpaque,
     cursorAccent: bgOpaque,
   };
 }
@@ -425,6 +432,10 @@ interface TierTerminalProps {
 function TierTerminalImpl({
   sessionId, tool, toolName, theme, lang, isActive, toolData, folderPath, resumeToken, hasBg, bgUrl, bgType, termColorScheme, termFont,
 }: TierTerminalProps) {
+  // Raw shells (local terminal / remote SSH) have no TUI painting its own
+  // caret — the xterm cursor is the only input-position indicator, so these
+  // tabs keep it visible (issue #95). Drives the theme + CSS below.
+  const isRawShell = tool === 'terminal' || tool === 'remote';
   // Dispatch-only subscription. Never re-renders this component.
   const dispatch = useAppDispatch();
   // Sentinel scanner needs access to the latest state to look up sibling
@@ -437,6 +448,10 @@ function TierTerminalImpl({
   useEffect(() => { appStateRef.current = _appState; }, [_appState]);
 
   const termRef  = useRef<HTMLDivElement>(null);
+  // Frozen helper-textarea position held for the lifetime of an IME
+  // composition (Windows) — see the compositionstart/end wiring in the
+  // init effect. Null when no composition is active.
+  const imeFrozenRef = useRef<{ left: string; top: string } | null>(null);
   const wrapRef  = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitRef   = useRef<FitAddon | null>(null);
@@ -524,9 +539,9 @@ function TierTerminalImpl({
       rescaleOverlappingGlyphs: true, // Force ambiguous-width chars (block chars ▀▄█) to single cell width
       // Cursor blink fires a GPU repaint every ~530ms for the entire app
       // lifetime. On laptops (especially Apple Silicon Air without a fan)
-      // that's a constant power draw users feel as warmth. Off by default —
-      // also redundant since the cursor itself is invisible (theme.cursor =
-      // bg color), but kept for renderer paths that ignore the color trick.
+      // that's a constant power draw users feel as warmth. Off in AI-agent
+      // tabs (cursor invisible there anyway) and raw shells alike — a
+      // static, non-blinking caret costs nothing once painted.
       cursorBlink: false,
       // Default `cursorInactiveStyle: 'outline'` makes xterm flip the
       // cursor presentation on blur, which dirties the WebGL buffer and
@@ -534,11 +549,11 @@ function TierTerminalImpl({
       // of the upstream CLI's own caret character (Claude Code, Codex)
       // every time the user clicks anywhere outside the terminal.
       // 'none' suppresses the inactive cursor entirely so blur is a
-      // no-op for the renderer. Cursor is already hidden via theme +
-      // CSS, so this is double-belt; the win is that the redraw stops.
+      // no-op for the renderer. The win is that the redraw stops; in raw
+      // shells the caret simply hides while the terminal is unfocused.
       cursorInactiveStyle: 'none',
       scrollback: 5000,
-      theme: buildXtermTheme(theme, hasBg, termColorScheme),
+      theme: buildXtermTheme(theme, hasBg, termColorScheme, isRawShell),
     });
 
     const fit = new FitAddon();
@@ -585,19 +600,47 @@ function TierTerminalImpl({
         }
       }
 
-      // ── Fix Windows IME candidate window position (issue #88) ──
-      // Windows IME caches the textarea position when it first gains focus.
-      // Subsequent CSS updates are ignored until focus is truly lost and
-      // regained. We trigger a blur/focus cycle on every mousedown to force
-      // IME to re-read the position. This ensures the candidate window appears
-      // at the cursor, not at some stale position.
+      // ── Windows IME candidate window position (issue #88) ──
+      // Windows IME caches the helper textarea's position when it first gains
+      // focus; later CSS moves are ignored until focus is truly lost and
+      // regained. The re-anchor + blur/focus cycle lives in the wrap div's
+      // onMouseDown/onClick handlers below — deliberately split across the
+      // gesture, because cycling focus on mousedown breaks xterm drag
+      // selection (issue #92).
       //
-      // Windows-only: macOS/Linux don't have this caching behavior.
-      // Side effect: This also makes paste operations more reliable by
-      // resetting focus state on every click.
+      // Freeze during composition: a TUI redraws on every keystroke and its
+      // buffer cursor can hop between the input box and the output region
+      // mid-composition; xterm's own _syncTextArea drags the helper textarea
+      // (and the IME candidate window with it) along every hop — the "jumpy
+      // candidate" users feel as 乱跳. We pin the textarea at compositionstart
+      // and hold it until compositionend, so the candidate stays put for the
+      // whole word/phrase. Clicks still re-anchor between compositions.
       if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win')) {
-        // The transparent shell approach has been removed in favor of a simpler
-        // mousedown handler that doesn't interfere with text selection.
+        const imeTextarea = termRef.current.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
+        if (imeTextarea) {
+          const freeze = () => {
+            imeFrozenRef.current = { left: imeTextarea.style.left, top: imeTextarea.style.top };
+          };
+          const unfreeze = () => { imeFrozenRef.current = null; };
+          imeTextarea.addEventListener('compositionstart', freeze, { capture: true });
+          imeTextarea.addEventListener('compositionend', unfreeze, { capture: true });
+          unlisteners.push(() => {
+            imeTextarea.removeEventListener('compositionstart', freeze, { capture: true });
+            imeTextarea.removeEventListener('compositionend', unfreeze, { capture: true });
+          });
+          // xterm's internal _syncTextArea runs off its own cursor-move
+          // listener (registered at open, before ours), so writing the frozen
+          // spot back here wins within the same synchronous dispatch — no
+          // intermediate paint, no visible jitter.
+          const cursorMoveListener = term.onCursorMove(() => {
+            const f = imeFrozenRef.current;
+            if (f) {
+              imeTextarea.style.left = f.left;
+              imeTextarea.style.top = f.top;
+            }
+          });
+          unlisteners.push(() => cursorMoveListener.dispose());
+        }
       }
 
       // Disable font ligatures on the DOM renderer rows to prevent
@@ -1230,8 +1273,8 @@ function TierTerminalImpl({
   useEffect(() => {
     const term = xtermRef.current;
     if (!term) return;
-    term.options.theme = buildXtermTheme(theme, hasBg, termColorScheme);
-  }, [theme, termColorScheme, hasBg]);
+    term.options.theme = buildXtermTheme(theme, hasBg, termColorScheme, isRawShell);
+  }, [theme, termColorScheme, hasBg, isRawShell]);
 
   // ── Terminal font sync (live, no PTY restart) ────────────────────────────
   useEffect(() => {
@@ -1633,16 +1676,22 @@ function TierTerminalImpl({
           setCtxMenu({ x: e.clientX, y: e.clientY, hasSelection: !!xtermRef.current?.hasSelection() });
         }}
         onMouseDown={(e) => {
-          // Windows IME fix (issue #88): on left-click, re-anchor the hidden
-          // .xterm-helper-textarea to the buffer cursor (the TUI input box)
-          // BEFORE the blur/focus cycle, so Windows IME re-reads the input-box
-          // position instead of landing on the click point. Without this, the
-          // candidate window follows the mouse: correct when you click the
-          // input box (mouse == input box), wrong when you click elsewhere.
-          // Coordinate formula matches xterm's own _syncTextArea
-          // (left = cursorX * cellW, top = cursorY * cellH, relative to
-          // .xterm-screen). Left-click only; middle/right have their own paths.
+          // Windows IME fix (issue #88), part 1 of 2: on left-click, re-anchor
+          // the hidden .xterm-helper-textarea to the buffer cursor (the TUI
+          // input box), so Windows IME later re-reads the input-box position
+          // instead of the click point. Coordinate formula matches xterm's own
+          // _syncTextArea (left = cursorX * cellW, top = cursorY * cellH,
+          // relative to .xterm-screen). Left-click only; middle/right have
+          // their own paths.
+          //
+          // The blur/focus cycle that makes IME actually re-read this position
+          // is deliberately NOT here — cycling focus on mousedown interrupts
+          // the in-progress mouse gesture and breaks xterm drag selection
+          // (issue #92). It runs in onClick, once the gesture is over.
           if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win') && e.button === 0) {
+            // Never move the textarea mid-composition — the candidate window
+            // is pinned for the composition's lifetime (see init effect).
+            if (imeFrozenRef.current) return;
             const term = xtermRef.current;
             const textarea = termRef.current?.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
             const screenEl = termRef.current?.querySelector('.xterm-screen') as HTMLElement | null;
@@ -1653,7 +1702,23 @@ function TierTerminalImpl({
               const cy = term.buffer.active.cursorY;
               textarea.style.left = `${cx * cellW}px`;
               textarea.style.top = `${cy * cellH}px`;
-              // Blur then refocus to force Windows IME to re-read the position
+            }
+          }
+        }}
+        onClick={() => {
+          // Windows IME fix (issue #88), part 2 of 2: the mouse gesture is
+          // complete, so blur/refocus the helper textarea to force Windows IME
+          // to re-read the position anchored on mousedown. Skipped when the
+          // gesture produced a selection — that was a drag-select, not an
+          // intent to type, and cycling focus there serves no purpose
+          // (issue #92).
+          if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win')) {
+            // Blurring now would cancel an in-flight composition — let it
+            // finish; the next click re-anchors.
+            if (imeFrozenRef.current) return;
+            if (xtermRef.current?.hasSelection()) return;
+            const textarea = termRef.current?.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
+            if (textarea) {
               textarea.blur();
               setTimeout(() => textarea.focus(), 0);
             }
@@ -1706,7 +1771,9 @@ function TierTerminalImpl({
           // If no image found, let the event propagate to xterm for normal text paste
         }}
       >
-        <div ref={termRef} className="tier-xterm" />
+        {/* Raw shells get the `raw-shell` class so the CSS cursor-hiding
+            rule skips them (issue #95 — see TierTerminal.css). */}
+        <div ref={termRef} className={`tier-xterm${isRawShell ? ' raw-shell' : ''}`} />
       </div>
 
       {/* Terminal right-click context menu */}

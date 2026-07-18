@@ -137,9 +137,11 @@
     opacity: 0.9;
 }
 
-/* Completely hide native xterm cursor */
-.tier-xterm .xterm-cursor,
-.tier-xterm .xterm-cursor-layer {
+/* Completely hide native xterm cursor — except in raw-shell tabs (local
+   terminal / remote SSH), where no TUI paints its own caret and the xterm
+   cursor is the only input-position indicator the user has (issue #95). */
+.tier-xterm:not(.raw-shell) .xterm-cursor,
+.tier-xterm:not(.raw-shell) .xterm-cursor-layer {
     display: none !important;
     opacity: 0 !important;
 }
