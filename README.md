@@ -52,8 +52,8 @@ Coffee CLI can launch **any** command-line agent — but the ones below get deep
 
 | Tier | What you get | CLIs |
 |---|---|---|
-| **T1** | Dynamic Island · History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | **Claude Code** · Codex CLI · OpenCode · mimocode |
-| **T2** | History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | OpenClaw · Hermes Agent · Antigravity · Qwen Code · Pi · Kimi Code · Grok Build |
+| **T1** | Dynamic Island · History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | **Claude Code** · Codex CLI · OpenCode · mimocode · Kimi Code |
+| **T2** | History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | OpenClaw · Hermes Agent · Antigravity · Qwen Code · Pi · Grok Build |
 | **T3** | Brand icon · One-click launch | Crush · Aider · Goose · Copilot CLI |
 | **T4** | Open a terminal tab and type the command to launch | any other CLI |
 
