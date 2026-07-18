@@ -52,6 +52,11 @@ dirs = "5"
 # families + monospace flag). No system deps, unlike font-kit.
 ttf-parser = "0.20"
 base64 = "0.22.1"
+# PNG encoder for clipboard-image paste (issue #96): the Tauri clipboard
+# plugin's read_image() returns raw RGBA — no original format — so we encode
+# to PNG before writing the temp file the AI CLI references by path. Reuses
+# the same png 0.17.x already pulled in transitively by tauri, no extra build.
+png = "0.17"
 # In-app self-update downloader (Windows). Blocking + rustls, runs on a
 # spawn_blocking thread; streams the installer so we can emit download %.
 ureq = "2"

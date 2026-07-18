@@ -11,6 +11,7 @@
 // the clipboard, import from here. Do not re-derive.
 
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
+import { commands } from '../tauri';
 
 /** Write text to the system clipboard. Silently swallows failures
  *  because clipboard writes are always best-effort UX glue — we never
@@ -24,4 +25,14 @@ export function clipboardWrite(text: string): Promise<void> {
  *  do a simple `if (text)` check without try/catch boilerplate. */
 export function clipboardRead(): Promise<string> {
   return readText().then(t => t ?? '').catch(() => '');
+}
+
+/** Read an image from the OS clipboard and persist it as a PNG temp file,
+ *  returning the absolute path. Returns null when the clipboard holds no
+ *  image (or the clipboard is temporarily locked) — callers fall back to
+ *  `clipboardRead()` for the text-paste path. Goes through the Tauri
+ *  backend (arboard), so unlike `navigator.clipboard.read()` it never
+ *  triggers a WebView2 permission prompt. */
+export function clipboardReadImage(): Promise<string | null> {
+  return commands.readClipboardImage().catch(() => null);
 }

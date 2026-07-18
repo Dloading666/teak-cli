@@ -672,6 +672,7 @@ dependencies = [
  "log",
  "notify",
  "notify-debouncer-full",
+ "png 0.17.16",
  "portable-pty",
  "regex",
  "rmcp",

@@ -13,7 +13,7 @@ import { createPortal } from 'react-dom';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { clipboardRead, clipboardWrite } from '../../lib/clipboard';
+import { clipboardRead, clipboardWrite, clipboardReadImage } from '../../lib/clipboard';
 import { subscribeTerminalEvents } from '../../lib/pty-event-bus';
 import { rig } from '../../lib/latency-rig';
 import * as outputScheduler from '../../lib/terminal-output-scheduler';
@@ -758,43 +758,18 @@ function TierTerminalImpl({
         if (cmdOrCtrl && e.code === 'KeyV') {
           e.preventDefault();
 
-          // Try to paste image first (issue #89)
-          navigator.clipboard.read().then(async (clipboardItems) => {
-            for (const item of clipboardItems) {
-              const imageType = item.types.find(type => type.startsWith('image/'));
-              if (imageType) {
-                const blob = await item.getType(imageType);
-                const reader = new FileReader();
-                reader.onload = async (evt) => {
-                  const dataUrl = evt.target?.result as string;
-                  if (!dataUrl || !dataUrl.startsWith('data:')) return;
-
-                  const match = dataUrl.match(/^data:image\/([^;]+);base64,(.+)$/);
-                  if (!match) return;
-
-                  const [, ext, base64] = match;
-                  try {
-                    const path = await commands.saveClipboardImage(base64, ext);
-                    term.paste(path);
-                  } catch (err) {
-                    console.error('Failed to save clipboard image:', err);
-                  }
-                };
-                reader.readAsDataURL(blob);
-                return; // Image found, done
-              }
-            }
-
-            // No image, fall back to text paste
+          // Image-first paste (issue #89): if the clipboard holds a still
+          // image, persist it as a temp file and paste that path so the AI
+          // CLI can read it off the local filesystem. Routed through the
+          // Tauri backend (arboard) — NOT navigator.clipboard.read(), which
+          // would pop a WebView2 "wants to read the clipboard" prompt every
+          // paste (issue #96, project clipboard rule).
+          (async () => {
+            const imgPath = await clipboardReadImage();
+            if (imgPath) { term.paste(imgPath); return; }
             const text = await clipboardRead();
             if (text) term.paste(normalizePasteNewlines(text));
-          }).catch((err) => {
-            // Clipboard API failed, fall back to text only
-            console.log('Clipboard.read() failed, falling back to text:', err);
-            clipboardRead().then(text => {
-              if (text) term.paste(normalizePasteNewlines(text));
-            });
-          });
+          })();
           return false;
         }
 
@@ -806,43 +781,14 @@ function TierTerminalImpl({
         if (e.ctrlKey && e.shiftKey && e.code === 'KeyV') {
           e.preventDefault();
 
-          // Try to paste image first (issue #89), same as Ctrl+V
-          navigator.clipboard.read().then(async (clipboardItems) => {
-            for (const item of clipboardItems) {
-              const imageType = item.types.find(type => type.startsWith('image/'));
-              if (imageType) {
-                const blob = await item.getType(imageType);
-                const reader = new FileReader();
-                reader.onload = async (evt) => {
-                  const dataUrl = evt.target?.result as string;
-                  if (!dataUrl || !dataUrl.startsWith('data:')) return;
-
-                  const match = dataUrl.match(/^data:image\/([^;]+);base64,(.+)$/);
-                  if (!match) return;
-
-                  const [, ext, base64] = match;
-                  try {
-                    const path = await commands.saveClipboardImage(base64, ext);
-                    term.paste(path);
-                  } catch (err) {
-                    console.error('Failed to save clipboard image:', err);
-                  }
-                };
-                reader.readAsDataURL(blob);
-                return;
-              }
-            }
-
-            // No image, fall back to text paste
+          // Same image-first paste as Ctrl+V (issue #89); backend clipboard
+          // read avoids the WebView2 permission prompt (issue #96).
+          (async () => {
+            const imgPath = await clipboardReadImage();
+            if (imgPath) { term.paste(imgPath); return; }
             const text = await clipboardRead();
             if (text) term.paste(normalizePasteNewlines(text));
-          }).catch((err) => {
-            // Clipboard API failed, fall back to text only
-            console.log('Clipboard.read() failed, falling back to text:', err);
-            clipboardRead().then(text => {
-              if (text) term.paste(normalizePasteNewlines(text));
-            });
-          });
+          })();
           return false;
         }
       }
@@ -1787,46 +1733,16 @@ function TierTerminalImpl({
             closeCtxMenu();
           }}
           onPaste={async () => {
-            // Try to paste image first
-            try {
-              const clipboardItems = await navigator.clipboard.read();
-              for (const item of clipboardItems) {
-                // Check if clipboard contains an image
-                const imageType = item.types.find(type => type.startsWith('image/'));
-                if (imageType) {
-                  const blob = await item.getType(imageType);
-                  const reader = new FileReader();
-                  reader.onload = async (evt) => {
-                    const dataUrl = evt.target?.result as string;
-                    if (!dataUrl || !dataUrl.startsWith('data:')) return;
-
-                    const match = dataUrl.match(/^data:image\/([^;]+);base64,(.+)$/);
-                    if (!match) return;
-
-                    const [, ext, base64] = match;
-                    try {
-                      const path = await commands.saveClipboardImage(base64, ext);
-                      if (xtermRef.current) {
-                        xtermRef.current.paste(path);
-                      }
-                    } catch (err) {
-                      console.error('Failed to save clipboard image:', err);
-                    }
-                  };
-                  reader.readAsDataURL(blob);
-                  closeCtxMenu();
-                  return;
-                }
-              }
-            } catch (err) {
-              // Clipboard API not available or no image, fall back to text
-              console.log('No image in clipboard, trying text:', err);
+            // Image-first paste (issue #89), then text. Backend clipboard
+            // read (arboard) avoids the WebView2 permission prompt (issue #96).
+            const imgPath = await clipboardReadImage();
+            if (imgPath) {
+              xtermRef.current?.paste(imgPath);
+              closeCtxMenu();
+              return;
             }
-
-            // Fall back to text paste
-            clipboardRead().then(text => {
-              if (text && xtermRef.current) xtermRef.current.paste(normalizePasteNewlines(text));
-            });
+            const text = await clipboardRead();
+            if (text && xtermRef.current) xtermRef.current.paste(normalizePasteNewlines(text));
             closeCtxMenu();
           }}
           onSelectAll={() => {

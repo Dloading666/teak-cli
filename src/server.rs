@@ -326,6 +326,90 @@ fn save_clipboard_image(data_base64: String, extension: String) -> Result<String
     Ok(path.to_string_lossy().to_string())
 }
 
+/// Read a still image from the system clipboard and persist it as a PNG temp
+/// file, returning the path (or `None` when the clipboard holds no image).
+///
+/// This replaces the old `navigator.clipboard.read()` path in the frontend,
+/// which violated the project's clipboard rule: WebView2 may pop a native
+/// "tauri.localhost wants to read the clipboard" permission prompt on every
+/// paste. Routing through Tauri's `plugin-clipboard-manager` (arboard) reads
+/// the OS clipboard directly with no permission prompt.
+///
+/// `read_image()` must NOT run on the main thread (deadlocks on Linux when
+/// the WebView also touches the clipboard), so the whole command is async and
+/// offloaded to `spawn_blocking`. The plugin returns raw RGBA — no original
+/// format — so we re-encode to PNG (screenshots paste as PNG anyway).
+#[tauri::command]
+async fn read_clipboard_image(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri_plugin_clipboard_manager::ClipboardExt;
+
+        let image = match app.clipboard().read_image() {
+            Ok(img) => img,
+            // No image in the clipboard, or clipboard temporarily unavailable
+            // (some apps hold an exclusive lock). Not an error — caller falls
+            // back to text paste.
+            Err(_) => return Ok(None),
+        };
+
+        let rgba = image.rgba();
+        let width = image.width();
+        let height = image.height();
+        if width == 0 || height == 0 || rgba.len() != (width as usize) * (height as usize) * 4 {
+            return Ok(None);
+        }
+
+        // 25 MB cap matches save_clipboard_image — bounds temp-disk usage from
+        // absurdly large clipboard bitmaps before we even attempt PNG deflate.
+        const MAX_BYTES: usize = 25 * 1024 * 1024;
+        if rgba.len() > MAX_BYTES {
+            return Err(format!(
+                "Clipboard image too large: {} bytes (max {})",
+                rgba.len(),
+                MAX_BYTES
+            ));
+        }
+
+        let tmp_dir = std::env::temp_dir().join("coffee-cli").join("pasted-images");
+        std::fs::create_dir_all(&tmp_dir).map_err(|e| format!("mkdir: {}", e))?;
+
+        static SEQ: AtomicU64 = AtomicU64::new(0);
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let pid = std::process::id();
+        let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+        let path = tmp_dir.join(format!("clip-{}-{}-{}.png", stamp, pid, seq));
+
+        // Encode RGBA → PNG. The png 0.17 encoder owns the writer; collect to
+        // a Vec then write once so a mid-encode failure can't leave a partial
+        // file that an AI CLI would later try to read as a real image.
+        let mut buf = std::io::Cursor::new(Vec::with_capacity(rgba.len()));
+        {
+            let mut encoder = png::Encoder::new(&mut buf, width, height);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder
+                .write_header()
+                .map_err(|e| format!("png header: {}", e))?;
+            writer
+                .write_image_data(rgba)
+                .map_err(|e| format!("png encode: {}", e))?;
+        }
+
+        std::fs::write(&path, buf.into_inner())
+            .map_err(|e| format!("write image file: {}", e))?;
+
+        Ok(Some(path.to_string_lossy().to_string()))
+    })
+    .await
+    .map_err(|e| format!("join: {}", e))?
+}
+
 // ─── File System Operations ───────────────────────────────────────────────────
 
 /// Open the native file explorer and highlight / reveal the given path.
@@ -3626,6 +3710,7 @@ pub fn start_ui() -> anyhow::Result<()> {
             start_fs_watcher,
             stop_fs_watcher,
             save_clipboard_image,
+            read_clipboard_image,
             list_directory,
             read_text_file,
             show_in_folder,

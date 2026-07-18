@@ -203,6 +203,11 @@ export const commands = {
   saveClipboardImage: (dataBase64: string, extension: string) =>
     invoke<string>('save_clipboard_image', { dataBase64, extension }),
 
+  /** Read an image from the OS clipboard and persist it as a PNG temp file,
+   *  returning its absolute path (or null when the clipboard has no image).
+   *  Replaces navigator.clipboard.read() — no WebView2 permission prompt. */
+  readClipboardImage: () => invoke<string | null>('read_clipboard_image'),
+
   listDirectory: (path: string) => invoke<DirEntryInfo[]>('list_directory', { path }),
   listSystemFonts: () => invoke<FontInfo[]>('list_system_fonts'),
 
