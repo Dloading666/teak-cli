@@ -35,7 +35,7 @@ const ICON_PROPS = {
   strokeLinejoin: 'round' as const,
 };
 
-export function SessionContextMenu({ menu, onClose }: { menu: SessionCtxMenuState; onClose: () => void }) {
+export function SessionContextMenu({ menu, onClose, onRename }: { menu: SessionCtxMenuState; onClose: () => void; onRename: (session: SavedSession) => void }) {
   const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
   const { session } = menu;
@@ -65,6 +65,7 @@ export function SessionContextMenu({ menu, onClose }: { menu: SessionCtxMenuStat
 
   const copy = (text: string) => { clipboardWrite(text); onClose(); };
   const handlePin = () => { togglePin(session.tool ?? '', session.id); onClose(); };
+  const handleRename = () => { onRename(session); onClose(); };
   const handleDelete = () => { hideSession(session.tool ?? '', session.id); onClose(); };
   const handleShowInFolder = async () => {
     onClose();
@@ -74,7 +75,7 @@ export function SessionContextMenu({ menu, onClose }: { menu: SessionCtxMenuStat
 
   // Smart positioning - mirror Explorer's ContextMenu (overflow flip).
   const MENU_WIDTH = 220;
-  const MENU_HEIGHT = 260;
+  const MENU_HEIGHT = 290;
   const isBottomOverflow = menu.y + MENU_HEIGHT > window.innerHeight;
   const isRightOverflow = menu.x + MENU_WIDTH > window.innerWidth;
   const style: React.CSSProperties = {
@@ -91,6 +92,13 @@ export function SessionContextMenu({ menu, onClose }: { menu: SessionCtxMenuStat
           <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>
         </svg>
         {pinned ? t('menu.unpin' as any) : t('menu.pin' as any)}
+      </button>
+
+      <button className="ctx-menu-item" onClick={handleRename}>
+        <svg {...ICON_PROPS}>
+          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+        </svg>
+        {t('menu.rename' as any)}
       </button>
 
       {hasGroup2 && <div className="ctx-menu-divider" />}
