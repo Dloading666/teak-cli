@@ -16,6 +16,11 @@ pub struct AppState {
     /// workspace folder is open; None otherwise. Swapping this Mutex'd
     /// Option replaces the watcher atomically on folder switch.
     pub fs_watcher: Mutex<Option<crate::fs_watcher::FsWatcher>>,
+    /// External launch request passed via `launch --tool … [--cwd …]` argv.
+    /// Drained exactly once by the frontend (`take_pending_launch`) on mount;
+    /// warm-start requests skip this slot and arrive as `launch-request`
+    /// events from the single-instance callback instead (see launch.rs).
+    pub pending_launch: Mutex<Option<crate::launch::LaunchRequest>>,
 }
 
 
@@ -114,6 +119,15 @@ pub(crate) fn check_tool_unix(bin: &str) -> bool {
 #[tauri::command]
 fn install_hook_for_tool(tool: String) {
     crate::hook_installer::install_for_tool(&tool);
+}
+
+/// Drain the cold-start external launch request (`launch --tool … --cwd …`),
+/// if any. Exactly-once semantics — the first caller gets the request, every
+/// later caller gets `None`. Warm-start requests don't pass through here;
+/// they arrive as `launch-request` events from the single-instance callback.
+#[tauri::command]
+fn take_pending_launch(state: State<'_, AppState>) -> Option<crate::launch::LaunchRequest> {
+    state.pending_launch.lock().ok()?.take()
 }
 
 #[tauri::command]
@@ -3644,7 +3658,7 @@ pub fn set_tool_config(
     crate::tool_config::set(&tool, entry).map_err(|e| e.to_string())
 }
 
-pub fn start_ui() -> anyhow::Result<()> {
+pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow::Result<()> {
     // Create shared session BEFORE the builder so we can clone it for the exit handler
     let terminal_session = terminal::SharedSession::default();
 
@@ -3664,12 +3678,20 @@ pub fn start_ui() -> anyhow::Result<()> {
     // share the bundle identifier, and the lock would silently redirect the
     // dev launch to the production process and exit.
     #[cfg(not(debug_assertions))]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
         use tauri::Manager;
         if let Some(w) = app.get_webview_window("main") {
             let _ = w.unminimize();
             let _ = w.show();
             let _ = w.set_focus();
+        }
+        // A second instance invoked as `launch --tool … --cwd …` forwards
+        // its argv here — re-parse and hand the request to the frontend of
+        // the ALREADY-RUNNING instance, so the launcher works without
+        // restarting the app or touching existing tabs (see launch.rs).
+        if let Some(req) = crate::launch::parse_launch_args(&args) {
+            use tauri::Emitter;
+            let _ = app.emit("launch-request", req);
         }
     }));
 
@@ -3681,6 +3703,7 @@ pub fn start_ui() -> anyhow::Result<()> {
             terminal_session,
             hook_port: std::sync::atomic::AtomicU16::new(0),
             fs_watcher: Mutex::new(None),
+            pending_launch: Mutex::new(pending_launch),
         })
         .invoke_handler(tauri::generate_handler![
             crate::fonts::list_system_fonts,
@@ -3707,6 +3730,7 @@ pub fn start_ui() -> anyhow::Result<()> {
             detect_shells,
             crate::tools::list_tools,
             install_hook_for_tool,
+            take_pending_launch,
             start_fs_watcher,
             stop_fs_watcher,
             save_clipboard_image,

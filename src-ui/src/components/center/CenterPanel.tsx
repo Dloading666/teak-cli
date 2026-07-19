@@ -867,6 +867,68 @@ export function CenterPanel() {
     });
   };
 
+  // External launch (`coffee-cli launch --tool <id> [--cwd <dir>]`) — reached
+  // from the cold-start drain (takePendingLaunch) and the warm-start
+  // single-instance forward ('launch-request' event). Reuses an idle
+  // launchpad tab when one exists so the agent never hijacks a tab that
+  // already runs a session; otherwise opens a fresh tab (same 5-tab cap as
+  // the + button).
+  const launchCtxRef = useRef({ terminals, activeTerminalId });
+  useEffect(() => { launchCtxRef.current = { terminals, activeTerminalId }; });
+  const applyLaunchRequest = (tool: ToolType, cwd?: string) => {
+    if (!BUILTIN_AI_CLI_FALLBACK.some(item => item.key === tool)) return;
+    const { terminals: terms, activeTerminalId: activeId } = launchCtxRef.current;
+    const current = terms.find(t => t.id === activeId);
+    let id: string;
+    if (current && current.tool === null) {
+      id = current.id;
+    } else {
+      const idle = terms.find(t => t.tool === null);
+      if (idle) {
+        id = idle.id;
+        dispatch({ type: 'SET_ACTIVE_TERMINAL', id });
+      } else {
+        if (terms.length >= 5) {
+          showToast(t('session.max'));
+          return;
+        }
+        id = crypto.randomUUID();
+        dispatch({ type: 'ADD_TERMINAL', session: { id, tool: null, folderPath: cwd ?? null } });
+      }
+    }
+    if (cwd) {
+      dispatch({ type: 'SET_FOLDER', path: cwd });
+      setLastCwdByTool(prev => {
+        const next = { ...prev, [tool as string]: cwd };
+        try { localStorage.setItem('coffee:last-cwd-by-tool', JSON.stringify(next)); } catch { /* storage full/blocked — non-fatal */ }
+        return next;
+      });
+      pushRecentFolder(cwd);
+    }
+    dispatch({ type: 'SET_TERMINAL_TOOL', id, tool });
+  };
+
+  // Drain the cold-start launch request once on mount, then keep listening
+  // for warm-start forwards emitted by the single-instance plugin (second
+  // process invoked as `launch …` — the running instance never restarts).
+  useEffect(() => {
+    if (!isTauri) return;
+    commands.takePendingLaunch()
+      .then(req => { if (req) applyLaunchRequest(req.tool as ToolType, req.cwd); })
+      .catch(() => {});
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        unlisten = await listen<{ tool: string; cwd?: string }>('launch-request', e => {
+          applyLaunchRequest(e.payload.tool as ToolType, e.payload.cwd);
+        });
+      } catch { /* event bridge unavailable (e.g. browser dev) — ignore */ }
+    })();
+    return () => { if (unlisten) unlisten(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCloseTab = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     dispatch({ type: 'REMOVE_TERMINAL', id });
