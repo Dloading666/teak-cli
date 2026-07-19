@@ -957,9 +957,14 @@ html.is-macos #root {
     white-space: nowrap;
     flex-shrink: 0;
 }
-/* macOS: clear the native traffic lights (Overlay draws them top-left). */
+/* macOS: clear the native traffic lights (Overlay draws them top-left) with
+   a comfortable gap. The lights start at trafficLightPosition x:14
+   (tauri.macos.conf.json) and span ~54px → they end ≈68px; 76px left the
+   brand logo almost touching them (~8px), which read as cramped (issue
+   #102). 88px gives a ~20px breathing room between the green light and the
+   logo, matching the spacing Finder/ Safari keep around their own chrome. */
 html.is-macos .titlebar-left-slot .brand {
-    padding-left: 76px;
+    padding-left: 88px;
 }
 .titlebar-left-slot.is-collapsed {
     width: 0;
