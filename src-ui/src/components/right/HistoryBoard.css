@@ -6,6 +6,7 @@
    contrast. */
 
 .history-card {
+  position: relative;
   padding: 14px 14px;
   margin-bottom: 8px;
   cursor: default !important;
@@ -55,13 +56,6 @@
    shown only on pinned cards. Non-interactive (pin/unpin lives in the right-
    click context menu); styled to match the meta row text so it reads as an
    indicator, not a button. No hover/cursor - pure marker. */
-.history-card-pin {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  color: var(--text-3);
-  opacity: 0.7;
-}
 /* ── Loading Skeleton ──
    Shimmer driven by --text-3 so the skeleton bars are visible against
    light AND dark cards. Pure white-rgba was invisible on the light theme. */
@@ -134,4 +128,146 @@
 .agent-session-search:focus {
   background: var(--bg-hover);
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+/* ─── Agent filter dropdown ─── */
+/* Search row: the input takes the remaining width, the filter trigger hugs
+   the right edge. */
+.agent-session-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.agent-session-search-row .agent-session-search-wrap {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.history-tool-filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: 12px;
+  font-family: var(--font, system-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.history-tool-filter-trigger:hover {
+  background: var(--bg-hover);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.history-tool-filter-trigger.active {
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+.history-tool-filter-label {
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-tool-filter-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+.history-tool-filter-menu {
+  /* Same opacity fix as Explorer's .ctx-menu — --bg-card is ~3% white in
+     dark themes, so a portaled menu floating over the session list reads
+     as transparent. Layer --bg-panel over --bg-app so Light theme's
+     translucent panel still reads opaque. Glass shape gets its frosted
+     look from the [data-shape="glass"] override in global.css. */
+  background-color: var(--bg-app);
+  background-image: linear-gradient(var(--bg-panel), var(--bg-panel));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20), 0 6px 20px rgba(0, 0, 0, 0.22);
+  padding: 4px;
+  z-index: 1000;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.history-tool-filter-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-1);
+  font-size: 12.5px;
+  font-family: var(--font, system-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.history-tool-filter-opt:hover {
+  background: var(--bg-hover);
+}
+.history-tool-filter-opt.active {
+  color: var(--accent);
+}
+.history-tool-filter-opt-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-tool-filter-count {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+/* ─── Card pin button + inline rename ─── */
+/* One-click pin at the card's top-right. Hidden until hover; always shown
+   (accent, filled) once pinned — it doubles as the pinned marker. */
+.history-card-pin-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.history-card:hover .history-card-pin-btn,
+.history-card-pin-btn.pinned {
+  opacity: 1;
+}
+.history-card-pin-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+.history-card-pin-btn.pinned {
+  color: var(--accent);
+}
+
+.history-card-rename-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-app);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-xs);
+  padding: 2px 6px;
+  color: var(--text-1);
+  font-size: 13px;
+  font-family: var(--font, system-ui);
+  outline: none;
 }
