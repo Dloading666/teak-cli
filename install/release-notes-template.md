@@ -1,59 +1,49 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-- ✨ Kimi Code 升级为一等灵动岛:状态灯随真实事件实时变化(工作中 / 等待输入 / 空闲),不再是静态假绿点。
-- 🐛 修复"Using Write 时灵动岛误变绿":Kimi 的 Stop 是步骤级信号,不再据此误判空闲。
-- 🐛 终端拖选回归修复:左键可自由拖选文字、选中高亮清晰可见(Claude Code / Codex tab)。
-- 🐛 本地终端(PowerShell)与远程 SSH tab 现在有可见光标,输入位置一目了然。
-- 🐛 中文输入法候选框在组合输入(打词/短语)时不再四处乱跳。
-- 🐛 终端粘贴图片改走系统剪贴板直读,不再弹出"想读取剪贴板"权限框。
+- ✨ 历史会话面板新增「工作目录筛选」:按项目文件夹一键过滤,快速回到某个工作场景的全部会话。
+- ✨ 会话可重命名:右键 → 重命名,自定义标题覆盖自动摘要;清空即恢复原标题。
+- ✨ 卡片悬停显示置顶 / 删除按钮:一键置顶常用会话、一键隐藏不再需要的会话。
+- 🔎 搜索现可匹配工具名:输入「kimi」直接找到所有 Kimi Code 会话。
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-- ✨ Kimi Code 升級為一等靈動島:狀態燈隨真實事件即時變化(工作中 / 等待輸入 / 空閒),不再是靜態假綠點。
-- 🐛 修復「Using Write 時靈動島誤變綠」:Kimi 的 Stop 是步驟級訊號,不再據此誤判空閒。
-- 🐛 終端拖選回歸修復:左鍵可自由拖選文字、選取高亮清晰可見(Claude Code / Codex 分頁)。
-- 🐛 本地終端(PowerShell)與遠端 SSH 分頁現在有可見游標,輸入位置一目了然。
-- 🐛 中文輸入法候選框在組合輸入(打詞/短語)時不再四處亂跳。
-- 🐛 終端貼上圖片改走系統剪貼簿直讀,不再彈出「想讀取剪貼簿」權限框。
+- ✨ 歷史會話面板新增「工作目錄篩選」:按專案資料夾一鍵過濾,快速回到某個工作場景的全部會話。
+- ✨ 會話可重新命名:右鍵 → 重新命名,自訂標題覆蓋自動摘要;清空即恢復原標題。
+- ✨ 卡片懸停顯示置頂 / 刪除按鈕:一鍵置頂常用會話、一鍵隱藏不再需要的會話。
+- 🔎 搜尋現可匹配工具名名稱:輸入「kimi」直接找到所有 Kimi Code 會話。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-- ✨ Kimi Code promoted to first-class Dynamic Island: the status dot now reacts live to real events (working / waiting for input / idle) instead of a static fake-green dot.
-- 🐛 Fixed the Dynamic Island turning green mid-"Using Write": Kimi's Stop is a per-step signal, so it's no longer treated as a turn-end idle.
-- 🐛 Terminal drag-select regression fixed: left-click freely selects text again and the selection highlight is clearly visible (Claude Code / Codex tabs).
-- 🐛 Local terminal (PowerShell) and remote SSH tabs now show a visible caret, so the input position is obvious.
-- 🐛 IME candidate window no longer jumps around during composed input (typing words / phrases).
-- 🐛 Terminal image paste now reads the OS clipboard directly — no more "wants to read the clipboard" permission prompt.
+- ✨ New workspace filter in the history panel: filter sessions by project folder in one click to jump back to every session for a given workspace.
+- ✨ Rename any session: right-click → Rename, a custom title overrides the auto summary; clearing it restores the original.
+- ✨ Hover a card to reveal pin / delete buttons: pin your frequent sessions, hide the ones you no longer need.
+- 🔎 Search now matches tool names: typing "kimi" finds all Kimi Code sessions directly.
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-- ✨ Kimi Code が一等のダイナミックアイランドに昇格:ステータスランプが実際のイベントに合わせてリアルタイムに変化(作業中 / 入力待ち / アイドル)するようになり、静的な偽の緑点ではなくなりました。
-- 🐛 「Using Write」中にダイナミックアイランドが緑になる問題を修正:Kimi の Stop はステップ単位の信号のため、ターン終了のアイドルと誤判定しなくなりました。
-- 🐛 端末のドラッグ選択の回帰を修正:左クリックで再び自由にテキストを選択でき、選択ハイライトがはっきり見えます(Claude Code / Codex タブ)。
-- 🐛 ローカル端末(PowerShell)とリモート SSH タブにキャレットが表示され、入力位置が一目で分かります。
-- 🐛 IME 候補ウィンドウが変換中(単語 / フレーズ入力)にあちこちへ飛び回らなくなりました。
-- 🐛 端末への画像貼り付けが OS クリップボードを直接読むようになり、「クリップボードを読み取りたがる」権限プロンプトが出なくなりました。
+- ✨ 履歴パネルに「ワークスペースフィルター」を追加:プロジェクトフォルダーで一瞬フィルタリングし、あるワークスペースの会話をすべてすぐに呼び戻せます。
+- ✨ 会話のリネーム:右クリック → リネームで、自動要約をカスタムタイトルで上書き。空にすれば元のタイトルに戻ります。
+- ✨ カード ホバーでピン / 削除ボタンを表示:よく使う会話をピン留め、不要な会話を一瞬で非表示。
+- 🔎 検索がツール名にもマッチ:「kimi」と打てば Kimi Code の会話をすべて直接見つけられます。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-- ✨ Kimi Code 가 일등 다이내믹 아일랜드로 승격: 상태 표시등이 실제 이벤트에 맞춰 실시간으로 변합니다(작업 중 / 입력 대기 / 유휴). 더 이상 정적인 가짜 녹색 점이 아닙니다.
-- 🐛 "Using Write" 중 다이내믹 아일랜드가 녹색으로 변하던 문제 수정: Kimi 의 Stop 은 단계별 신호이므로 더 이상 턴 종료 유휴로 오판하지 않습니다.
-- 🐛 터미널 드래그 선택 회귀 수정: 왼쪽 클릭으로 다시 자유롭게 텍스트를 선택할 수 있고 선택 하이라이트가 선명하게 보입니다(Claude Code / Codex 탭).
-- 🐛 로컬 터미널(PowerShell)과 원격 SSH 탭에 캐럿이 표시되어 입력 위치를 한눈에 알 수 있습니다.
-- 🐛 IME 후보 창이 조합 입력(단어 / 구절 입력) 중 이리저리 튀지 않습니다.
-- 🐛 터미널 이미지 붙여넣기가 OS 클립보드를 직접 읽도록 바뀌어 "클립보드를 읽으려 합니다" 권한 프롬프트가 더 이상 나타나지 않습니다.
+- ✨ 기록 패널에 「워크스페이스 필터」 추가: 프로젝트 폴더 기준으로 한 번에 필터링해, 어떤 작업 공간의 모든 세션으로 빠르게 돌아갑니다.
+- ✨ 세션 이름 변경: 우클릭 → 이름 변경으로 사용자 지정 제목이 자동 요약을 덮습니다. 비우면 원래 제목으로 복원됩니다.
+- ✨ 카드에 마우스를 올리면 고정 / 삭제 버튼 표시: 자주 쓰는 세션은 고정, 더 필요 없는 세션은 한 번에 숨깁니다.
+- 🔎 검색이 이제 도구 이름도 매치: 「kimi」를 입력하면 Kimi Code 세션을 모두 바로 찾을 수 있습니다.
 
 </details>
