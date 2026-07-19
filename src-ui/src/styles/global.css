@@ -2078,7 +2078,8 @@ body.gambit-docked .multi-agent-grid-standalone {
    items stay legible. No blur — keeps carbon's static/zero-cost rule. */
 [data-shape="carbon"] .ctx-menu,
 [data-shape="carbon"] .gambit-skill-popover,
-[data-shape="carbon"] .term-ctx-menu {
+[data-shape="carbon"] .term-ctx-menu,
+[data-shape="carbon"] .history-tool-filter-menu {
     background-color: color-mix(in oklab, var(--bg-app) 76%, transparent) !important;
     background-image: none !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;

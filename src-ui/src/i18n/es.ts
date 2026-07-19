@@ -81,7 +81,7 @@ export const es = {
   'diff.unchanged_lines': '⋯ {count} líneas sin cambios',
   'task.default_title': 'Nueva tarea',
   'task.search_sessions': 'Buscar sesiones...',
-  'task.filter_all_projects': 'Todos los proyectos',
+  'task.filter_all_projects': 'Todos',
   'menu.no_recent': 'No hay sesiones recientes',
   'task.messages': '{count} mensajes',
 

@@ -34,6 +34,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* Reserve room for the hover pin + delete buttons (right:8/36, 24px each)
+     so a long title ellipsizes instead of painting under them. */
+  padding-right: 64px;
 }
 
 .history-card-meta {
@@ -94,6 +97,14 @@
   100% { background-position: -200% 0; }
 }
 
+/* Search box and the workspace-filter trigger must be the same height so
+   the rail's top edge reads as one line. Both pin a fixed height instead of
+   relying on content box (CJK glyphs lift the default line-height ~2px,
+   which makes the trigger taller than the input in zh-CN). */
+:root {
+  --history-search-h: 34px;
+}
+
 .agent-session-search-wrap {
   position: relative;
   margin-bottom: 12px;
@@ -110,6 +121,7 @@
 .agent-session-search {
   width: 100%;
   box-sizing: border-box;
+  height: var(--history-search-h);
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -117,6 +129,7 @@
   color: var(--text-1);
   font-size: 13px;
   font-family: var(--font, system-ui);
+  line-height: 1;
   outline: none;
   transition: all 0.2s ease;
 }
@@ -148,24 +161,19 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 7px 10px;
+  height: var(--history-search-h);
+  box-sizing: border-box;
+  padding: 8px 10px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-2);
-  font-size: 12px;
+  font-size: 13px;
   font-family: var(--font, system-ui);
+  line-height: 1;
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.15s ease;
-}
-.history-tool-filter-trigger:hover {
-  background: var(--bg-hover);
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-}
-.history-tool-filter-trigger.active {
-  border-color: var(--accent);
-  color: var(--text-1);
 }
 .history-tool-filter-label {
   max-width: 72px;
@@ -226,9 +234,13 @@
   font-size: 11px;
 }
 
-/* ─── Card pin button + inline rename ─── */
+/* ─── Card pin/delete buttons + inline rename ─── */
 /* One-click pin at the card's top-right. Hidden until hover; always shown
-   (accent, filled) once pinned — it doubles as the pinned marker. */
+   (accent, filled) once pinned — it doubles as the pinned marker. The
+   delete button sits just left of it, same hover-reveal pattern — both go
+   through the existing localStorage soft-delete (hideSession), no real
+   removal. The title reserves padding-right so long names ellipsize before
+   reaching the buttons instead of painting under them. */
 .history-card-pin-btn {
   position: absolute;
   top: 8px;
@@ -247,11 +259,31 @@
   opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
+.history-card-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
 .history-card:hover .history-card-pin-btn,
-.history-card-pin-btn.pinned {
+.history-card-pin-btn.pinned,
+.history-card:hover .history-card-delete-btn {
   opacity: 1;
 }
-.history-card-pin-btn:hover {
+.history-card-pin-btn:hover,
+.history-card-delete-btn:hover {
   background: var(--bg-hover);
   color: var(--text-1);
 }
@@ -265,7 +297,7 @@
   background: var(--bg-app);
   border: 1px solid var(--accent);
   border-radius: var(--radius-xs);
-  padding: 2px 6px;
+  padding: 2px 64px 2px 6px;
   color: var(--text-1);
   font-size: 13px;
   font-family: var(--font, system-ui);

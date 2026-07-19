@@ -10,7 +10,7 @@ import {
   subscribeHistory,
   getHistorySnapshot,
 } from '../../lib/history-cache';
-import { subscribeHidden, getHiddenSnapshot } from '../../lib/hidden-sessions';
+import { subscribeHidden, getHiddenSnapshot, hideSession } from '../../lib/hidden-sessions';
 import { subscribePinned, getPinnedSnapshot, togglePin } from '../../lib/pinned-sessions';
 import { subscribeRenamed, getRenamedSnapshot, setCustomName } from '../../lib/renamed-sessions';
 import { SessionContextMenu, type SessionCtxMenuState } from './SessionContextMenu';
@@ -133,6 +133,10 @@ export function HistoryBoard() {
   // key, null = none) and the draft value.
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  // Escape should cancel (discard) the rename, but unmounting the focused
+  // input fires onBlur — which would otherwise commit the draft anyway. This
+  // flag is set on Escape so onBlur knows to skip the save. Reset each edit.
+  const cancelRenameRef = useRef(false);
   const [ctxMenu, setCtxMenu] = useState<SessionCtxMenuState | null>(null);
   useEffect(() => { prefetchHistory(); }, []);
   const isLoading = isTauri && (status === 'idle' || status === 'loading') && cachedSessions.length === 0;
@@ -179,6 +183,14 @@ export function HistoryBoard() {
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('resize', reposition);
     };
+  }, [filterMenuOpen]);
+  // Escape closes the portaled filter menu — same dismissal UX as the right-
+  // click menu and the rename input.
+  useEffect(() => {
+    if (!filterMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFilterMenuOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('keydown', onKey); };
   }, [filterMenuOpen]);
   // Right-click cut/copy/paste/select menu for the search box (same one
   // Gambit/terminal/task-list use).
@@ -229,12 +241,19 @@ export function HistoryBoard() {
     };
   }, [projectCounts]);
 
-  // Same auto-reset discipline as the agent filter.
+  // Same auto-reset discipline as the agent filter. Also closes the portaled
+  // menu if the trigger is about to unmount: soft-deleting sessions down to
+  // <2 projects makes projectCounts.length drop below the render threshold,
+  // the trigger vanishes, and the fixed-position menu would otherwise strand
+  // at stale screen coordinates.
   useEffect(() => {
+    if (projectCounts.length < 2 && filterMenuOpen) {
+      setFilterMenuOpen(false);
+    }
     if (activeProject && !projectCounts.some(p => p.key === activeProject)) {
       setActiveProject(null);
     }
-  }, [projectCounts, activeProject]);
+  }, [projectCounts, activeProject, filterMenuOpen]);
 
   // Debounce the raw query so fast typing doesn't re-filter the full session
   // list on every keystroke (history-cache can hold thousands of sessions —
@@ -317,6 +336,7 @@ export function HistoryBoard() {
   // Enter inline-rename mode on a card (invoked from the context menu).
   const startRename = (saved: SavedSession) => {
     const k = `${saved.tool ?? ''}:${saved.id}`;
+    cancelRenameRef.current = false;
     setRenamingKey(k);
     setRenameValue(renamed[k] ?? saved.name ?? '');
   };
@@ -359,14 +379,13 @@ export function HistoryBoard() {
         </div>
         {/* Project (workspace) filter dropdown, keyed by normalized cwd.
             Only worth the control when 2+ distinct projects exist. Shows the
-            active project's folder icon + name (full path in tooltip). */}
+            active project's folder icon + name. */}
         {projectCounts.length >= 2 && (
           <button
             ref={filterTriggerRef}
             type="button"
             className={`history-tool-filter-trigger${activeProject ? ' active' : ''}`}
             onClick={toggleFilterMenu}
-            title={activeProject ? (projectCounts.find(p => p.key === activeProject)?.cwd ?? '') : undefined}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -455,14 +474,22 @@ export function HistoryBoard() {
                   onContextMenu={(e) => e.stopPropagation()}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
+                      e.preventDefault();
+                      cancelRenameRef.current = false;
                       setCustomName(session.tool ?? '', session.id, renameValue);
                       setRenamingKey(null);
                     } else if (e.key === 'Escape') {
+                      // Discard: flag the blur handler to skip the save, then
+                      // unmount (blur fires on the way out).
+                      cancelRenameRef.current = true;
                       setRenamingKey(null);
                     }
                   }}
                   onBlur={() => {
-                    setCustomName(session.tool ?? '', session.id, renameValue);
+                    if (!cancelRenameRef.current) {
+                      setCustomName(session.tool ?? '', session.id, renameValue);
+                    }
+                    cancelRenameRef.current = false;
                     setRenamingKey(null);
                   }}
                   onFocus={(e) => e.target.select()}
@@ -477,13 +504,30 @@ export function HistoryBoard() {
                 </span>
               </div>
             </div>
+            {/* One-click soft-delete (hide), hover-revealed. stopPropagation so
+                it doesn't trigger the card's click-to-resume. Same localStorage
+                soft-delete the right-click menu uses — no real removal. */}
+            <button
+              type="button"
+              className="history-card-delete-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                hideSession(session.tool ?? '', session.id);
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="m19 6-.867 13.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/>
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            </button>
             {/* One-click pin, hover-revealed (always visible once pinned,
                 replacing the old passive marker). stopPropagation so it
                 doesn't trigger the card's click-to-resume. */}
             <button
               type="button"
               className={`history-card-pin-btn${isPinnedSession ? ' pinned' : ''}`}
-              title={isPinnedSession ? t('menu.unpin' as any) : t('menu.pin' as any)}
               onClick={(e) => {
                 e.stopPropagation();
                 togglePin(session.tool ?? '', session.id);
@@ -546,7 +590,6 @@ export function HistoryBoard() {
               type="button"
               key={p.key}
               className={`history-tool-filter-opt${activeProject === p.key ? ' active' : ''}`}
-              title={p.cwd}
               onClick={() => { setActiveProject(activeProject === p.key ? null : p.key); setFilterMenuOpen(false); }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>

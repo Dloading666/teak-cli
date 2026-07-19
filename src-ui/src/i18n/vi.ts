@@ -84,7 +84,7 @@ export const vi = {
   'diff.unchanged_lines': '⋯ {count} dòng không đổi',
   'task.default_title': 'Nhiệm vụ mới',
   'task.search_sessions': 'Tìm phiên làm việc...',
-  'task.filter_all_projects': 'Tất cả dự án',
+  'task.filter_all_projects': 'Tất cả',
   'menu.no_recent': 'Không tìm thấy phiên gần đây',
   'task.messages': '{count} tin nhắn',
 
