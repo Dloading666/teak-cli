@@ -291,15 +291,27 @@
   color: var(--accent);
 }
 
+/* Inline rename — seamless, no border/background/padding so switching into
+   edit mode causes zero layout shift (same pattern as TaskBoard's
+   .task-title-edit). Sized to match .history-card-title exactly (font-size,
+   weight, line-height, padding-right gutter for the pin/delete buttons);
+   the only tell-tale is the accent caret. */
 .history-card-rename-input {
   width: 100%;
   box-sizing: border-box;
-  background: var(--bg-app);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-xs);
-  padding: 2px 64px 2px 6px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0 64px 0 0;
+  margin: 0;
   color: var(--text-1);
   font-size: 13px;
   font-family: var(--font, system-ui);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   outline: none;
+  caret-color: var(--accent);
 }
