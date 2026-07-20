@@ -107,6 +107,15 @@ const getToolName = (tool: string, _lang: string) => getToolDisplayName(tool);
 // legacy sessions that predate cwd capture, or whose ~/.claude.json
 // project entry is gone).
 const projectName = (cwd: string, tool: string) => {
+  // OpenClaw has no user-project concept — its sessions all carry the same
+  // internal `~/.openclaw/workspace` cwd, so the basename would print the
+  // meaningless "workspace" on every card. Show the tool name instead,
+  // matching the project-filter dropdown that already excludes openclaw
+  // (it has no user-project concept). Same story as the launchpad: the row
+  // should read "OpenClaw", not a leaked internal folder name.
+  if (tool === 'openclaw') {
+    return getToolName(tool, '');
+  }
   if (cwd) {
     const trimmed = cwd.replace(/[\\/]+$/, '');
     const idx = Math.max(trimmed.lastIndexOf('\\'), trimmed.lastIndexOf('/'));
