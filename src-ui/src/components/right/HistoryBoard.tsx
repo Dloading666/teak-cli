@@ -209,11 +209,17 @@ export function HistoryBoard() {
   // Project (workspace) filter: which cwd's sessions to show (null = all).
   // Keyed by normalized cwd (trailing slashes trimmed, separators unified —
   // no case-folding: Linux paths are case-sensitive).
+  // OpenClaw is excluded: it has no user-project concept — every session's
+  // cwd is its own internal `~/.openclaw/workspace`, so it would form one
+  // meaningless bucket that all OpenClaw sessions collapse into. It still
+  // shows in the flat list (and under "all"); it just never contributes a
+  // selectable project bucket.
   const projectCounts = useMemo(() => {
     const counts = new Map<string, number>();
     // Display form of each normalized key: first-seen original cwd wins.
     const display = new Map<string, string>();
     for (const s of baseSessions) {
+      if (s.tool === 'openclaw') continue;
       const raw = (s.cwd ?? '').trim();
       if (!raw || hidden.has(`${s.tool ?? ''}:${s.id}`)) continue;
       const key = normCwd(raw);

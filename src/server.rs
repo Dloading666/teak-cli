@@ -2413,7 +2413,24 @@ fn collect_jsonl_paths_with_mtime(
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_file() {
-                if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+                // OpenClaw writes two `.jsonl` per session side-by-side:
+                // `<uuid>.jsonl` (the conversation — what we want) and
+                // `<uuid>.trajectory.jsonl` (a trace/telemetry log). Both
+                // sit at depth 3 under `.openclaw/agents` and both end in
+                // `.jsonl`, so the bare-extension check below would collect
+                // both. The trajectory file carries a top-level `sessionId`
+                // per line, which parse_agent_jsonl latches onto — producing
+                // a second SavedSession with the SAME id as the real one.
+                // Two history rows share `key={session.id}` in HistoryBoard
+                // → React duplicate-key chaos (a junk "Openclaw Session · 0
+                // messages" card next to the real one, and soft-delete
+                // hide-keys both rows at once so it reads as "can't delete").
+                // No other tool writes `.trajectory.jsonl`, so skip it here.
+                let file_name = path.file_name().and_then(|n| n.to_str());
+                let is_trajectory = file_name
+                    .map(|n| n.ends_with(".trajectory.jsonl"))
+                    .unwrap_or(false);
+                if !is_trajectory && path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
                     let mtime = entry.metadata().ok()
                         .and_then(|m| m.modified().ok())
                         .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
