@@ -96,9 +96,6 @@ export const vi = {
   'time.yesterday': 'Hôm qua',
   'time.days_ago': '{days} ngày trước',
 
-  // Session
-  'session.max': 'Tối đa 5 phiên có thể mở cùng lúc.',
-
   // Settings modal (titlebar gear)
   'settings.title': 'Cài đặt',
   'settings.appearance': 'Giao diện',

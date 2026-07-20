@@ -93,9 +93,6 @@ export const ja = {
   'time.yesterday': '昨日',
   'time.days_ago': '{days} 日前',
 
-  // Session
-  'session.max': '同時に開けるセッションは最大 5 つです。',
-
   // Settings modal (titlebar gear)
   'settings.title': '設定',
   'settings.appearance': '外観',

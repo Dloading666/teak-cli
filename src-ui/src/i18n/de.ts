@@ -94,9 +94,6 @@ export const de = {
   'time.yesterday': 'Gestern',
   'time.days_ago': 'Vor {days} Tagen',
 
-  // Session
-  'session.max': 'Es können maximal 5 Sitzungen gleichzeitig geöffnet sein.',
-
   // Settings modal (titlebar gear)
   'settings.title': 'Einstellungen',
   'settings.appearance': 'Darstellung',

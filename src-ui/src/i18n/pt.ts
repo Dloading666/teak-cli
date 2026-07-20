@@ -94,9 +94,6 @@ export const pt = {
   'time.yesterday': 'Ontem',
   'time.days_ago': 'Há {days} dias',
 
-  // Session
-  'session.max': 'É possível ter no máximo 5 sessões abertas ao mesmo tempo.',
-
   // Settings modal (titlebar gear)
   'settings.title': 'Configurações',
   'settings.appearance': 'Aparência',

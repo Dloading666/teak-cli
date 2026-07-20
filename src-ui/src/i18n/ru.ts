@@ -94,9 +94,6 @@ export const ru = {
   'time.yesterday': 'Вчера',
   'time.days_ago': '{days} дн. назад',
 
-  // Session
-  'session.max': 'Можно открывать не более 5 сессий одновременно.',
-
   // Settings modal (titlebar gear)
   'settings.title': 'Настройки',
   'settings.appearance': 'Оформление',

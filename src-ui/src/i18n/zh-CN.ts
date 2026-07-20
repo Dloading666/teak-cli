@@ -93,9 +93,6 @@ export const zhCN = {
   'time.yesterday': '昨天',
   'time.days_ago': '{days}天前',
 
-  // Session
-  'session.max': '最多只能同时打开 5 个会话。',
-
   // Settings modal (titlebar gear)
   'settings.title': '设置',
   'settings.appearance': '外观',

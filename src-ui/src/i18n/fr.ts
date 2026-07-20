@@ -93,9 +93,6 @@ export const fr = {
   'time.yesterday': 'Hier',
   'time.days_ago': 'Il y a {days} jours',
 
-  // Session
-  'session.max': 'Vous ne pouvez pas ouvrir plus de 5 sessions simultanément.',
-
   // Settings modal (titlebar gear)
   'settings.title': 'Paramètres',
   'settings.appearance': 'Apparence',

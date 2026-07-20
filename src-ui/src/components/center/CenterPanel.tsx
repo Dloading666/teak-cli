@@ -858,10 +858,6 @@ export function CenterPanel() {
 
 
   const handleAddTab = () => {
-    if (terminals.length >= 5) {
-      showToast(t('session.max'));
-      return;
-    }
     dispatch({
       type: 'ADD_TERMINAL',
       session: { id: crypto.randomUUID(), tool: null, folderPath: null }
@@ -872,8 +868,8 @@ export function CenterPanel() {
   // from the cold-start drain (takePendingLaunch) and the warm-start
   // single-instance forward ('launch-request' event). Reuses an idle
   // launchpad tab when one exists so the agent never hijacks a tab that
-  // already runs a session; otherwise opens a fresh tab (same 5-tab cap as
-  // the + button).
+  // already runs a session; otherwise opens a fresh tab (no cap — matches
+  // the + button, which is also uncapped so launcher scripts never stall).
   const launchCtxRef = useRef({ terminals, activeTerminalId });
   useEffect(() => { launchCtxRef.current = { terminals, activeTerminalId }; });
   const applyLaunchRequest = (tool: ToolType, cwd?: string) => {
@@ -889,10 +885,6 @@ export function CenterPanel() {
         id = idle.id;
         dispatch({ type: 'SET_ACTIVE_TERMINAL', id });
       } else {
-        if (terms.length >= 5) {
-          showToast(t('session.max'));
-          return;
-        }
         id = crypto.randomUUID();
         dispatch({ type: 'ADD_TERMINAL', session: { id, tool: null, folderPath: cwd ?? null } });
       }

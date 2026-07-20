@@ -93,9 +93,6 @@ export const ko = {
   'time.yesterday': '어제',
   'time.days_ago': '{days}일 전',
 
-  // Session
-  'session.max': '동시에 최대 5개의 세션만 열 수 있습니다.',
-
   // Settings modal (titlebar gear)
   'settings.title': '설정',
   'settings.appearance': '외관',

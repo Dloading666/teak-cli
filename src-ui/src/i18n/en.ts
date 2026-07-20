@@ -93,9 +93,6 @@ export const en = {
   'time.yesterday': 'Yesterday',
   'time.days_ago': '{days} days ago',
 
-  // Session
-  'session.max': 'Maximum 5 sessions can be open at once.',
-
   // Settings modal (titlebar gear)
   'settings.title': 'Settings',
   'settings.appearance': 'Appearance',
