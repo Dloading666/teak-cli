@@ -172,6 +172,12 @@ export const commands = {
   checkToolsInstalled: () =>
     invoke<Record<string, boolean>>('check_tools_installed'),
 
+  // External launch request (`launch --tool <id> [--cwd <dir>]`) handed to
+  // the GUI at cold start. Drained exactly once by CenterPanel on mount —
+  // warm-start requests arrive as 'launch-request' events instead.
+  takePendingLaunch: () =>
+    invoke<{ tool: string; cwd?: string } | null>('take_pending_launch'),
+
   /** Probed availability of optional shells (pwsh / Git Bash / wsl on
    *  Windows; zsh/bash/fish/sh on Unix). Fed to the SettingsModal shell
    *  picker so it only shows shells the user actually has. Inbox shells

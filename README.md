@@ -126,8 +126,28 @@ The Coffee CLI app ships with a fully localized UI in 11 languages — menus, di
 | **Task Board** | Organize what you've asked the agent to do across To-Do / In Progress / Done |
 | **Agent Installer** | One-click install of Claude Code, Codex, and more — no terminal required |
 | **Remote Terminal** | SSH into remote machines and run agents on servers without leaving the app |
+| **External Launch** | Open the app straight into a fresh agent tab at a chosen folder from scripts, launchers, and file-manager context menus |
 
 **11 languages supported out of the box:** English · 简体中文 · 繁體中文 · Deutsch · Español · Français · 日本語 · 한국어 · Português · Русский · Tiếng Việt
+
+### External Launch (CLI)
+
+`coffee-cli launch --tool <id> [--cwd <dir>]` skips the launchpad and drops
+you straight into a new agent tab — for launcher apps, context menus,
+Raycast/Alfred actions, and shell aliases. `--tool` is any registered tool
+id (`claude`, `codex`, `kimicode`, `hermes`, …); omit `--cwd` to reuse the
+tool's last folder. Already running? The request is forwarded to the
+running instance and opens a new tab — existing sessions are never
+restarted or hijacked.
+
+```bash
+# macOS — call the binary directly (LaunchServices drops --args when the app is already running)
+"/Applications/Coffee CLI.app/Contents/MacOS/coffee-cli" launch --tool kimicode --cwd /work/project
+# Windows — pair with an Explorer right-click entry that passes the folder as %V
+coffee-cli.exe launch --tool claude --cwd "C:\work\project"
+# Linux
+coffee-cli launch --tool codex --cwd ~/work/project
+```
 
 ---
 
@@ -190,9 +210,22 @@ Coffee CLI 同时消除两道门槛：**不需要终端经验，不需要懂英�
 
 ### 核心功能
 
-**多 Tab 会话** · **Gambit 快捷命令** · **Hook 自动化** · **会话历史** · **内置文件浏览器** · **任务板** · **Agent 安装器** · **远程终端**
+**多 Tab 会话** · **Gambit 快捷命令** · **Hook 自动化** · **会话历史** · **内置文件浏览器** · **任务板** · **Agent 安装器** · **远程终端** · **外部唤起**
 
 原生支持 11 种语言，开箱即用。
+
+### 外部唤起（命令行）
+
+`coffee-cli launch --tool <id> [--cwd <dir>]` 跳过启动台，直接新开一个指定 Agent、指定目录的标签页——适合启动器、资源管理器右键菜单、Raycast/Alfred、脚本别名。`--tool` 取注册表中的 id（`claude`、`codex`、`kimicode`、`hermes`……）；省略 `--cwd` 时沿用该工具上次使用的目录。应用已在运行时，请求会转发给运行中的实例新开标签页，不影响已有会话。
+
+```bash
+# macOS —— 建议直接调用二进制（应用已运行时，open -a 的 --args 会被系统丢弃）
+"/Applications/Coffee CLI.app/Contents/MacOS/coffee-cli" launch --tool kimicode --cwd /work/project
+# Windows —— 配合资源管理器右键菜单，用 %V 传入当前文件夹
+coffee-cli.exe launch --tool claude --cwd "C:\work\project"
+# Linux
+coffee-cli launch --tool codex --cwd ~/work/project
+```
 
 ### 安装
 

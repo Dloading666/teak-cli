@@ -7,6 +7,7 @@ mod hook_forwarder;
 mod hook_installer;
 mod fonts;
 mod fs_watcher;
+mod launch;
 mod tool_config;
 mod tools;
 mod skills;
@@ -169,6 +170,10 @@ fn main() -> Result<()> {
     // with a known subcommand. This is opt-in; double-clicking the
     // executable still gets the GUI (no argv).
     let args: Vec<String> = std::env::args().collect();
+    // `launch --tool <id> [--cwd <dir>]` doesn't short-circuit: the GUI
+    // starts as usual, but the request rides along and the frontend drains
+    // it on mount (see launch.rs for the cold/warm delivery paths).
+    let pending_launch = launch::parse_launch_args(&args);
     if let Some(sub) = args.get(1) {
         match sub.as_str() {
             // Forward-compatible: unknown subcommands fall through
@@ -180,7 +185,7 @@ fn main() -> Result<()> {
 
     // Default: launch the GUI. Each tab picks its own CWD at
     // launch time — no initial directory needed.
-    server::start_ui()
+    server::start_ui(pending_launch)
 }
 
 /// Query the installed WebKit2GTK 4.1 minor version via dlopen +
