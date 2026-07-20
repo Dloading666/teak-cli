@@ -66,6 +66,8 @@ export const ko = {
   'launchpad.open_folder': '폴더 열기',
   'launchpad.detect_help_trigger': "인식 안 됨?",
   'launchpad.detect_help_tip': "영어권 개발자가 만든 AI 터미널 도구를 사용한 적이 있다면, 중일한 등 다른 언어 문자가 포함된 PATH가 깨져서 모든 터미널에서 인식하지 못할 수 있습니다. 3가지 복구 방법 ① 해당 AI 도구 재설치 ② 도구 PATH 수동 복구 ③ AI가 PATH를 복구하도록 맡기기",
+  'launchpad.switch_model_trigger': "모델 전환",
+  'launchpad.switch_model_tip': "모든 AI 도구를 원클릭으로 빠르게 모델을 전환하세요. EchoBird를 추천합니다. \"모델 전환\"을 클릭해 Echobird.ai를 열고 다운로드·설치하면 됩니다.",
   'changes.clean': '변경 없음 — 작업 트리가 깨끗합니다.',
   'changes.no_git': 'Git이 설치되지 않았습니다 — 코드 비교, 브랜치 등 Git 기능을 사용할 수 없습니다.',
   'changes.not_repo': '이 폴더는 Git 저장소가 아닙니다.',

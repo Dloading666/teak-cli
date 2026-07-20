@@ -66,6 +66,8 @@ export const zhTW = {
   'launchpad.open_folder': '開啟資料夾',
   'launchpad.detect_help_trigger': "識別不到?",
   'launchpad.detect_help_tip': "若你曾經用過英文開發者製作的 AI 終端工具,可能把含中日韓等其他語言字元的 PATH 改成亂碼,導致所有終端都識別不到。3種修復方案 ① 重裝該 AI 工具 ② 手動修復工具 PATH ③ 讓 AI 幫你修復 PATH",
+  'launchpad.switch_model_trigger': "切換模型",
+  'launchpad.switch_model_tip': "給所有的 AI 工具一鍵快速地切換模型,推薦使用 EchoBird,點擊\"切換模型\"打開 Echobird.ai 下載安裝即可。",
   'changes.clean': '沒有改動 — 工作區乾淨。',
   'changes.no_git': '未安裝 Git — 程式碼比對、分支等功能不可用。',
   'changes.not_repo': '目前資料夾不是 Git 儲存庫。',

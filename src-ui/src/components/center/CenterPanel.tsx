@@ -1633,6 +1633,27 @@ export function CenterPanel() {
                       >
                         {t('launchpad.detect_help_trigger' as any)}
                       </span>
+                      {/* "Switch model" — external link to EchoBird, our
+                          sister project for switching/comparing AI models.
+                          Sits next to "Can't detect?" in the same muted
+                          footer row. Tooltip explains where it goes; click
+                          opens via commands.openUrl (system browser, NOT an
+                          in-app webview — we don't do in-app viewers, see
+                          feedback_no_in_app_file_viewers). Same data-tip pill
+                          pattern as the detect-help trigger. */}
+                      <a
+                        className="switch-model-trigger"
+                        href="https://echobird.ai/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-tip={t('launchpad.switch_model_tip' as any)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          commands.openUrl('https://echobird.ai/').catch(() => {});
+                        }}
+                      >
+                        {t('launchpad.switch_model_trigger' as any)}
+                      </a>
                     </div>
 
                     {/* Activity heatmap — sits below the pinned cards so

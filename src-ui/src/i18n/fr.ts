@@ -66,6 +66,8 @@ export const fr = {
   'launchpad.open_folder': 'Ouvrir un dossier',
   'launchpad.detect_help_trigger': "Non détecté ?",
   'launchpad.detect_help_tip': "Si vous avez utilisé un outil terminal d'IA conçu par des développeurs anglophones uniquement, il a pu corrompre les segments de PATH contenant des caractères CJK ou non-ASCII (mojibake), empêchant tout terminal de détecter vos outils. 3 solutions : ① Réinstaller l'outil d'IA ② Corriger le PATH manuellement ③ Laisser l'IA corriger le PATH",
+  'launchpad.switch_model_trigger': "Changer de modèle",
+  'launchpad.switch_model_tip': "Basculez de modèle en un clic pour tous vos outils d'IA. Nous recommandons EchoBird — cliquez sur « Changer de modèle » pour ouvrir Echobird.ai et le télécharger.",
   'changes.clean': 'Aucune modification — l\'arbre de travail est propre.',
   'changes.no_git': 'Git n\'est pas installé — le diff, les branches et les autres fonctions Git sont indisponibles.',
   'changes.not_repo': 'Ce dossier n\'est pas un dépôt Git.',

@@ -66,6 +66,8 @@ export const ja = {
   'launchpad.open_folder': 'フォルダを開く',
   'launchpad.detect_help_trigger': "検出できない?",
   'launchpad.detect_help_tip': "英語圏開発者が制作した AI ターミナルツールを使ったことがある場合、中日韓などの非 ASCII 文字を含む PATH が文字化けし、すべてのターミナルで検出できなくなることがあります。3つの修復方法 ① 当該 AI ツールを再インストール ② ツールの PATH を手動で修復 ③ AI に PATH の修復を任せる",
+  'launchpad.switch_model_trigger': "モデル切替",
+  'launchpad.switch_model_tip': "すべての AI ツールをワンクリックで素早くモデル切替。EchoBird をおすすめします。「モデル切替」をクリックして Echobird.ai を開き、ダウンロード・インストールするだけです。",
   'changes.clean': '変更なし — 作業ツリーはクリーンです。',
   'changes.no_git': 'Git がインストールされていません — 差分・ブランチなどの Git 機能は利用できません。',
   'changes.not_repo': 'このフォルダは Git リポジトリではありません。',

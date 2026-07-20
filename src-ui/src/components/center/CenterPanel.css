@@ -410,6 +410,48 @@
   z-index: 100;
 }
 
+/* "Switch model" link to EchoBird (our sister project). Sits next to
+   "Can't detect?" in the same right-aligned muted footer row, with a
+   thin gap. Solid underline link (not dotted help-style) so it reads as
+   an outbound action, not a hover hint. Same data-tip pill tooltip as
+   detect-help-trigger, anchored to the right so CJK wraps normally.
+   span/a so the Glass/Carbon nuclear :not() rule leaves it alone. */
+.detect-help { gap: 14px; }
+.switch-model-trigger {
+  position: relative;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+.switch-model-trigger:hover {
+  color: var(--text-1);
+}
+.switch-model-trigger[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 340px;
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-line;
+  word-break: break-word;
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20), 0 6px 20px rgba(0, 0, 0, 0.22);
+  z-index: 100;
+}
+
 /* Card + folder button share a group wrapper */
 .launchpad-card-group {
   display: flex;

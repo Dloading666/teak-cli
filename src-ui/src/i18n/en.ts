@@ -66,6 +66,8 @@ export const en = {
   'launchpad.open_folder': 'Open Folder',
   'launchpad.detect_help_trigger': "Can't detect?",
   'launchpad.detect_help_tip': "If you've used an AI terminal tool made by English-only developers, it may have garbled PATH segments with CJK or other non-ASCII characters into mojibake, so all terminals fail to detect your tools. 3 fixes: ① Reinstall the AI tool ② Manually fix the tool's PATH ③ Let AI fix the PATH for you",
+  'launchpad.switch_model_trigger': "Switch model",
+  'launchpad.switch_model_tip': "One-click model switching for all your AI tools. We recommend EchoBird — click \"Switch model\" to open Echobird.ai and download it.",
   'changes.clean': 'No changes — working tree clean.',
   'changes.no_git': 'Git is not installed — code diff, branches and other git features are unavailable.',
   'changes.not_repo': 'This folder is not a Git repository.',
