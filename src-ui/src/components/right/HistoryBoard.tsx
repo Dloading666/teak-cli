@@ -31,6 +31,12 @@ import PI_SVG from '../../icons-inline/pi.svg?raw';
 // Grok Build - same monochrome currentColor mark treatment as Pi: inline SVG
 // so it inherits the surrounding text color across light/dark themes.
 import GROK_SVG from '../../icons-inline/grok.svg?raw';
+// OpenClaw (lobster mascot) — full-color brand mark (red gradient + teal
+// eyes), NOT currentColor, so it renders as an INLINE SVG rather than <img>;
+// inlining shares the same SVG bytes CenterPanel uses, no duplicate file on
+// disk. The markup carries its own fills, so it does NOT go through the
+// currentColor branch above.
+import OPENCLAW_SVG from '../../icons-inline/openclaw.svg?raw';
 import './HistoryBoard.css';
 
 // Tool icons — claude/codex/qwen/antigravity load via <img src=public/...>
@@ -68,6 +74,19 @@ const getToolIcon = (tool: string) => {
         aria-hidden
         style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '1em', height: '1em', flexShrink: 0 }}
         dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    );
+  }
+  // OpenClaw is a full-color brand mark (red gradient lobster, teal eyes) —
+  // inline SVG with its own fills, NOT currentColor. Renders as an inline
+  // span so the markup's hardcoded colors show verbatim (an <img> would also
+  // work, but we reuse the same SVG bytes CenterPanel imports).
+  if (tool === 'openclaw') {
+    return (
+      <span
+        aria-hidden
+        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '1em', height: '1em', flexShrink: 0 }}
+        dangerouslySetInnerHTML={{ __html: OPENCLAW_SVG }}
       />
     );
   }
