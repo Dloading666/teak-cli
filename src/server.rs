@@ -1015,6 +1015,15 @@ const SYSTEM_INJECTION_TAGS: &[&str] = &[
     // Gemini tool tile, but legacy session files keep this constant
     // relevant.
     "# GEMINI.md",
+    // Claude Code's own session-summary / compaction prompt, injected as
+    // a user message at session start (by Claude Code's compaction, and by
+    // community "save-session" skills that reuse the same template).
+    // It isn't something the user typed, so skip it in the title
+    // extractor and let the next real user line become the title —
+    // otherwise the history card reads "Below is a conversation log from
+    // a Claud...". Verified against real transcripts: this literal prefix
+    // is the only injection observed in practice.
+    "Below is a conversation log from a Claude Code coding session",
 ];
 
 fn is_system_injected(text: &str) -> bool {
