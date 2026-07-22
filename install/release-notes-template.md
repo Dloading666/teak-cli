@@ -1,44 +1,44 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-- ✨ 新增「切换模型」入口:工具选择区新增一个链接,点击在系统浏览器打开 [EchoBird](https://echobird.ai/) —— 可给所有 AI 工具一键快速切换模型。鼠标悬停显示说明,推荐下载安装 EchoBird。
-- 🔧 取消 5 个标签页上限:此前「+」按钮和外部启动(`coffee-cli launch ...`)在打开 5 个标签后会静默失效,现彻底解除限制,标签数量不受限(#104)。
-- 🧹 OpenClaw 不再出现在会话历史:OpenClaw 没有 CLI 恢复命令,点击历史卡片只会报错;现将其从历史列表移除(启动台仍可正常启动)。
+- 🍎 **修复 macOS 中文输入法符号丢失**:此前在 macOS 上用中文输入法时,Shift+9(（）)、Shift+/(？)等符号会丢字、配对符号还会导致光标乱飞。现已修复,符号正常输入。Windows 不受影响、保持原样(#107)。
+- 🪟 **窄窗口布局适配**:窗口缩小时,工具选择卡片不再溢出盖住文件夹按钮;右侧任务栏不再被顶出窗口边缘,从 900px 最小窗宽起两栏都完整可见(#109)。
+- 🧹 **历史标题提取更准**:跳过 Claude Code 会话摘要提示词的干扰,会话历史标题提取更准。
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-- ✨ 新增「切換模型」入口:工具選擇區新增一個連結,點擊在系統瀏覽器開啟 [EchoBird](https://echobird.ai/) —— 可給所有 AI 工具一鍵快速切換模型。滑鼠懸停顯示說明,推薦下載安裝 EchoBird。
-- 🔧 取消 5 個分頁上限:此前「+」按鈕和外部啟動(`coffee-cli launch ...`)在開啟 5 個分頁後會靜默失效,現徹底解除限制,分頁數量不受限(#104)。
-- 🧹 OpenClaw 不再出現在會話歷史:OpenClaw 沒有 CLI 恢復命令,點擊歷史卡片只會報錯;現將其從歷史列表移除(啟動台仍可正常啟動)。
+- 🍎 **修復 macOS 中文輸入法符號遺失**:此前在 macOS 上用中文輸入法時,Shift+9(（）)、Shift+/(？)等符號會丟字、配對符號還會導致游標亂飛。現已修復,符號正常輸入。Windows 不受影響、維持原樣(#107)。
+- 🪟 **窄視窗佈局調適**:視窗縮小時,工具選擇卡片不再溢出蓋住資料夾按鈕;右側任務欄不再被頂出視窗邊緣,從 900px 最小視窗寬起兩欄都完整可見(#109)。
+- 🧹 **歷史標題提取更準**:跳過 Claude Code 工作階段摘要提示詞的干擾,工作階段歷史標題提取更準。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-- ✨ New "Switch model" entry: a link in the tool picker opens [EchoBird](https://echobird.ai/) in your system browser — one-click model switching across all your AI tools. Hover for a tip recommending the EchoBird download.
-- 🔧 Removed the 5-tab cap: the "+" button and external launch (`coffee-cli launch ...`) previously silently no-op'd once five tabs were open; tabs are now uncapped (#104).
-- 🧹 OpenClaw no longer appears in session history: OpenClaw has no CLI resume command, so clicking its history cards only errored; it's now dropped from the history list (still launches normally from the launchpad).
+- 🍎 **Fixed macOS CJK IME symbol loss**: on macOS with a Chinese IME, Shift+9 (（）), Shift+/ (？) and similar symbols used to drop characters and pair-symbols caused the cursor to jump around. Now fixed — symbols enter normally. Windows is unaffected and unchanged (#107).
+- 🪟 **Narrow-window layout adaptation**: when the window shrinks, tool-picker cards no longer overflow over the folder button, and the right task rail no longer clips off the window edge — both rails stay fully visible from the 900px minimum width (#109).
+- 🧹 **More accurate history titles**: history-title extraction now skips the Claude Code session-summary prompt, so session titles are more accurate.
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-- ✨「モデル切替」入口を追加:ツール選択エリアにリンクを追加。クリックするとシステムブラウザで [EchoBird](https://echobird.ai/) を開き、すべての AI ツールをワンクリックでモデル切替できます。ホバーで EchoBird のダウンロードを推奨する説明を表示。
-- 🔧 5タブ上限を撤廃:「+」ボタンと外部起動(`coffee-cli launch ...`)は5タブ以降サイレントに無効化されていました。タブ数は今後無制限です(#104)。
-- 🧹 OpenClaw を会話履歴から除外:OpenClaw には CLI 復元コマンドがなく、履歴カードをクリックするとエラーになるだけでした。履歴リストから除外します(ランチパッドからの起動は引き続き正常)。
+- 🍎 **macOS 中国語 IME の記号欠落を修正**:macOS で中国語 IME 使用時、Shift+9（（））、Shift+/（？）などの記号が抜け落ちたり、ペア記号でカーソルが乱れていた問題を修正。記号が正常に入力できるようになりました。Windows は影響を受けず従来通りです(#107)。
+- 🪟 **狭いウィンドウのレイアウト調整**:ウィンドウ縮小時にツール選択カードがフォルダボタンを覆わなくなり、右側タスクレールがウィンドウ端からはみ出さなくなりました。900px の最小幅から両レールが完全に表示されます(#109)。
+- 🧹 **履歴タイトル抽出がより正確に**:Claude Code のセッション要約プロンプトの干渉をスキップし、セッション履歴のタイトル抽出がより正確になりました。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-- ✨「모델 전환」입구 추가:도구 선택 영역에 링크를 추가. 클릭하면 시스템 브라우저로 [EchoBird](https://echobird.ai/) 를 열어 모든 AI 도구를 원클릭으로 모델 전환할 수 있습니다. 마우스를 올리면 EchoBird 다운로드를 추천하는 설명이 표시됩니다.
-- 🔧 5개 탭 상한 제거:「+」버튼과 외부 실행(`coffee-cli launch ...`)이 5개 탭 이후 조용히 무시되던 문제를 해결했습니다. 이제 탭 수에 제한이 없습니다(#104).
-- 🧹 OpenClaw 가 세션 기록에서 제외:OpenClaw 에는 CLI 재개 명령이 없어 기록 카드를 클릭하면 에러만 났습니다. 이제 기록 목록에서 제외합니다(런치패드에서의 실행은 정상).
+- 🍎 **macOS 중국어 IME 기호 누락 수정**:macOS 에서 중국어 IME 사용 시 Shift+9(（）)、Shift+/(？) 등 기호가 누락되고 짝 기호로 인해 커서가 튀던 문제를 수정했습니다. 기호가 정상적으로 입력됩니다. Windows 는 영향을 받지 않고 기존과 동일합니다(#107).
+- 🪟 **좁은 창 레이아웃 개선**:창이 좁아질 때 도구 선택 카드가 폴더 버튼을 가리지 않고, 우측 작업 레일이 창 가장자리 밖으로 밀려나지 않습니다. 900px 최소 폭부터 두 레일이 완전히 표시됩니다(#109).
+- 🧹 **히스토리 제목 추출 정확도 향상**:Claude Code 세션 요약 프롬프트의 간섭을 건너뛰어 세션 히스토리 제목 추출이 더 정확해졌습니다.
 
 </details>
