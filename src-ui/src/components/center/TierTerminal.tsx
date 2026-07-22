@@ -648,6 +648,111 @@ function TierTerminalImpl({
       const xtermRows = termRef.current.querySelector('.xterm-rows') as HTMLElement | null;
       if (xtermRows) xtermRows.style.fontVariantLigatures = 'none';
 
+      // ── macOS IME symbol commit passthrough (issue #107) ────────────────
+      // On macOS WKWebView, a Chinese IME committing a symbol (Shift+9 → （,
+      // Shift+/ → ？) emits its `input` (insertText) event BEFORE the
+      // keyCode-229 keydown. xterm's `_inputEvent` (CoreBrowserTerminal.ts:1196)
+      // delivers a commit only when `(!ev.composed || !this._keyDownSeen)`; with
+      // the user still holding Shift at commit time `_keyDownSeen` is already
+      // true, so xterm bails and the symbol never reaches the PTY. xterm's
+      // 229-diff fallback then reads the textarea AFTER the commit landed →
+      // empty diff → nothing sent. The reporter (issue #107) saw exactly this:
+      // five Shift+9 presses yield only three （, and a Shift+/ that moves the
+      // cursor but produces no ？.
+      //
+      // Fix is macOS-only. Linux has its own input path (see the WebKitGTK
+      // duplication fix above); Windows on WebView2 does NOT hit the
+      // commit-first ordering — its IMEs use the Chromium 229-first flow that
+      // xterm's CompositionHelper diff path already handles, and we verified
+      // Shift+/ → ？ works there. Touching Windows would gamble a regression on
+      // the platform we dogfood, so the guard is `!__IS_LINUX__ && isMac`
+      // (mirroring the `!__IS_LINUX__ && userAgent.includes('win')` shape used
+      // by the #88 Windows IME block above).
+      //
+      // Two cooperating pieces (we deliberately DROP PR #108's piece (a) — the
+      // keydown/keypress opt-out for non-letter symbol keys: it targets the
+      // Chromium flow-1 case that Windows already handles, and its
+      // `isImeSymbolKey` excludes keyCode 229 anyway, so it is a no-op on macOS
+      // flow-2 and only risks disturbing TUIs that bind Shift+symbol via
+      // modifyOtherKeys):
+      //   a. A capture-phase `input` listener on the container (wired just
+      //      below) forwards exactly the commits xterm will NOT deliver — the
+      //      complementary case to xterm's condition, i.e.
+      //      `ev.composed && keyDownSeen` — then stopPropagation (xterm's
+      //      textarea-capture listener is a descendant target, so this prevents
+      //      its double-delivery) and clears the textarea so a later 229-diff
+      //      can't re-send stale text. The 229-first Chromium ordering is left
+      //      to xterm's diff path (last229At guard), so every commit is
+      //      delivered exactly once.
+      //   b. Pair-inserting IMEs (（）, “”, ‘’) synthesize an ArrowLeft after
+      //      the commit to park the caret; in a terminal that key must NOT
+      //      reach the PTY (it drags the real cursor over just-typed text —
+      //      "光标乱窜"). Arrow keys within 150ms of a non-ASCII commit are
+      //      bounced back to the textarea (return false) — handled in
+      //      attachCustomKeyEventHandler below.
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const ime = isMac && !__IS_LINUX__
+        ? {
+            keyDownSeen: false,        // mirror of xterm `_keyDownSeen`
+            last229At: 0,             // Chromium: 229 BEFORE commit → xterm owns it
+            lastNonAsciiCommitAt: 0,  // window for the caret-key swallow
+            lastCompositionEndAt: 0,  // guard so a composition's final commit
+                                      // isn't double-delivered alongside
+                                      // CompositionHelper's compositionend readout
+          }
+        : null;
+
+      // ── macOS IME symbol commit passthrough, commit side (issue #107) ──
+      // Companion to the keydown bookkeeping + caret-swallow in
+      // attachCustomKeyEventHandler above. An IME commit arrives as a plain
+      // `input` event on the helper textarea (inputType 'insertText').
+      // xterm delivers it only when `(!ev.composed || !_keyDownSeen)`
+      // (CoreBrowserTerminal.ts:1196); we forward exactly the complementary
+      // case (`ev.composed && keyDownSeen`) — the commits xterm drops on
+      // WKWebView's commit-first flow. Registered CAPTURE-phase on the
+      // container (an ancestor of the textarea) so it runs BEFORE xterm's
+      // own capture listener on the textarea; stopPropagation then prevents
+      // xterm's listener from double-delivering, and clearing the textarea
+      // stops a later 229-diff from re-sending stale text. Composition
+      // commits (pinyin words), emoji-picker inserts and paste are left
+      // alone — xterm handles them as before. macOS-only for the reasons
+      // documented at the `ime` declaration above.
+      if (isMac && !__IS_LINUX__ && ime) {
+        const imeTextarea = termRef.current.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
+        if (imeTextarea) {
+          const host = termRef.current;
+          const markCompositionEnd = () => { ime.lastCompositionEndAt = performance.now(); };
+          imeTextarea.addEventListener('compositionend', markCompositionEnd, { capture: true });
+          const onImeCommitInput = (ev: Event) => {
+            if (ev.target !== imeTextarea) return;
+            const ie = ev as InputEvent;
+            if (ie.inputType !== 'insertText' || !ie.data || ie.isComposing) return;
+            // Non-ASCII commit — arm the caret-key swallow no matter which
+            // path delivers the text.
+            if (/[^\x00-\x7f]/.test(ie.data)) ime.lastNonAsciiCommitAt = performance.now();
+            // Screen readers read the textarea itself — leave it untouched.
+            if (term.options.screenReaderMode) return;
+            // Chromium ordering: a 229 keydown just preceded this commit —
+            // xterm's CompositionHelper diff path owns it.
+            if (performance.now() - ime.last229At < 50) return;
+            // A composition session just finalized — CompositionHelper's
+            // compositionend readout owns that commit.
+            if (performance.now() - ime.lastCompositionEndAt < 100) return;
+            // Mirror of xterm's delivery condition `(!ev.composed ||
+            // !_keyDownSeen)`: only forward when xterm will NOT.
+            if (!ie.composed || !ime.keyDownSeen) return;
+            forwardInput(ie.data);
+            ev.stopPropagation();
+            imeTextarea.value = '';
+          };
+          host.addEventListener('input', onImeCommitInput, { capture: true });
+          unlisteners.push(() => {
+            host.removeEventListener('input', onImeCommitInput, { capture: true });
+            imeTextarea.removeEventListener('compositionend', markCompositionEnd, { capture: true });
+          });
+        }
+      }
+
     // GPU-accelerated rendering: WebGL is required for customGlyphs +
     // rescaleOverlappingGlyphs (correct ASCII art / Claude mascot / box
     // border alignment). DOM renderer silently drops those options AND
@@ -706,7 +811,11 @@ function TierTerminalImpl({
     //                are filtered via a tiny per-line buffer so they don't strand the
     //                dot in "working" until the 30s auto-idle fallback.
     let codexLine = '';
-    term.onData((data) => {
+    // Single entry point for user-typed data on its way to the PTY. term.onData
+    // covers xterm's own key handling; the macOS IME symbol-passthrough input
+    // listener below calls the same function for IME-committed text that
+    // xterm drops (issue #107, WKWebView commit-first ordering).
+    const forwardInput = (data: string) => {
       commands.tierTerminalInput(sessionId, data).catch(() => {});
       if (tool !== 'codex') return;
       for (let i = 0; i < data.length; i++) {
@@ -733,12 +842,40 @@ function TierTerminalImpl({
           codexLine += ch;
         }
       }
-    });
+    };
+    term.onData(forwardInput);
+
+    // ── macOS IME symbol commit passthrough (issue #107) ────────────────
+    // `ime` (declared above, next to the macOS input listener) mirrors
+    // xterm's private `_keyDownSeen` (set on keydown, cleared on keyup —
+    // both fire `attachCustomKeyEventHandler` per CoreBrowserTerminal.ts:1025
+    // and :1122). Coupling is intentional and documented; pin against this
+    // xterm version on upgrade.
 
     // Handle native Copy/Paste shortcuts
     term.attachCustomKeyEventHandler((e) => {
+      // macOS IME bookkeeping (issue #107) — mirror xterm's `_keyDownSeen` and
+      // record the Chromium-style 229 ordering for the commit listener.
+      if (ime) {
+        if (e.type === 'keydown') {
+          ime.keyDownSeen = true;
+          if (e.keyCode === 229) ime.last229At = performance.now();
+        } else if (e.type === 'keyup') {
+          ime.keyDownSeen = false;
+        }
+      }
       if (e.type === 'keydown') {
         rig.inputStart();
+        // macOS pair-inserting IMEs synthesize a caret-move right after
+        // committing （）/“”/‘’ — bounce it back to the textarea (moving the
+        // hidden caret is harmless) instead of letting xterm fire it into the
+        // PTY where it shifts the REAL cursor over just-typed text (#107).
+        if (ime &&
+            (e.code === 'ArrowLeft' || e.code === 'ArrowRight') &&
+            !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && !e.isComposing &&
+            performance.now() - ime.lastNonAsciiCommitAt < 150) {
+          return false;
+        }
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
         const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
