@@ -503,12 +503,15 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
-  padding: 16px 16px 16px 24px;
+  /* Fluid horizontal costs: on narrow windows the padding/gap shrink
+     before the name has to ellipsize (issue: agent name overlapped the
+     folder icon when the window was compressed horizontally). */
+  padding: 16px clamp(8px, 1.2vw, 16px) 16px clamp(14px, 1.8vw, 24px);
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
-  gap: 12px;
+  gap: clamp(6px, 0.9vw, 12px);
   height: 80px;
   cursor: pointer;
   position: relative;
@@ -609,8 +612,11 @@
 .folder-menu-item .folder-menu-del svg { opacity: 1; color: inherit; }
 
 .launchpad-folder-btn svg {
-  width: 28px;
-  height: 28px;
+  /* Fluid with the card: full 28px at normal widths, down to 22px on
+     narrow windows so the button stays affordable (name ellipsizes first,
+     the folder affordance never gets overlapped). */
+  width: clamp(22px, 2vw, 28px);
+  height: clamp(22px, 2vw, 28px);
   flex-shrink: 0;
 }
 
@@ -637,12 +643,13 @@
 
 
 .launchpad-icon {
-  /* Fixed pixel box. Every icon inside is forced to fill this box so
-     visual sizes stay uniform regardless of the source asset's internal
+  /* Fluid pixel box (44px at normal widths, down to 32px on narrow
+     windows). Every icon inside is forced to fill this box so visual
+     sizes stay uniform regardless of the source asset's internal
      viewBox utilization (brand SVGs had wildly different content-to-
      viewBox ratios before). Tune here if the grid density changes. */
-  width: 44px;
-  height: 44px;
+  width: clamp(32px, 3.2vw, 44px);
+  height: clamp(32px, 3.2vw, 44px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -666,13 +673,26 @@
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  /* Clip the name when the card gets too narrow — the span below
+     ellipsizes instead of painting over the folder button (narrow-window
+     overlap fix). */
+  overflow: hidden;
 }
 
 .launchpad-card span {
-  font-size: 18px; /* Increased text size */
+  font-size: clamp(15px, 1.35vw, 18px);
   font-weight: 500;
   color: var(--text-1);
   white-space: nowrap;
+}
+
+/* Agent name: ellipsize when the card is squeezed instead of overflowing
+   onto the folder button. The terminal card's inline-flex name (with the
+   remote-link icon) only clips — flex items can't ellipsize — which is
+   fine for its short CJK label. */
+.launchpad-card-info > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .launchpad-card-cwd {
@@ -683,7 +703,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
+  /* Shrink with the card (was a fixed 160px that could out-wide a narrow
+     card and overflow). */
+  max-width: 100%;
   letter-spacing: 0.3px;
 }
 
