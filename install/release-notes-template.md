@@ -1,49 +1,44 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-- 🎨 **全新默认外观:黑曜石 + Panel**:出厂即见近黑底(#0a0a0a)配直角强边框,严谨、高级、简约的开发者工具质感,广谱耐看。已升级的老用户保留自己已选的主题与形态,不受影响。
-- 🧹 **历史不再混入"幽灵会话"**:Claude Code 在长对话中会生成一份上下文压缩摘要,此前它被误当成一条会话显示为空标题的 "Claude Session" 卡片,现已过滤掉。
-- 📋 **全屏 TUI 内的复制真正进剪贴板**:Claude Code 全屏拖选文字会提示"已复制",但此前粘贴不到外部应用——现已接入 OSC 52,选中内容真正写入系统剪贴板,中文也不乱码(#111)。
-- 🖥️ **修复全屏 TUI 滚动后的画面残影**:在 Claude Code 等全屏 TUI 里快速滚动,停下后边缘可能出现竖条鬼影或文字错位,现已清除(#110)。
+- 🖱️ **Gambit 输入框右键菜单全区域可用**:此前面板停靠后,输入框只有第一行右键能弹出菜单,其余区域右键无反应。现已修复,在输入框任意位置右键均可弹出菜单。
+- 🖥️ **修复侧栏展开/收起时的终端乱码**:展开或收起左右两侧面板时,中间终端曾出现画面错乱/乱码。现已消除——收起动画期间终端保持稳定,动画结束后自动对齐到新尺寸。
+- 📋 **修复打开历史记录后复制失效**:此前 v3.2.3 引入的 OSC 52 处理器会在打开历史会话时把内部内容写进系统剪贴板,冲掉用户真正要粘贴的内容。已移除该处理器——拖选复制照常工作且更舒服(#111 回归)。
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-- 🎨 **全新預設外觀:黑曜石 + Panel**:出廠即見近黑底(#0a0a0a)配直角強邊框,嚴謹、高級、簡約的開發者工具質感,廣譜耐看。已升級的老使用者保留自己已選的主題與形態,不受影響。
-- 🧹 **歷史不再混入「幽靈工作階段」**:Claude Code 在長對話中會產生一份上下文壓縮摘要,此前被誤當成一條工作階段顯示為空標題的 "Claude Session" 卡片,現已過濾掉。
-- 📋 **全螢幕 TUI 內的複製真正進剪貼簿**:Claude Code 全螢幕拖選文字會提示「已複製」,但此前貼不到外部應用——現已接入 OSC 52,選取內容真正寫入系統剪貼簿,中文也不亂碼(#111)。
-- 🖥️ **修復全螢幕 TUI 捲動後的畫面殘影**:在 Claude Code 等全螢幕 TUI 裡快速捲動,停下後邊緣可能出現豎條鬼影或文字錯位,現已清除(#110)。
+- 🖱️ **Gambit 輸入框右鍵選單全區域可用**:此前面板停靠後,輸入框只有第一行右鍵能彈出選單,其餘區域右鍵無反應。現已修復,在輸入框任意位置右鍵均可彈出選單。
+- 🖥️ **修復側欄展開/收起時的終端亂碼**:展開或收起左右兩側面板時,中間終端曾出現畫面錯亂/亂碼。現已消除——收起動畫期間終端保持穩定,動畫結束後自動對齊到新尺寸。
+- 📋 **修復打開歷史記錄後複製失效**:此前 v3.2.3 引入的 OSC 52 處理器會在打開歷史工作階段時把內部內容寫進系統剪貼簿,沖掉使用者真正要貼上的內容。已移除該處理器——拖選複製照常工作且更舒服(#111 回歸)。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-- 🎨 **New default look: Obsidian + Panel**: Out of the box you now get a near-black canvas (#0a0a0a) with sharp corners and strong borders — a restrained, premium, developer-tool aesthetic that wears well. Existing users keep their saved theme and shape; this only affects fresh installs.
-- 🧹 **No more phantom sessions in history**: Claude Code writes a context-compaction summary as a separate file during long chats; it used to show up as an empty-titled "Claude Session" card. Now filtered out.
-- 📋 **Fullscreen-TUI copy now actually reaches the clipboard**: Selecting text in a Claude Code fullscreen toasted "copied" but pasted nowhere outside. OSC 52 is now wired in, so selections truly land on the OS clipboard — CJK included (#111).
-- 🖥️ **Fixed fullscreen-TUI scroll smear**: Fast scrolling inside a Claude Code fullscreen TUI could leave a vertical band of ghost text or misaligned glyphs after you stopped. Cleared (#110).
+- 🖱️ **Gambit input right-click menu works everywhere**: After the panel was docked, only the first line of the input box showed a right-click menu; right-clicking elsewhere did nothing. Fixed — the menu now appears anywhere inside the input box.
+- 🖥️ **Fixed terminal garble when collapsing/expanding side panels**: Collapsing or expanding the left/right panels used to garble the center terminal. Eliminated — the terminal stays stable during the slide animation and snaps to the new size once it settles.
+- 📋 **Fixed copy breaking after opening history**: The OSC 52 handler introduced in v3.2.3 wrote internal content to the system clipboard when opening chat history, clobbering what you actually wanted to paste. The handler is removed — drag-select copy works as normal and feels better (#111 regression).
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-- 🎨 **新しいデフォルト外観:Obsidian + Panel**:初期状態で黒に近い背景(#0a0a0a)と角張った強い境界線を実現。控えめで上質な開発者ツールの質感で、飽きが来ません。既存ユーザーは保存済みのテーマと形状を維持し、影響を受けません。
-- 🧹 **履歴に「幽霊セッション」が混入しなくなりました**:Claude Code は長い会話中にコンテキスト圧縮の要約を別ファイルとして書き出し、空のタイトルの "Claude Session" カードとして表示されていました。今後は除外されます。
-- 📋 **全画面 TUI 内のコピーが本当にクリップボードへ**:Claude Code の全画面でテキストを選ぶと「コピーしました」と出るのに外部アプリに貼れなかった問題を、OSC 52 を接続して解決。選択内容が OS クリップボードへ本当に書き込まれ、日本語/中国語も文字化けしません(#111)。
-- 🖥️ **全画面 TUI のスクロール残像を修正**:Claude Code などの全画面 TUI で高速スクロール後、端に縦縞のゴーストや文字のズレが残ることがありました。解消しました(#110)。
+- 🖱️ **Gambit 入力欄の右クリックメニューが全域で使用可能**:パネル停靠後、入力欄の 1 行目でしか右クリックメニューが出ず、それ以外の領域の右クリックが無反応だった問題を修正。入力欄のどこで右クリックしてもメニューが出るようになりました。
+- 🖥️ **サイドパネル開閉時の端末文字化けを修正**:左右パネルの展開/収納時に中央の端末が乱れていた問題を解消。スライドアニメーション中は端末が安定し、終了後に新しいサイズへ自動整列します。
+- 📋 **履歴を開いた後のコピー失効を修正**:v3.2.3 で導入した OSC 52 ハンドラが履歴セッションを開く際に内部内容をシステムクリップボードへ書き込み、実際に貼りたかった内容を上書きしていた問題を解消。ハンドラを削除し、ドラッグ選択によるコピーは従来通り快適に動作します(#111 リグレッション)。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-- 🎨 **새 기본 외관: 흑요석(Obsidian) + Panel**:기본이 검게 가까운 배경(#0a0a0a)과 각진 모서리·강한 테두리로, 절제되고 고급스러운 개발자 도구의 질감을 제공합니다. 기존 사용자는 저장한 테마와 형태를 그대로 유지해 영향을 받지 않습니다.
-- 🧹 **히스토리에 '유령 세션'이 섞이지 않게**:Claude Code 가 긴 대화 중 컨텍스트 압축 요약을 별도 파일로 남겨, 빈 제목의 "Claude Session" 카드로 표시되던 것을 이제 걸러냅니다.
-- 📋 **전체화면 TUI 의 복사가 진짜 클립보드로**:Claude Code 전체화면에서 텍스트를 선택하면 "복사됨" 이라 뜨지만 외부 앱에 붙여넣기가 안 되던 문제를 OSC 52 연결로 해결. 선택 내용이 OS 클립보드에 실제로 기록되고, 한국어/중국어도 깨지지 않습니다(#111).
-- 🖥️ **전체화면 TUI 스크롤 잔상 수정**:Claude Code 등 전체화면 TUI 에서 빠르게 스크롤한 뒤 가장자리에 세로 띠 고스트나 글자 어긋남이 남던 것을 제거했습니다(#110).
+- 🖱️ **Gambit 입력란 우클릭 메뉴 전 영역 사용 가능**:패널 도킹 후 입력란 첫 줄에서만 우클릭 메뉴가 뜨고 나머지 영역은 반응 없던 문제 수정. 입력란 어디서 우클릭해도 메뉴가 나타납니다.
+- 🖥️ **측면 패널 펼치기/접기 시 터미널 깨짐 수정**:좌우 패널을 펼치거나 접을 때 중앙 터미널이 깨지던 문제 해결. 슬라이드 애니메이션 중 터미널은 안정을 유지하고, 종료 후 새 크기에 자동 정렬됩니다.
+- 📋 **히스토리 열람 후 복사 실패 수정**:v3.2.3 에서 도입한 OSC 52 핸들러가 히스토리 세션을 열 때 내부 내용을 시스템 클립보드에 써, 실제로 붙여넣을 내용을 덮어쓰던 문제 해결. 핸들러를 제거하여 드래그 선택 복사가 종래처럼 쾌적하게 동작합니다(#111 리그레션).
 
 </details>

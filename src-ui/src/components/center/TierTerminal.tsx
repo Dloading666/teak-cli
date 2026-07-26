@@ -982,36 +982,6 @@ function TierTerminalImpl({
       }
     });
 
-    // ── OSC 52 clipboard write (TUI-driven copy) ─────────────────────────
-    // Full-screen TUIs that capture the mouse (Claude Code fullscreen) draw
-    // their OWN selection highlight and copy by emitting OSC 52 — xterm's
-    // buffer never holds a selection, so hasSelection() stays false and every
-    // app-level copy path (Ctrl+C, right-click ▸ Copy) is disabled while the
-    // TUI toasts "copied". The OS clipboard is never updated, so the text
-    // pastes nowhere outside (and the TUI's toast is lying). xterm.js core
-    // deliberately does NOT implement OSC 52 (InputHandler.ts lists
-    // "52 - Manipulate Selection Data" as a comment only) — the embedder must
-    // wire it. Decode the base64 payload (UTF-8 safe — raw atob would mangle
-    // CJK) and write via the Tauri clipboard plugin; navigator.clipboard
-    // would pop the WebView2 permission prompt (project clipboard rule,
-    // issue #96). Read queries (Pd = '?') are refused — returning false lets
-    // xterm swallow the sequence unanswered.
-    const osc52 = term.parser.registerOscHandler(52, (data: string) => {
-      try {
-        const sep = data.indexOf(';');
-        if (sep === -1) return false;
-        const payload = data.slice(sep + 1);
-        if (payload === '?' || payload === '') return false;
-        const bytes = Uint8Array.from(atob(payload), (ch) => ch.charCodeAt(0));
-        const text = new TextDecoder().decode(bytes);
-        if (text) clipboardWrite(text);
-        return true;
-      } catch {
-        return false; // malformed base64 — not ours to handle
-      }
-    });
-    unlisteners.push(() => osc52.dispose());
-
     // Clickable links: URLs only (http/https/file). Bare file/dir paths are
     // intentionally NOT matched — unquoted paths with spaces (e.g. Windows
     // "Coffee CLI_3.0.3...exe") can't be reliably bounded by a regex (would
