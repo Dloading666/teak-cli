@@ -932,33 +932,6 @@ function TierTerminalImpl({
       return true; // Let xterm handle all other keys natively
     });
 
-    // ── Post-scroll full repaint (WebGL smear mitigation) ─────────────────
-    // In alt-screen TUIs that capture the mouse (Claude Code fullscreen), every
-    // wheel notch is forwarded as mouse escape sequences and the TUI answers
-    // with a complete full-screen ANSI redraw. Under WebView2's ANGLE/D3D
-    // compositor, bursts of back-to-back full-frame redraws can leave the GL
-    // canvas holding stale row textures — visible AFTER the scroll stops as a
-    // vertical band of ghost text along the edge and cell-level misalignment
-    // ("滑动之后页面文字错位"). Same WebGL framebuffer-staleness family as
-    // issues #47 / #74, but those masks only cover tab-switch / window-focus,
-    // not the scroll path. Fix: shortly after the LAST wheel event of a
-    // gesture, re-mark every row dirty so the renderer re-uploads all row
-    // textures once the redraw storm settles. Cost is one extra viewport
-    // repaint per scroll gesture (debounced); harmless on the DOM renderer.
-    let scrollRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-    const schedulePostScrollRefresh = () => {
-      if (scrollRefreshTimer !== null) clearTimeout(scrollRefreshTimer);
-      scrollRefreshTimer = setTimeout(() => {
-        scrollRefreshTimer = null;
-        try {
-          if (term.rows > 0) term.refresh(0, term.rows - 1);
-        } catch { /* term disposed */ }
-      }, 150);
-    };
-    unlisteners.push(() => {
-      if (scrollRefreshTimer !== null) clearTimeout(scrollRefreshTimer);
-    });
-
     // ── Alternate-scroll mode (mouse wheel in full-screen TUIs) ───────────
     // Real terminals (Windows Terminal, iTerm2, xterm) translate the mouse
     // wheel into arrow-key presses when an app is in the ALTERNATE screen
@@ -980,7 +953,6 @@ function TierTerminalImpl({
       try {
         const inAltScreen = term.buffer.active.type === 'alternate';
         if (!inAltScreen) return true; // normal buffer → xterm scrolls scrollback
-        if (e.deltaY !== 0) schedulePostScrollRefresh();
         const mouseOff = term.modes.mouseTrackingMode === 'none';
         if (!mouseOff || e.deltaY === 0) return true;
 
