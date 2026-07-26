@@ -22,10 +22,10 @@
     <!-- Apply theme + shape BEFORE React renders to prevent flash of unstyled variables -->
     <script>
       (function() {
-        var theme = 'dark';
-        var shape = 'carbon';
-        try { theme = localStorage.getItem('cc-theme') || 'dark'; } catch(e) {}
-        try { shape = localStorage.getItem('cc-shape') || 'carbon'; } catch(e) {}
+        var theme = 'obsidian';
+        var shape = 'panel';
+        try { theme = localStorage.getItem('cc-theme') || 'obsidian'; } catch(e) {}
+        try { shape = localStorage.getItem('cc-shape') || 'panel'; } catch(e) {}
         document.documentElement.setAttribute('data-theme', theme);
         document.documentElement.setAttribute('data-shape', shape);
       })();

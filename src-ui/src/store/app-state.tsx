@@ -605,15 +605,17 @@ const VALID_ICON_THEMES: IconTheme[] = [
 ];
 
 function getInitialState(): AppState {
-  let theme: ThemeColor = 'dark';
-  // Default 'carbon' — matches the index.html pre-paint script (also carbon)
-  // so there's no soft→carbon flash on mount. Carbon shares Soft's radii
-  // (16/8/9999), so the rounded + titlebar-tab showcase is preserved; it just
-  // layers the hex mesh + translucent chrome on top. Screenshots skew heavily
-  // to Carbon despite the old soft default = users actively choose it, so it's
-  // the right out-of-box. KEEP index.html's pre-paint default in sync with
-  // this value or first paint flashes.
-  let shape: ThemeShape = 'carbon';
+  // Default 'obsidian' + 'panel' — the "严谨高级简约" out-of-box. Carbon's
+  // hex-mesh + translucent chrome is polarizing (love-it-or-hate-it); obsidian
+  // (#0a0a0a near-black, neutral, no hue tint) + panel (sharp 0-radius corners,
+  // strong 2px borders) reads as a flat, restrained developer-tool aesthetic
+  // that a broader 70% find acceptable vs carbon's 50/50 split. Panel is also
+  // simpler than carbon (no mask/backdrop-filter/:not() nuclear rule), so less
+  // to render-break across edge cases. KEEP index.html's pre-paint default in
+  // sync with these two values or first paint flashes (obsidian/panel → React
+  // hydrate). Existing users keep their saved theme/shape (localStorage wins).
+  let theme: ThemeColor = 'obsidian';
+  let shape: ThemeShape = 'panel';
   let iconTheme: IconTheme = 'devicon';
   let lang = 'zh-CN';
   let folderPath: string | null = null;
