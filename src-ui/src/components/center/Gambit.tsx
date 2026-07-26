@@ -497,7 +497,13 @@ function GambitImpl({
     };
   }, [ctxMenu]);
 
-  const onContextMenu = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+  // Bound to the whole .gambit-input box, not just the textarea. Docked
+  // Gambit stretches the box (flex:1) while the textarea is only as tall as
+  // its content, so right-clicking the empty area below line 1 used to land
+  // on the container — no handler, no menu, just the root's preventDefault.
+  // Left-click already routed anywhere-in-the-box to the textarea (see the
+  // container's onMouseDown); right-click now matches.
+  const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     const ta = textareaRef.current;
     const hasSelection = !!ta && (ta.selectionStart ?? 0) !== (ta.selectionEnd ?? 0);
@@ -782,6 +788,7 @@ function GambitImpl({
       <div
         className="gambit-input"
         ref={inputRef}
+        onContextMenu={onContextMenu}
         onMouseDown={(e) => {
           // Click anywhere in the box (padding, the pill overlay, a pill
           // chip body) → focus the textarea. preventDefault stops focus
@@ -820,7 +827,6 @@ function GambitImpl({
           onChange={(e) => onDraftChange(e.target.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
-          onContextMenu={onContextMenu}
           spellCheck={false}
           rows={1}
         />
