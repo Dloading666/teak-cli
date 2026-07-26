@@ -932,31 +932,66 @@ function TierTerminalImpl({
       return true; // Let xterm handle all other keys natively
     });
 
-    // ── Post-scroll full repaint (WebGL smear mitigation) ─────────────────
-    // In alt-screen TUIs that capture the mouse (Claude Code fullscreen), every
-    // wheel notch is forwarded as mouse escape sequences and the TUI answers
-    // with a complete full-screen ANSI redraw. Under WebView2's ANGLE/D3D
-    // compositor, bursts of back-to-back full-frame redraws can leave the GL
-    // canvas holding stale row textures — visible AFTER the scroll stops as a
-    // vertical band of ghost text along the edge and cell-level misalignment
-    // ("滑动之后页面文字错位"). Same WebGL framebuffer-staleness family as
-    // issues #47 / #74, but those masks only cover tab-switch / window-focus,
-    // not the scroll path. Fix: shortly after the LAST wheel event of a
-    // gesture, re-mark every row dirty so the renderer re-uploads all row
-    // textures once the redraw storm settles. Cost is one extra viewport
-    // repaint per scroll gesture (debounced); harmless on the DOM renderer.
-    let scrollRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-    const schedulePostScrollRefresh = () => {
-      if (scrollRefreshTimer !== null) clearTimeout(scrollRefreshTimer);
-      scrollRefreshTimer = setTimeout(() => {
-        scrollRefreshTimer = null;
-        try {
-          if (term.rows > 0) term.refresh(0, term.rows - 1);
-        } catch { /* term disposed */ }
-      }, 150);
+    // ── Post-scroll WebGL repair (smear / row misalignment) ───────────────
+    // Windows/WebView2: after scrolling, rows come back misaligned with a
+    // vertical band of ghost glyphs, and it never self-heals — re-rendering
+    // reproduces the identical smear because the corruption lives in the
+    // WebGL glyph texture atlas, not in xterm's row dirty-flags, so
+    // refresh() alone re-renders from the same poisoned textures.
+    // clearTextureAtlas() forces a re-raster. Same framebuffer-staleness
+    // family as #47 / #74, whose masks only cover tab-switch / window-focus.
+    //
+    // Two constraints learned from the reverted #110 / #112 attempts:
+    //   • #110 armed the repair only in the ALTERNATE screen. Claude Code
+    //     captures the mouse but stays in the NORMAL buffer (its host
+    //     scrollbar is live), so the repair never ran where it was reported.
+    //   • Hooking term.onScroll unconditionally also fires when PTY output
+    //     pushes the viewport — an atlas rebuild after every pause in agent
+    //     output. Gate on a real user gesture instead.
+    // The repair runs in a rAF, never synchronously inside xterm's own
+    // scroll path (a re-entrant refresh there cost us the scrollbar).
+    let repairTimer: ReturnType<typeof setTimeout> | null = null;
+    let repairFrame = 0;
+    let gestureUntil = 0; // deadline (performance.now) of the last user gesture
+    const schedulePostScrollRepair = () => {
+      if (repairTimer !== null) clearTimeout(repairTimer);
+      repairTimer = setTimeout(() => {
+        repairTimer = null;
+        cancelAnimationFrame(repairFrame);
+        repairFrame = requestAnimationFrame(() => {
+          try {
+            webglRef.current?.clearTextureAtlas();
+            if (term.rows > 0) term.refresh(0, term.rows - 1);
+          } catch { /* term disposed mid-gesture */ }
+        });
+      }, 200);
     };
+    // Wheel, scrollbar drag and the viewport keys are the only ways the user
+    // moves the viewport; each opens a 1 s window in which onScroll below is
+    // allowed to arm the repair.
+    const VIEWPORT_KEYS = new Set(['PageUp', 'PageDown', 'Home', 'End']);
+    const onScrollGesture = (e: Event) => {
+      if (e.type === 'pointerdown' &&
+          !(e.target as HTMLElement | null)?.closest?.('.scrollbar')) return;
+      if (e.type === 'keydown' && !VIEWPORT_KEYS.has((e as KeyboardEvent).code)) return;
+      gestureUntil = performance.now() + 1000;
+      schedulePostScrollRepair();
+    };
+    const scrollHost = termRef.current;
+    scrollHost?.addEventListener('wheel', onScrollGesture, { passive: true });
+    scrollHost?.addEventListener('pointerdown', onScrollGesture);
+    scrollHost?.addEventListener('keydown', onScrollGesture);
+    const scrollSub = term.onScroll(() => {
+      if (performance.now() > gestureUntil) return; // output-driven → ignore
+      schedulePostScrollRepair();
+    });
     unlisteners.push(() => {
-      if (scrollRefreshTimer !== null) clearTimeout(scrollRefreshTimer);
+      scrollHost?.removeEventListener('wheel', onScrollGesture);
+      scrollHost?.removeEventListener('pointerdown', onScrollGesture);
+      scrollHost?.removeEventListener('keydown', onScrollGesture);
+      scrollSub.dispose();
+      if (repairTimer !== null) clearTimeout(repairTimer);
+      cancelAnimationFrame(repairFrame);
     });
 
     // ── Alternate-scroll mode (mouse wheel in full-screen TUIs) ───────────
@@ -980,7 +1015,6 @@ function TierTerminalImpl({
       try {
         const inAltScreen = term.buffer.active.type === 'alternate';
         if (!inAltScreen) return true; // normal buffer → xterm scrolls scrollback
-        if (e.deltaY !== 0) schedulePostScrollRefresh();
         const mouseOff = term.modes.mouseTrackingMode === 'none';
         if (!mouseOff || e.deltaY === 0) return true;
 
@@ -1010,35 +1044,18 @@ function TierTerminalImpl({
       }
     });
 
-    // ── OSC 52 clipboard write (TUI-driven copy) ─────────────────────────
-    // Full-screen TUIs that capture the mouse (Claude Code fullscreen) draw
-    // their OWN selection highlight and copy by emitting OSC 52 — xterm's
-    // buffer never holds a selection, so hasSelection() stays false and every
-    // app-level copy path (Ctrl+C, right-click ▸ Copy) is disabled while the
-    // TUI toasts "copied". The OS clipboard is never updated, so the text
-    // pastes nowhere outside (and the TUI's toast is lying). xterm.js core
-    // deliberately does NOT implement OSC 52 (InputHandler.ts lists
-    // "52 - Manipulate Selection Data" as a comment only) — the embedder must
-    // wire it. Decode the base64 payload (UTF-8 safe — raw atob would mangle
-    // CJK) and write via the Tauri clipboard plugin; navigator.clipboard
-    // would pop the WebView2 permission prompt (project clipboard rule,
-    // issue #96). Read queries (Pd = '?') are refused — returning false lets
-    // xterm swallow the sequence unanswered.
-    const osc52 = term.parser.registerOscHandler(52, (data: string) => {
-      try {
-        const sep = data.indexOf(';');
-        if (sep === -1) return false;
-        const payload = data.slice(sep + 1);
-        if (payload === '?' || payload === '') return false;
-        const bytes = Uint8Array.from(atob(payload), (ch) => ch.charCodeAt(0));
-        const text = new TextDecoder().decode(bytes);
-        if (text) clipboardWrite(text);
-        return true;
-      } catch {
-        return false; // malformed base64 — not ours to handle
-      }
-    });
-    unlisteners.push(() => osc52.dispose());
+    // ── OSC 52 is deliberately NOT implemented — do not re-add ───────────
+    // A handler shipped in v3.2.3 (#111) so TUIs that draw their own selection
+    // (Claude Code captures the mouse, so xterm's buffer never holds one)
+    // could land their copy on the OS clipboard. Reverted: OSC 52 is a write
+    // the terminal cannot attribute to a user action. Anything reaching the
+    // PTY can emit it — a TUI copying on mere selection, or `cat` on a hostile
+    // file — and it silently replaces whatever the user was holding to paste.
+    // That is why xterm.js core leaves "52 - Manipulate Selection Data" as a
+    // comment in InputHandler.ts instead of wiring it.
+    // The clipboard changes only when the user asks: right-click ▸ Copy,
+    // Ctrl/Cmd+C, Ctrl+Shift+C. A TUI whose own copy doesn't reach the OS
+    // clipboard is that tool's problem to solve.
 
     // Clickable links: URLs only (http/https/file). Bare file/dir paths are
     // intentionally NOT matched — unquoted paths with spaces (e.g. Windows
