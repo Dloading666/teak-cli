@@ -1345,12 +1345,24 @@ function TierTerminalImpl({
 
     // Resize observer — CRITICAL: Never call fit() when the container is hidden
     // (display:none gives zero dimensions, causing xterm to collapse to 1 column)
-    const ro = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const { width, height } = entry.contentRect;
-      // Skip if container has zero dimensions (hidden tab)
-      if (width < 10 || height < 10) return;
+    //
+    // COALESCE: fit() is expensive — it recomputes cols/rows, resizes the WebGL
+    // canvas, and re-uploads the glyph texture atlas. The side panels animate
+    // their width over a 250ms CSS transition on collapse/expand (App.tsx
+    // PANEL_SLIDE_MS), and the center terminal's container follows frame-by-frame
+    // via flex:1. An uncoalesced ResizeObserver fires ~15 times during that slide,
+    // each fit() tearing down and rebuilding the GL framebuffer → the "展开收起
+    // 就乱码" garbled-display bug (same family as Tabby's "tab blanking/flicker",
+    // commit 6955c4f — they coalesce resize work via a body.resizing class). We
+    // debounce to trailing: skip fit() while geometry is still changing, run ONE
+    // fit() ~100ms after the last change. During the slide the GL canvas keeps
+    // its pre-animation backing size and CSS (width:100%/height:100%) scales it
+    // — slight glyph stretch, never the full-storm 乱码. After the slide settles,
+    // a single clean fit() snaps to the new cols/rows. Also de-storms window-edge
+    // drag for free.
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const runFit = () => {
+      resizeTimer = null;
       try { fit.fit(); } catch {}
       // Notify PTY backend of the new size so the CLI tool can redraw
       try {
@@ -1360,6 +1372,15 @@ function TierTerminalImpl({
           commands.tierTerminalResize(sessionId, cols, rows).catch(() => {});
         }
       } catch {}
+    };
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      // Skip if container has zero dimensions (hidden tab)
+      if (width < 10 || height < 10) return;
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(runFit, 100);
     });
     ro.observe(termRef.current!);
 
@@ -1367,6 +1388,7 @@ function TierTerminalImpl({
       mounted = false;
       unregisterFocus();
       ro.disconnect();
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
       term.dispose();
       outputScheduler.unregisterSession(sessionId);
       xtermRef.current = null;
