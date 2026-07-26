@@ -1044,18 +1044,49 @@ function TierTerminalImpl({
       }
     });
 
-    // ── OSC 52 is deliberately NOT implemented — do not re-add ───────────
-    // A handler shipped in v3.2.3 (#111) so TUIs that draw their own selection
-    // (Claude Code captures the mouse, so xterm's buffer never holds one)
-    // could land their copy on the OS clipboard. Reverted: OSC 52 is a write
-    // the terminal cannot attribute to a user action. Anything reaching the
-    // PTY can emit it — a TUI copying on mere selection, or `cat` on a hostile
-    // file — and it silently replaces whatever the user was holding to paste.
-    // That is why xterm.js core leaves "52 - Manipulate Selection Data" as a
-    // comment in InputHandler.ts instead of wiring it.
-    // The clipboard changes only when the user asks: right-click ▸ Copy,
-    // Ctrl/Cmd+C, Ctrl+Shift+C. A TUI whose own copy doesn't reach the OS
-    // clipboard is that tool's problem to solve.
+    // ── OSC 52 clipboard write (TUI-driven copy) ─────────────────────────
+    // TUIs that capture the mouse (Claude Code) draw their OWN selection, so
+    // xterm's buffer never holds one: hasSelection() is false, right-click ▸
+    // Copy stays gray and Ctrl+C has nothing to take. OSC 52 is the only way
+    // such a copy can reach the OS clipboard. It was briefly removed after
+    // v3.2.3 over the risk below — dogfooding rated the result worse: inside
+    // Claude Code there was then no way to copy at all.
+    //
+    // The risk is real, so it is fenced rather than ignored: OSC 52 is a
+    // clipboard write the terminal cannot attribute to a user action, and
+    // anything reaching the PTY can emit it (`cat` on a hostile file, a
+    // remote host over SSH). Guards mirror Wave Terminal's design — the only
+    // peer that implements this at all; VS Code and Tabby simply don't:
+    //   • focus gate — this window focused AND this terminal the active tab,
+    //     so background panes and unattended output can't reach the clipboard
+    //   • size caps on both the raw sequence and the decoded payload
+    //   • read queries (Pd = '?') refused, so the clipboard is never handed
+    //     back to the program
+    // Decoding is UTF-8 safe (atob → Uint8Array → TextDecoder; raw atob
+    // mangles CJK) and the write goes through the Tauri clipboard plugin,
+    // never navigator.clipboard — which would pop the WebView2 permission
+    // prompt (project clipboard rule, issue #96).
+    const OSC52_MAX_RAW = 128 * 1024;
+    const OSC52_MAX_DECODED = 75 * 1024;
+    const osc52 = term.parser.registerOscHandler(52, (data: string) => {
+      try {
+        if (data.length > OSC52_MAX_RAW) return false;
+        if (!document.hasFocus() || !isActiveRef.current) return false;
+        const sep = data.indexOf(';');
+        if (sep === -1) return false;
+        const payload = data.slice(sep + 1);
+        if (payload === '?' || payload === '') return false;
+        if (payload.length * 0.75 > OSC52_MAX_DECODED) return false;
+        const bytes = Uint8Array.from(atob(payload), (ch) => ch.charCodeAt(0));
+        if (bytes.byteLength > OSC52_MAX_DECODED) return false;
+        const text = new TextDecoder().decode(bytes);
+        if (text) clipboardWrite(text);
+        return true;
+      } catch {
+        return false; // malformed base64 — not ours to handle
+      }
+    });
+    unlisteners.push(() => osc52.dispose());
 
     // Clickable links: URLs only (http/https/file). Bare file/dir paths are
     // intentionally NOT matched — unquoted paths with spaces (e.g. Windows
