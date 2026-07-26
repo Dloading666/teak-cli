@@ -1713,6 +1713,57 @@ function TierTerminalImpl({
     return unsubscribe;
   }, []);
 
+  // ── Glyph atlas rebuild on display / power transitions ──────────────────
+  // Two triggers our peers wire up and we were missing. Both leave the WebGL
+  // glyph atlas holding textures that no longer match reality, and neither
+  // fires xterm's contextlost event, so nothing else rebuilds them:
+  //   • DPI / monitor change — the atlas was rasterized at the old device
+  //     pixel ratio (Tabby: displayMetricsChanged$ → clearTextureAtlas).
+  //   • OS sleep → resume — the GPU comes back with texture memory reclaimed
+  //     underneath it (VS Code: onDidResumeOS → forceRedraw(), which is
+  //     literally clearTextureAtlas). Tauri surfaces no resume event, so
+  //     detect the wall-clock gap a suspended process leaves behind.
+  // Backgrounded terminals hold no addon (detachWebglRenderer), so this
+  // no-ops for them — they rebuild on re-attach anyway.
+  useEffect(() => {
+    const rebuildAtlas = () => {
+      try {
+        webglRef.current?.clearTextureAtlas();
+        const term = xtermRef.current;
+        if (term && term.rows > 0) term.refresh(0, term.rows - 1);
+      } catch { /* terminal disposed */ }
+    };
+
+    // matchMedia on the CURRENT dpr fires once when it stops being current;
+    // re-arm against the new value each time.
+    let dprQuery: MediaQueryList | null = null;
+    function onDprChange() {
+      rebuildAtlas();
+      armDprWatch();
+    }
+    function armDprWatch() {
+      dprQuery?.removeEventListener('change', onDprChange);
+      dprQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+      dprQuery.addEventListener('change', onDprChange);
+    }
+    armDprWatch();
+
+    // A suspended process gets no timer ticks, so a gap far larger than the
+    // interval means the machine slept in between.
+    const TICK_MS = 30_000;
+    let lastTick = Date.now();
+    const resumeProbe = setInterval(() => {
+      const now = Date.now();
+      if (now - lastTick > TICK_MS * 3) rebuildAtlas();
+      lastTick = now;
+    }, TICK_MS);
+
+    return () => {
+      dprQuery?.removeEventListener('change', onDprChange);
+      clearInterval(resumeProbe);
+    };
+  }, []);
+
   // ── Startup splash dismissal ────────────────────────────────────────────
   // Detect real TUI via alternate screen buffer entry (\x1b[?1049h).
   // This precisely distinguishes "database migration text" from "actual TUI rendered".
