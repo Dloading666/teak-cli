@@ -36,5 +36,23 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     history_shape: Some(HistoryShape::GrokSessions {
         root_under_home: ".grok/sessions",
     }),
-    default_args: &[],
+    // `--minimal`: scrollback-native render mode. Grok's fullscreen TUI paints
+    // its own 24-bit RGB background (GrokNight = pure black), bypassing the
+    // xterm.js default bg — so Coffee CLI's theme/wallpaper never shows through
+    // (same family as the OpenCode TUI transparency issue). In `--minimal` the
+    // palette is `Theme::terminal_default()`: every bg_* field is `Color::Reset`,
+    // so grok draws on the terminal's own background and Coffee CLI's Glass /
+    // wallpaper shows through. Same fix as OpenCode's `lucent-orng` 4-bg-slot
+    // theme, just expressed as a render mode.
+    //
+    // OSC 11 is NOT a path here: grok's `osc11.rs` returns `None` on Windows
+    // (`#[cfg(not(unix))]` branch, same as codex), so an xterm-side OSC handler
+    // is dead code on the primary platform. `--minimal` is the only source fix.
+    //
+    // Trade-off: minimal mode drops the interactive ScrollbackPane (fold /
+    // in-app selection / mouse canvas) — but that pane's mouse interaction was
+    // already impaired under WebView2/xterm.js (alt-screen mouse/WebGL smear
+    // family, see PR #110), and the user can `/fullscreen` back per-session.
+    // Compatible with `--resume` (verified in `grok --help`).
+    default_args: &["--minimal"],
 };
