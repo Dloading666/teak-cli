@@ -1155,6 +1155,13 @@ fn parse_agent_jsonl(
     let mut updated_at = String::new();
     let mut title = String::new();
     let mut total_messages = 0;
+    // Count of REAL user messages — ones that are not IDE/system injections
+    // (compaction prompt, AGENTS.md, environment_context, etc.). A session
+    // file with zero real user messages is a Claude Code compaction / summary
+    // sub-task (it contains only the "Below is a conversation log..."
+    // injection + the assistant's generated summary), not a conversation the
+    // user had. Surfacing it lists a phantom "Claude Session" card. Drop it.
+    let mut real_user_messages = 0u32;
 
     for line in reader.lines().map_while(Result::ok) {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) {
@@ -1179,6 +1186,33 @@ fn parse_agent_jsonl(
                 if let Some(role) = msg_obj.get("role").and_then(|v| v.as_str()) {
                     if role == "user" || role == "assistant" {
                         total_messages += 1;
+                    }
+                    if role == "user" {
+                        // Tally real (non-injected) user messages for the
+                        // compaction-sub-task filter below. Mirrors the
+                        // is_system_injected checks the title extractor uses,
+                        // but runs on EVERY user line (the title branch only
+                        // acts on the first). String content and array
+                        // content (first text block) both covered.
+                        let is_real_user = match msg_obj.get("content") {
+                            Some(c) if c.is_string() => {
+                                c.as_str().map_or(false, |s| !is_system_injected(s))
+                            }
+                            Some(c) if c.is_array() => c.as_array().map_or(false, |arr| {
+                                arr.iter().any(|block| {
+                                    let kind = block.get("type").and_then(|v| v.as_str());
+                                    if kind != Some("text") && kind != Some("input_text") {
+                                        return false;
+                                    }
+                                    block.get("text").and_then(|v| v.as_str())
+                                        .map_or(false, |t| !is_system_injected(t))
+                                })
+                            }),
+                            _ => false,
+                        };
+                        if is_real_user {
+                            real_user_messages += 1;
+                        }
                     }
                     if role == "user" && title.is_empty() {
                         if let Some(content_str) = msg_obj.get("content").and_then(|v| v.as_str()) {
@@ -1232,8 +1266,17 @@ fn parse_agent_jsonl(
             cwd = real_path.clone();
         }
     }
+    // No real user message anywhere in the file → this is a Claude Code
+    // compaction / summary sub-task (or an empty/crashed shell), not a
+    // conversation the user had. Excluding it keeps phantom "Claude Session"
+    // cards out of the history list. Verified on real transcripts: a pure
+    // compaction file holds 1 injected user line + assistant summary lines
+    // and nothing else; any live session has ≥1 real user line.
+    if real_user_messages == 0 {
+        return None;
+    }
     let turn_count = if total_messages > 0 { std::cmp::max(1, (total_messages + 1) / 2) } else { 0 };
-    
+
     // Fallback date from file metadata
     if let Ok(meta) = std::fs::metadata(file_path) {
         if let Ok(mod_time) = meta.modified() {
@@ -4366,5 +4409,93 @@ mod tests {
     fn codex_desktop_plain_block_passes_through_unchanged() {
         let block = "新网站保存到 C:\\EchoBird\\new-web 如何\n";
         assert_eq!(strip_codex_desktop_file_preamble(block), block);
+    }
+
+    // ── compaction / summary sub-task filtering ────────────────────────────
+    // A Claude Code compaction sub-task JSONL holds only the "Below is a
+    // conversation log..." injection as its user line plus the assistant's
+    // generated summary — no real user input. It must NOT surface as a
+    // phantom "Claude Session" card. See parse_agent_jsonl.
+    fn write_jsonl(path: &std::path::Path, lines: &[&str]) {
+        use std::io::Write;
+        let mut f = std::fs::File::create(path).unwrap();
+        for l in lines {
+            writeln!(f, "{}", l).unwrap();
+        }
+    }
+
+    #[test]
+    fn drops_pure_compaction_subtask_session() {
+        let dir = std::env::temp_dir().join(format!("coffee-cli-compact-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("30d442fb-fake-compaction.jsonl");
+        write_jsonl(&f, &[
+            "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"Below is a conversation log from a Claude Code coding session.\\nCreate a summary to help the next session quickly understand the context.\"}}",
+            "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"# Session Summary\\n...\"}]}}",
+            "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"### Tasks\\n- did stuff\"}]}}",
+        ]);
+        let got = parse_agent_jsonl(&f, "claude", &std::collections::HashMap::new());
+        assert!(got.is_none(), "pure compaction sub-task must not be listed");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn keeps_real_session_with_real_user_message() {
+        let dir = std::env::temp_dir().join(format!("coffee-cli-real-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("dadf2990-fake-real.jsonl");
+        write_jsonl(&f, &[
+            "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"修复一下历史记录的 bug\"}}",
+            "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"好的，我来看看\"}]}}",
+        ]);
+        let got = parse_agent_jsonl(&f, "claude", &std::collections::HashMap::new()).expect("real session kept");
+        assert_eq!(got.name, "修复一下历史记录的 bug");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn keeps_session_that_continued_after_compaction() {
+        // The live-session case: compaction injected as the FIRST user line,
+        // but the user kept chatting in the same session file. Must survive —
+        // filtering on "first user line is injected" would wrongly drop this.
+        let dir = std::env::temp_dir().join(format!("coffee-cli-cont-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("43b57955-fake-continued.jsonl");
+        write_jsonl(&f, &[
+            "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"Below is a conversation log from a Claude Code coding session.\\nCreate a summary...\"}}",
+            "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"summary\"}]}}",
+            "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"继续帮我测一下 OSC 52\"}}",
+            "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"好\"}]}}",
+        ]);
+        let got = parse_agent_jsonl(&f, "claude", &std::collections::HashMap::new()).expect("continued session kept");
+        // Title is the FIRST real user line, not the compaction injection.
+        assert_eq!(got.name, "继续帮我测一下 OSC 52");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn counts_array_content_user_message_with_mixed_blocks() {
+        // A user message whose content is an ARRAY can mix an injected block
+        // (e.g. an ide_opened_file tool_result) with a real text block. The
+        // counter must count this as ONE real user message (.any() semantics)
+        // — not zero (which would drop a live session) and not >1. Covers the
+        // array branch of the counter that the string-content tests don't.
+        let dir = std::env::temp_dir().join(format!("coffee-cli-arr-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("a3f2c910-fake-array.jsonl");
+        write_jsonl(&f, &[
+            // First user msg: array with an injected tool_result block AND a
+            // real text block — must count as 1 real user message.
+            "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"x\",\"content\":\"<ide_opened_file>\"},{\"type\":\"text\",\"text\":\"帮我把这个文件重构一下\"}]}}",
+            "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"好的\"}]}}",
+        ]);
+        let got = parse_agent_jsonl(&f, "claude", &std::collections::HashMap::new()).expect("mixed-array session kept");
+        // Title comes from the real text block, not the injected tool_result.
+        assert_eq!(got.name, "帮我把这个文件重构一下");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
