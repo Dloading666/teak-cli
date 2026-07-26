@@ -932,66 +932,31 @@ function TierTerminalImpl({
       return true; // Let xterm handle all other keys natively
     });
 
-    // ── Post-scroll WebGL repair (smear / row misalignment) ───────────────
-    // Windows/WebView2: after scrolling, rows come back misaligned with a
-    // vertical band of ghost glyphs, and it never self-heals — re-rendering
-    // reproduces the identical smear because the corruption lives in the
-    // WebGL glyph texture atlas, not in xterm's row dirty-flags, so
-    // refresh() alone re-renders from the same poisoned textures.
-    // clearTextureAtlas() forces a re-raster. Same framebuffer-staleness
-    // family as #47 / #74, whose masks only cover tab-switch / window-focus.
-    //
-    // Two constraints learned from the reverted #110 / #112 attempts:
-    //   • #110 armed the repair only in the ALTERNATE screen. Claude Code
-    //     captures the mouse but stays in the NORMAL buffer (its host
-    //     scrollbar is live), so the repair never ran where it was reported.
-    //   • Hooking term.onScroll unconditionally also fires when PTY output
-    //     pushes the viewport — an atlas rebuild after every pause in agent
-    //     output. Gate on a real user gesture instead.
-    // The repair runs in a rAF, never synchronously inside xterm's own
-    // scroll path (a re-entrant refresh there cost us the scrollbar).
-    let repairTimer: ReturnType<typeof setTimeout> | null = null;
-    let repairFrame = 0;
-    let gestureUntil = 0; // deadline (performance.now) of the last user gesture
-    const schedulePostScrollRepair = () => {
-      if (repairTimer !== null) clearTimeout(repairTimer);
-      repairTimer = setTimeout(() => {
-        repairTimer = null;
-        cancelAnimationFrame(repairFrame);
-        repairFrame = requestAnimationFrame(() => {
-          try {
-            webglRef.current?.clearTextureAtlas();
-            if (term.rows > 0) term.refresh(0, term.rows - 1);
-          } catch { /* term disposed mid-gesture */ }
-        });
-      }, 200);
+    // ── Post-scroll full repaint (WebGL smear mitigation) ─────────────────
+    // In alt-screen TUIs that capture the mouse (Claude Code fullscreen), every
+    // wheel notch is forwarded as mouse escape sequences and the TUI answers
+    // with a complete full-screen ANSI redraw. Under WebView2's ANGLE/D3D
+    // compositor, bursts of back-to-back full-frame redraws can leave the GL
+    // canvas holding stale row textures — visible AFTER the scroll stops as a
+    // vertical band of ghost text along the edge and cell-level misalignment
+    // ("滑动之后页面文字错位"). Same WebGL framebuffer-staleness family as
+    // issues #47 / #74, but those masks only cover tab-switch / window-focus,
+    // not the scroll path. Fix: shortly after the LAST wheel event of a
+    // gesture, re-mark every row dirty so the renderer re-uploads all row
+    // textures once the redraw storm settles. Cost is one extra viewport
+    // repaint per scroll gesture (debounced); harmless on the DOM renderer.
+    let scrollRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const schedulePostScrollRefresh = () => {
+      if (scrollRefreshTimer !== null) clearTimeout(scrollRefreshTimer);
+      scrollRefreshTimer = setTimeout(() => {
+        scrollRefreshTimer = null;
+        try {
+          if (term.rows > 0) term.refresh(0, term.rows - 1);
+        } catch { /* term disposed */ }
+      }, 150);
     };
-    // Wheel, scrollbar drag and the viewport keys are the only ways the user
-    // moves the viewport; each opens a 1 s window in which onScroll below is
-    // allowed to arm the repair.
-    const VIEWPORT_KEYS = new Set(['PageUp', 'PageDown', 'Home', 'End']);
-    const onScrollGesture = (e: Event) => {
-      if (e.type === 'pointerdown' &&
-          !(e.target as HTMLElement | null)?.closest?.('.scrollbar')) return;
-      if (e.type === 'keydown' && !VIEWPORT_KEYS.has((e as KeyboardEvent).code)) return;
-      gestureUntil = performance.now() + 1000;
-      schedulePostScrollRepair();
-    };
-    const scrollHost = termRef.current;
-    scrollHost?.addEventListener('wheel', onScrollGesture, { passive: true });
-    scrollHost?.addEventListener('pointerdown', onScrollGesture);
-    scrollHost?.addEventListener('keydown', onScrollGesture);
-    const scrollSub = term.onScroll(() => {
-      if (performance.now() > gestureUntil) return; // output-driven → ignore
-      schedulePostScrollRepair();
-    });
     unlisteners.push(() => {
-      scrollHost?.removeEventListener('wheel', onScrollGesture);
-      scrollHost?.removeEventListener('pointerdown', onScrollGesture);
-      scrollHost?.removeEventListener('keydown', onScrollGesture);
-      scrollSub.dispose();
-      if (repairTimer !== null) clearTimeout(repairTimer);
-      cancelAnimationFrame(repairFrame);
+      if (scrollRefreshTimer !== null) clearTimeout(scrollRefreshTimer);
     });
 
     // ── Alternate-scroll mode (mouse wheel in full-screen TUIs) ───────────
@@ -1015,6 +980,7 @@ function TierTerminalImpl({
       try {
         const inAltScreen = term.buffer.active.type === 'alternate';
         if (!inAltScreen) return true; // normal buffer → xterm scrolls scrollback
+        if (e.deltaY !== 0) schedulePostScrollRefresh();
         const mouseOff = term.modes.mouseTrackingMode === 'none';
         if (!mouseOff || e.deltaY === 0) return true;
 
@@ -1045,40 +1011,26 @@ function TierTerminalImpl({
     });
 
     // ── OSC 52 clipboard write (TUI-driven copy) ─────────────────────────
-    // TUIs that capture the mouse (Claude Code) draw their OWN selection, so
-    // xterm's buffer never holds one: hasSelection() is false, right-click ▸
-    // Copy stays gray and Ctrl+C has nothing to take. OSC 52 is the only way
-    // such a copy can reach the OS clipboard. It was briefly removed after
-    // v3.2.3 over the risk below — dogfooding rated the result worse: inside
-    // Claude Code there was then no way to copy at all.
-    //
-    // The risk is real, so it is fenced rather than ignored: OSC 52 is a
-    // clipboard write the terminal cannot attribute to a user action, and
-    // anything reaching the PTY can emit it (`cat` on a hostile file, a
-    // remote host over SSH). Guards mirror Wave Terminal's design — the only
-    // peer that implements this at all; VS Code and Tabby simply don't:
-    //   • focus gate — this window focused AND this terminal the active tab,
-    //     so background panes and unattended output can't reach the clipboard
-    //   • size caps on both the raw sequence and the decoded payload
-    //   • read queries (Pd = '?') refused, so the clipboard is never handed
-    //     back to the program
-    // Decoding is UTF-8 safe (atob → Uint8Array → TextDecoder; raw atob
-    // mangles CJK) and the write goes through the Tauri clipboard plugin,
-    // never navigator.clipboard — which would pop the WebView2 permission
-    // prompt (project clipboard rule, issue #96).
-    const OSC52_MAX_RAW = 128 * 1024;
-    const OSC52_MAX_DECODED = 75 * 1024;
+    // Full-screen TUIs that capture the mouse (Claude Code fullscreen) draw
+    // their OWN selection highlight and copy by emitting OSC 52 — xterm's
+    // buffer never holds a selection, so hasSelection() stays false and every
+    // app-level copy path (Ctrl+C, right-click ▸ Copy) is disabled while the
+    // TUI toasts "copied". The OS clipboard is never updated, so the text
+    // pastes nowhere outside (and the TUI's toast is lying). xterm.js core
+    // deliberately does NOT implement OSC 52 (InputHandler.ts lists
+    // "52 - Manipulate Selection Data" as a comment only) — the embedder must
+    // wire it. Decode the base64 payload (UTF-8 safe — raw atob would mangle
+    // CJK) and write via the Tauri clipboard plugin; navigator.clipboard
+    // would pop the WebView2 permission prompt (project clipboard rule,
+    // issue #96). Read queries (Pd = '?') are refused — returning false lets
+    // xterm swallow the sequence unanswered.
     const osc52 = term.parser.registerOscHandler(52, (data: string) => {
       try {
-        if (data.length > OSC52_MAX_RAW) return false;
-        if (!document.hasFocus() || !isActiveRef.current) return false;
         const sep = data.indexOf(';');
         if (sep === -1) return false;
         const payload = data.slice(sep + 1);
         if (payload === '?' || payload === '') return false;
-        if (payload.length * 0.75 > OSC52_MAX_DECODED) return false;
         const bytes = Uint8Array.from(atob(payload), (ch) => ch.charCodeAt(0));
-        if (bytes.byteLength > OSC52_MAX_DECODED) return false;
         const text = new TextDecoder().decode(bytes);
         if (text) clipboardWrite(text);
         return true;
@@ -1742,57 +1694,6 @@ function TierTerminalImpl({
       fallback = setTimeout(reveal, 180);
     });
     return unsubscribe;
-  }, []);
-
-  // ── Glyph atlas rebuild on display / power transitions ──────────────────
-  // Two triggers our peers wire up and we were missing. Both leave the WebGL
-  // glyph atlas holding textures that no longer match reality, and neither
-  // fires xterm's contextlost event, so nothing else rebuilds them:
-  //   • DPI / monitor change — the atlas was rasterized at the old device
-  //     pixel ratio (Tabby: displayMetricsChanged$ → clearTextureAtlas).
-  //   • OS sleep → resume — the GPU comes back with texture memory reclaimed
-  //     underneath it (VS Code: onDidResumeOS → forceRedraw(), which is
-  //     literally clearTextureAtlas). Tauri surfaces no resume event, so
-  //     detect the wall-clock gap a suspended process leaves behind.
-  // Backgrounded terminals hold no addon (detachWebglRenderer), so this
-  // no-ops for them — they rebuild on re-attach anyway.
-  useEffect(() => {
-    const rebuildAtlas = () => {
-      try {
-        webglRef.current?.clearTextureAtlas();
-        const term = xtermRef.current;
-        if (term && term.rows > 0) term.refresh(0, term.rows - 1);
-      } catch { /* terminal disposed */ }
-    };
-
-    // matchMedia on the CURRENT dpr fires once when it stops being current;
-    // re-arm against the new value each time.
-    let dprQuery: MediaQueryList | null = null;
-    function onDprChange() {
-      rebuildAtlas();
-      armDprWatch();
-    }
-    function armDprWatch() {
-      dprQuery?.removeEventListener('change', onDprChange);
-      dprQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-      dprQuery.addEventListener('change', onDprChange);
-    }
-    armDprWatch();
-
-    // A suspended process gets no timer ticks, so a gap far larger than the
-    // interval means the machine slept in between.
-    const TICK_MS = 30_000;
-    let lastTick = Date.now();
-    const resumeProbe = setInterval(() => {
-      const now = Date.now();
-      if (now - lastTick > TICK_MS * 3) rebuildAtlas();
-      lastTick = now;
-    }, TICK_MS);
-
-    return () => {
-      dprQuery?.removeEventListener('change', onDprChange);
-      clearInterval(resumeProbe);
-    };
   }, []);
 
   // ── Startup splash dismissal ────────────────────────────────────────────
