@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAppState, useAppDispatch } from './store/app-state';
 import { retryInvoke } from './tauri';
 import { subscribeAgentStatus } from './lib/agent-status-bus';
+import { initNotifySound } from './lib/notify-sound';
 import { routeFileDrop } from './lib/file-drop';
 import { initHistoryAutoRefresh } from './lib/history-cache';
 import { TitleBar } from './components/common/TitleBar';
@@ -109,6 +110,16 @@ export function App() {
       dispatch({ type: 'SET_AGENT_STATUS', id: payload.tab_id, status: payload.status });
     });
   }, [dispatch]);
+
+  // Completion / permission chimes (Settings ▸ Sound). Uses its own raw
+  // listener rather than subscribeAgentStatus so the bus's singleton
+  // activeEmit stays with the dispatch above. The getter lets the module
+  // suppress the chime when the finished tab is the one being watched.
+  const activeTerminalIdRef = useRef(state.activeTerminalId);
+  activeTerminalIdRef.current = state.activeTerminalId;
+  useEffect(() => {
+    return initNotifySound(() => activeTerminalIdRef.current);
+  }, []);
 
   // Apply theme + shape on mount and change — must sync with the inline script in index.html
   useEffect(() => {
