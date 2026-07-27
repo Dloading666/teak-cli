@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
+import { UnicodeGraphemesAddon } from '@xterm/addon-unicode-graphemes';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { clipboardRead, clipboardWrite, clipboardReadImage } from '../../lib/clipboard';
 import { subscribeTerminalEvents } from '../../lib/pty-event-bus';
@@ -575,6 +576,19 @@ function TierTerminalImpl({
     // apps'. Same reason VS Code loads this addon in its terminal.
     term.loadAddon(new Unicode11Addon());
     term.unicode.activeVersion = '11';
+    // Grapheme-aware widths (Unicode 15 + clustering). Supersedes V11: besides
+    // the single-codepoint emoji V11 already widens, this also fixes the
+    // multi-codepoint clusters V11 leaves wrong - ZWJ families (👨‍👩‍👧‍👦
+    // measured 8 cells under V11), skin-tone modifiers (👨🏽 = 4), and FE0F
+    // presentation emoji (❤️ ✈️ = 1) all become 2 cells. Probed headlessly:
+    // zero regression on CJK / box-drawing / dashes / ascii. Upstream marks
+    // this addon experimental, so load best-effort - if it throws we keep the
+    // stable V11 provider active instead of crashing terminal init.
+    try {
+      term.loadAddon(new UnicodeGraphemesAddon());
+    } catch {
+      // V11 remains the active unicode provider
+    }
 
     // Register focus function in the singleton focus registry.
     // CenterPanel handles the global focusin/mouseup listener and routes
