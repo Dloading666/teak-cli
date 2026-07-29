@@ -13,7 +13,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "openclaw",
     display_name: "OpenClaw",
     binary_name: "openclaw",
-    skill_dir_relative: Some(".openclaw/workspace/skills"),
     has_hook_surface: false,
     // OpenClaw is NOT collected into the History board. Verified against
     // upstream `openclaw --help` (2026.7.1-2): there is no

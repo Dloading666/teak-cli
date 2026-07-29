@@ -16,11 +16,7 @@
 //     getSnapshot + useSyncExternalStore), so React subscribers re-render
 //     when a new prompt is pushed from any tab.
 //
-// What gets stored: the user's RAW trimmed draft — NOT the final text sent,
-//     which includes the auto-generated skill preamble. When the user recalls
-//     an entry they want their own words back, not the "Use the X skill…"
-//     instruction we prepended on their behalf. Skill-only sends (empty user
-//     text) push nothing.
+// What gets stored: the user's RAW trimmed draft - exactly what they typed.
 //
 // Dedupe: consecutive duplicates collapse (shells call this `ignoredups`) so
 //     re-sending the same prompt three times doesn't clutter recall. A hard
@@ -75,7 +71,7 @@ export function getGambitHistorySnapshot(): string[] {
 }
 
 /** Append a prompt to history. Empty / whitespace-only input is ignored
- *  (skill-only sends have no user text worth recalling). Consecutive
+ *  Consecutive
  *  duplicates collapse. Trims to MAX_ENTRIES, evicting the oldest. */
 export function pushGambitHistory(text: string): void {
   const t = text.trim();

@@ -252,33 +252,6 @@ export const commands = {
     invoke<void>('fs_paste', { action, srcPath, targetDir }),
   showInFolder: (path: string) => invoke<void>('show_in_folder', { path }),
 
-  // ── Skills (Coffee CLI skill store, junctioned into ~/.claude/skills + ~/.codex/skills) ──
-  // Frontend does HTTP fetch (no Rust HTTP dep), pipes bytes here.
-  skillsEnsureDirs: () => invoke<void>('skills_ensure_dirs'),
-  skillsWriteFile: (name: string, relPath: string, bytes: number[] | Uint8Array) =>
-    invoke<void>('skills_write_file', { name, relPath, bytes: Array.from(bytes) }),
-  skillsList: () => invoke<{ name: string; enabled: boolean; skillMd: string | null; iconDataUrl: string | null; path: string }[]>('skills_list'),
-  /** Toggle a skill on or off. On success, returns a list of per-tool
-   *  warnings — usually empty. Non-empty entries describe tools whose
-   *  skills dir already contained a real folder for this skill (manual
-   *  install); Coffee CLI doesn't clobber those, so the user keeps
-   *  their version on those tools. UI should surface these as a
-   *  per-line toast alongside the success indicator. */
-  skillsToggle: (name: string, enable: boolean) =>
-    invoke<string[]>('skills_toggle', { name, enable }),
-  skillsDelete: (name: string) => invoke<void>('skills_delete', { name }),
-
-  // Codex-compatible plugin marketplaces (git-cloned repos under
-  // ~/.coffee-cli/marketplace). We read the marketplace.json rule, render
-  // cards, and inject the plugin path into the agent prompt — nothing more.
-  addMarketplace: (gitUrl: string) => invoke<void>('add_marketplace', { gitUrl }),
-  listMarketplaces: () => invoke<Marketplace[]>('list_marketplaces'),
-  setMarketplacePluginEnabled: (key: string, enabled: boolean) =>
-    invoke<void>('set_marketplace_plugin_enabled', { key, enabled }),
-  updateMarketplace: (id: string) => invoke<void>('update_marketplace', { id }),
-  deleteMarketplace: (id: string) => invoke<void>('delete_marketplace', { id }),
-  openMarketplaceDir: () => invoke<void>('open_marketplace_dir'),
-
   // Task Board persistence (~/.coffee-cli/tasks.json)
   loadTasks: () => invoke<string>('load_tasks'),
   saveTasks: (data: string) => invoke<void>('save_tasks', { data }),
@@ -316,24 +289,6 @@ export const commands = {
   setToolConfig: (tool: string, entry: ToolConfigEntry) =>
     invoke<void>('set_tool_config', { tool, entry }),
 };
-
-// Codex-compatible plugin marketplace (a cloned git repo) + its plugins.
-export interface MarketplacePlugin {
-  key: string;
-  name: string;
-  displayName: string;
-  description: string;
-  /** Absolute path to the icon file; load via convertFileSrc (asset proto). */
-  iconPath: string | null;
-  path: string;
-  enabled: boolean;
-}
-export interface Marketplace {
-  id: string;
-  displayName: string;
-  manifestPath: string;
-  plugins: MarketplacePlugin[];
-}
 
 // In-app self-update progress, emitted by download_and_install_update.
 export interface SelfUpdateProgress {

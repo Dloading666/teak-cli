@@ -180,8 +180,4 @@ Apague esta nota quando quiser e comece a sua primeira tarefa.`,
   'heatmap.tooltip_one': '1 mensagem em {date}',
   'heatmap.tooltip_none': 'Sem atividade em {date}',
 
-  // Avisos do painel Skills
-  'skills.toast.enabled': 'Ativada',
-  'skills.toast.disabled': 'Desativada',
-
 } as const;

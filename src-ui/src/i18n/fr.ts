@@ -179,8 +179,4 @@ Supprimez cette note quand vous voulez et commencez votre première tâche.`,
   'heatmap.tooltip_one': '1 message le {date}',
   'heatmap.tooltip_none': 'Aucune activité le {date}',
 
-  // Toasts du panneau Skills
-  'skills.toast.enabled': 'Activée',
-  'skills.toast.disabled': 'Désactivée',
-
 } as const;

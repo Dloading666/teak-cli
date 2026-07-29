@@ -1560,9 +1560,9 @@ body.gambit-docked .multi-agent-grid-standalone {
    Buttons / inputs / textareas / anchors aren't matched by the
    element list at all, so their own hover/focus bgs are
    untouched. */
-:is([data-shape="glass"], [data-shape="carbon"]) .panel-left :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-tabs, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
-:is([data-shape="glass"], [data-shape="carbon"]) .panel-right :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-tabs, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
-:is([data-shape="glass"], [data-shape="carbon"]) .panel-center :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-tabs, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line) {
+:is([data-shape="glass"], [data-shape="carbon"]) .panel-left :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
+:is([data-shape="glass"], [data-shape="carbon"]) .panel-right :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
+:is([data-shape="glass"], [data-shape="carbon"]) .panel-center :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line) {
     background: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;
@@ -1657,21 +1657,6 @@ body.gambit-docked .multi-agent-grid-standalone {
     background: transparent !important;
 }
 
-/* Library segmented toggle (Agents / Skills above the launchpad
-   grid). Container becomes a faint glass pill; the active segment
-   inside reads as "lit-up brighter glass" instead of the source-
-   default solid var(--accent) fill, which clashed visually with
-   the rest of the glass language. .library-tabs is excluded from
-   the panel-* :not() nuclear rule above so these settings actually
-   take effect. */
-[data-shape="glass"] .library-tabs {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.10);
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-}
-
 /* Library chrome buttons in glass — back chevron + per-card gear.
    Source defaults (text-3 + low opacity) were tuned against the
    solid bg-panel surface; against glass-frosted backdrops with
@@ -1690,7 +1675,7 @@ body.gambit-docked .multi-agent-grid-standalone {
 }
 
 /* Per-card gear renders 4–8× simultaneously, so painting all of
-   them accent would compete with the .is-pinned accent treatment
+   them accent would compete with the toggle's accent color.
    and cluster the eye. Promote to text-1 + full opacity instead
    (bright, unmistakable, but neutral grey). Hover on the gear
    itself still rewards with accent — that promotion is the
@@ -1698,17 +1683,6 @@ body.gambit-docked .multi-agent-grid-standalone {
 [data-shape="glass"] .library-gear-btn {
     color: var(--text-1);
     opacity: 1;
-}
-
-[data-shape="glass"] .library-tab.active {
-    background: rgba(255, 255, 255, 0.12);
-    color: var(--text-1);
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.24);
-    /* Concentric corners: .library-tabs uses --radius-md with 4px
-       padding, so its visible inner curve is (md - 4px). The active
-       segment must match exactly or its corners don't sit flush
-       against the inner wall. */
-    border-radius: calc(var(--radius-md) - 4px);
 }
 
 /* Card hover: kill the translateY lift so the cards stay still
@@ -1723,13 +1697,11 @@ body.gambit-docked .multi-agent-grid-standalone {
 
 /* Floating popups + modals — ctx-menu (right-click + lang +
    theme), tool-config-modal (per-agent launch settings),
-   gambit-skill-popover (the "+" picker in the compose footer).
    Same faint-white-wash + 1px-white-outline + top-edge highlight
    + outer drop shadow combo, so every floating overlay sits on
    the same Liquid-Glass tier above the panels. */
 [data-shape="glass"] .ctx-menu,
-[data-shape="glass"] .history-tool-filter-menu,
-[data-shape="glass"] .gambit-skill-popover {
+[data-shape="glass"] .history-tool-filter-menu {
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.14);
     backdrop-filter: var(--glass-blur);
@@ -1737,35 +1709,6 @@ body.gambit-docked .multi-agent-grid-standalone {
     box-shadow:
         inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
         0 12px 40px rgba(0, 0, 0, 0.40);
-}
-
-/* Skill popover row hover — source default is the solid
-   var(--bg-hover) panel color; in glass that prints a dark slab
-   over the frosted surface. Use the same translucent white wash
-   the rest of the glass family hovers with. */
-[data-shape="glass"] .gambit-skill-popover-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-}
-
-/* Toast capsule — opt-out of the panel-center :not() nuclear
-   rule above (toast lives inside launchpad-container → matches
-   the `.panel-center :is(div…)` selector and would otherwise
-   get its bg/border/shadow stripped to transparent, leaving
-   white text floating in the void). !important here is doing
-   the same job as the entries in the :not() allow-list — both
-   work; this approach keeps the rule self-contained next to
-   the toast's other glass-mode treatment.
-   Visually: heavier dark wash so the message is readable on
-   any wallpaper, plus a strong blur/saturate for the iOS
-   Dynamic-Island-style frosted capsule. */
-[data-shape="glass"] .toast-notification {
-    background: rgba(18, 20, 28, 0.72) !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    box-shadow:
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.20),
-        0 8px 24px rgba(0, 0, 0, 0.40) !important;
 }
 
 /* Per-tool config modal (gear icon on each card in the full
@@ -2099,7 +2042,6 @@ body.gambit-docked .multi-agent-grid-standalone {
    smoked translucent fill so the carbon mesh reads behind them while the
    items stay legible. No blur — keeps carbon's static/zero-cost rule. */
 [data-shape="carbon"] .ctx-menu,
-[data-shape="carbon"] .gambit-skill-popover,
 [data-shape="carbon"] .term-ctx-menu,
 [data-shape="carbon"] .history-tool-filter-menu {
     background-color: color-mix(in oklab, var(--bg-app) 76%, transparent) !important;

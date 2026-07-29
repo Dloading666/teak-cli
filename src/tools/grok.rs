@@ -28,7 +28,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "grok",
     display_name: "Grok Build",
     binary_name: "grok",
-    skill_dir_relative: Some(".grok/skills"),
     has_hook_surface: false,
     // ~/.grok/sessions/<encoded-cwd>/<uuid>/{summary.json, chat_history.jsonl}
     // Bespoke second pass - bypasses the generic mtime-then-parse pipeline

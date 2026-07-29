@@ -21,7 +21,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "pi",
     display_name: "Pi",
     binary_name: "pi",
-    skill_dir_relative: None,
     has_hook_surface: false,
     // ~/.pi/agent/sessions/<encoded-cwd>/<ts>_<uuid>.jsonl — depth 2, same
     // walker as Claude Code. cwd + session id live INSIDE the file header

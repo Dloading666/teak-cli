@@ -19,13 +19,6 @@
 //! All path-touching code (history scan, plugin install, allowlist)
 //! goes through `hermes_home()` instead of hardcoding `~/.hermes`,
 //! otherwise we silently miss data on Windows.
-//!
-//! Skills concept landed upstream in 2026-05 (the installer creates
-//! `<HERMES_HOME>/skills/` and runs `tools/skills_sync.py`). Our
-//! mirror routes through `ToolDescriptor::skill_dir`, which short-
-//! circuits to `hermes_home().join("skills")` for this descriptor —
-//! `skill_dir_relative: Some("skills")` is therefore only a label,
-//! never naively joined under `home`.
 
 use std::path::PathBuf;
 
@@ -35,9 +28,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "hermes",
     display_name: "Hermes Agent",
     binary_name: "hermes",
-    // <HERMES_HOME>/skills/ — see module doc for the Windows home
-    // override. ToolDescriptor::skill_dir special-cases the join.
-    skill_dir_relative: Some("skills"),
     // Hermes Agent exposes plugin hooks via `<HERMES_HOME>/plugins/<name>/`
     // Python plugins. Coffee CLI installs `coffee-cli-status` for the
     // tab indicator only.
@@ -65,7 +55,7 @@ pub fn hermes_home() -> PathBuf {
             // Relative HERMES_HOME would resolve against the current
             // process CWD — and Coffee CLI changes CWD per tab via the
             // launchpad's directory picker, so different surfaces (history
-            // scan, allowlist, plugin install, skills mirror) would silently
+            // scan, allowlist, plugin install) would silently
             // resolve to different dirs. Reject + fall through to defaults.
             log::warn!(
                 "[hermes] ignoring relative HERMES_HOME='{}' — must be absolute",

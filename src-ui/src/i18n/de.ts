@@ -180,8 +180,4 @@ Lösch diesen Zettel, wann du willst, und starte deine erste Aufgabe.`,
   'heatmap.tooltip_one': '1 Nachricht am {date}',
   'heatmap.tooltip_none': 'Keine Aktivität am {date}',
 
-  // Skills-Panel Toggle-Toasts
-  'skills.toast.enabled': 'Aktiviert',
-  'skills.toast.disabled': 'Deaktiviert',
-
 } as const;

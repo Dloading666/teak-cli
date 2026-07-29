@@ -1,5 +1,5 @@
 //! Per-tool integration registry — single source of truth for the
-//! per-CLI facts Coffee CLI needs (binary name, skills dir, history
+//! per-CLI facts Coffee CLI needs (binary name, history
 //! shape, hook surface, launch argv). Iterate `TOOLS` instead of
 //! hardcoding lists in callers.
 //!
@@ -181,17 +181,6 @@ pub struct ToolDescriptor {
     /// (Unix). Single source of truth for "is this tool on PATH".
     pub binary_name: &'static str,
 
-    /// Where this tool's enabled skills should be junctioned, as a
-    /// path relative to the user's home directory (forward-slash).
-    /// Three layout families exist (dotdir / XDG / workspace-nested);
-    /// each tool encodes its own. `None` = tool doesn't have a
-    /// skills concept yet. Always resolve via [`Self::skill_dir`]
-    /// instead of `home.join(skill_dir_relative)` so platform-
-    /// specific home overrides (Hermes Agent on Windows uses
-    /// `%LOCALAPPDATA%\hermes` instead of `~/.hermes`) are honored.
-    #[allow(dead_code)] // read only by skill_dir() below, which isn't wired to a call site yet
-    pub skill_dir_relative: Option<&'static str>,
-
     /// `true` if Coffee CLI installs a status-indicator hook for
     /// this tool. Drives `hook_installer::dispatch_install`. Tools
     /// without a hook surface (Antigravity / Qwen / OpenClaw today)
@@ -214,34 +203,6 @@ pub struct ToolDescriptor {
     pub default_args: &'static [&'static str],
 }
 
-impl ToolDescriptor {
-    /// Absolute path to this tool's skills directory, or `None` if
-    /// the tool has no skills concept.
-    ///
-    /// For most tools this is simply `<home>/<skill_dir_relative>`.
-    /// Hermes Agent diverges: its home is `%LOCALAPPDATA%\hermes`
-    /// on Windows (set by `install.ps1`) and `~/.hermes` elsewhere,
-    /// so we route through `tools::hermes::hermes_home()` and ignore
-    /// the caller-supplied `home`. `$HERMES_HOME` overrides both
-    /// when set.
-    ///
-    /// Always prefer this over `home.join(t.skill_dir_relative?)`
-    /// at call sites — that pattern silently breaks on Windows for
-    /// Hermes.
-    #[allow(dead_code)] // documented ToolDescriptor API; not wired to a call site yet
-    pub fn skill_dir(&self, home: &Path) -> Option<PathBuf> {
-        let rel = self.skill_dir_relative?;
-        if self.id == hermes::DESCRIPTOR.id {
-            // `rel` is the source of truth even on Hermes — we just swap
-            // the root from `home` to `hermes_home()`. If the upstream
-            // layout ever moves the skills dir, updating
-            // `skill_dir_relative` in hermes.rs is enough.
-            Some(hermes::hermes_home().join(rel))
-        } else {
-            Some(join_relative(home, rel))
-        }
-    }
-}
 
 mod antigravity;
 mod claude;

@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { focusTerminal } from '../../lib/focus-registry';
 import { onWindowForeground } from '../../lib/window-focus-filter';
 import { TierTerminal } from './TierTerminal';
-import { SkillsPanel } from './SkillsPanel';
 import { FourSplitGrid } from './FourSplitGrid';
 import { ToolConfigModal } from './ToolConfigModal';
 import { ContributionHeatmap } from './ContributionHeatmap';
@@ -452,19 +451,10 @@ export function CenterPanel() {
     return p.replace(/\\/g, '/').split('/').pop() || p || (t('task.tab.changes' as any) || 'Diff');
   }, [state.diffSelection?.path, t]);
 
-  // Toast carries an id (timestamp) so React re-mounts the element on
-  // every showToast() call — the slideDownToast animation is `forwards`
-  // and only runs once per mount, so without a fresh key, rapid
-  // back-to-back toasts wouldn't visually re-trigger (user sees nothing
-  // after the first one even though state is updating). Keying by id
-  // forces a remount → fresh animation pass each time.
-  const [toast, setToast] = useState<{ msg: string; id: number } | null>(null);
-  const showToast = (msg: string) => setToast({ msg, id: Date.now() });
   const [toolsInstalled, setToolsInstalled] = useState<Record<string, boolean>>({});
   // Per-tool launch override modal (gear icon → opens settings for that tool).
   const [configModalTool, setConfigModalTool] = useState<{ key: string; label: string } | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
-  const [libraryTab, setLibraryTab] = useState<'agents' | 'skills'>('agents');
   const [pinnedItems, setPinnedItems] = useState<string[]>(() => {
     // Hard cap must match MAX_PINS constant below. Inlined as a literal
     // because MAX_PINS is declared after this initializer runs.
@@ -576,7 +566,6 @@ export function CenterPanel() {
     const utilities = [
       // Terminal is an AI-CLI-like tool (needs cwd) rather than a 'utility'.
       { key: 'terminal' as ToolType, label: t('tool.terminal'), icon: <TerminalIcon />, type: 'ai-cli' as const, requiresCwd: true },
-      { key: 'installer' as ToolType, label: 'Coffee 101', icon: <SvgInstaller />, type: 'utility' as const, requiresCwd: false },
       // ─── Independent split (descending 4→3→2): N side-by-side PTYs ──
       {
         key: 'four-split' as ToolType,
@@ -599,6 +588,7 @@ export function CenterPanel() {
         type: 'utility' as const,
         requiresCwd: false,
       },
+      { key: 'installer' as ToolType, label: 'Coffee 101', icon: <SvgInstaller />, type: 'utility' as const, requiresCwd: false },
     ];
 
     return [...aiCliEntries, ...utilities];
@@ -846,15 +836,6 @@ export function CenterPanel() {
     };
   }, []);
 
-  // Auto-hide toast — keyed on toast.id so rapid replacements (toggle
-  // spam) reset the timer cleanly: previous timer is cleared, new 3s
-  // window starts from the latest message.
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast?.id]);
 
 
   const handleAddTab = () => {
@@ -1259,22 +1240,6 @@ export function CenterPanel() {
 
   return (
     <>
-      {/* Premium Toast Notification — Portaled to document.body so it
-          escapes any ancestor's overflow:hidden and renders against
-          the real viewport, not the launchpad-container interior.
-          With position:fixed + viewport-relative top, the slide-down
-          animation now reads as "drop in from the top of the
-          window" (the iOS system-banner idiom) instead of "slide
-          out from inside the terminal area." Also makes the toast
-          visible in every mode (terminal mode, launchpad mode,
-          library mode), not just when the launchpad is mounted. */}
-      {toast && createPortal(
-        <div key={toast.id} className="toast-notification">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-          {toast.msg}
-        </div>,
-        document.body
-      )}
       {tabSlot && createPortal(
       <div ref={tabsHeaderRef} className="chrome-tabs-header" data-count={terminals.filter(s => !s.isHidden || s.id === activeTerminalId).length}>
         {(() => {
@@ -1819,12 +1784,10 @@ export function CenterPanel() {
                   </div>
                 </div>
 
-                {/* ─── Page 2: Library (Agents | Skills) ─── */}
-                <div className={`launchpad-page library-page${libraryTab === 'skills' ? ' library-page--skills' : ''}`}>
+                {/* Page 2: Library (Agents) */}
+                <div className="launchpad-page library-page">
                   <div className="launchpad-inner">
-                    {libraryTab === 'agents' ? (
-                      <>
-                        {/* Section 1: AI CLI agents — 4-col grid (default) */}
+                        {/* Section 1: AI CLI agents (3-col) */}
                         <div className="library-grid">
                           {AGENT_CATALOG.filter(item => item.type === 'ai-cli').map(item => {
                             const pinId = `agent:${item.key}`;
@@ -1852,15 +1815,12 @@ export function CenterPanel() {
                                     </svg>
                                   </span>
                                 )}
+                                <div className={`library-toggle${isPinned ? ' on' : ''}`}><div className="library-toggle-knob" /></div>
                               </div>
                             );
                           })}
                         </div>
-                        {/* Section 2: Agent Tools — 4-col grid so the
-                            coordinated 4/3/2 agent cards line up directly
-                            above the independent 4/3/2 split cards:
-                              Row 1: multi-agent / three-agent / two-agent / Coffee 101
-                              Row 2: four-split  / three-split / two-split / hyper-agent */}
+                        {/* Section 2: Agent Tools (3-col, split tools first, Coffee 101 last) */}
                         <div className="library-section-title">{t('library.agent_tools' as any)}</div>
                         <div className="library-grid library-grid--tools">
                           {AGENT_CATALOG.filter(item => item.type === 'utility').map(item => {
@@ -1877,14 +1837,11 @@ export function CenterPanel() {
                               >
                                 <div className="library-item-icon">{item.icon}</div>
                                 <span className="library-item-name">{item.label}</span>
+                              <div className={`library-toggle${isPinned ? ' on' : ''}`}><div className="library-toggle-knob" /></div>
                               </div>
                             );
                           })}
                         </div>
-                      </>
-                    ) : (
-                      <SkillsPanel showToast={showToast} />
-                    )}
                   </div>
 
                 </div>
@@ -1946,37 +1903,7 @@ export function CenterPanel() {
                   </svg>
                 </div>
               </button>
-            </div>
-
-            {/* Tab pill — hoisted OUT of launchpad-chrome--library so
-                backdrop-filter can render correctly. With it nested
-                under the chrome, the parent's opacity 0→1 fade
-                isolated a stacking context for the duration of the
-                transition; backdrop-filter inside that isolate has
-                no wallpaper to sample, so the pill rendered as a
-                flat near-transparent rect during the fade and the
-                glass blur "snapped in" the moment opacity hit 1 —
-                that was the visible flash. As a sibling here the
-                pill owns its own opacity fade, which scales the
-                post-backdrop-filter result (only ANCESTOR opacity
-                isolates) — so the frosted glass reveals smoothly
-                in sync with the back-chevron's cross-fade. */}
-            <div
-              className={`library-tabs library-tabs--top ${showLibrary ? 'is-visible' : ''}`}
-              aria-hidden={!showLibrary}
-            >
-              <button
-                className={`library-tab ${libraryTab === 'agents' ? 'active' : ''}`}
-                onClick={() => setLibraryTab('agents')}
-              >
-                Agents {pinnedItems.length}/{MAX_PINS}
-              </button>
-              <button
-                className={`library-tab ${libraryTab === 'skills' ? 'active' : ''}`}
-                onClick={() => setLibraryTab('skills')}
-              >
-                Skills
-              </button>
+              <div className="library-counter">{pinnedItems.length} / {MAX_PINS}</div>
             </div>
 
           </div>

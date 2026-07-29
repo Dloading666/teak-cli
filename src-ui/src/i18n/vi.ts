@@ -185,8 +185,4 @@ Xóa tờ ghi chú này khi bạn sẵn sàng và bắt đầu tác vụ đầu 
   'heatmap.tooltip_some': '{count} tin nhắn vào {date}',
   'heatmap.tooltip_one': '1 tin nhắn vào {date}',
   'heatmap.tooltip_none': 'Không có hoạt động vào {date}',
-
-  // Toast bật/tắt Skills
-  'skills.toast.enabled': 'Đã bật',
-  'skills.toast.disabled': 'Đã tắt',
 };

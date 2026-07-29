@@ -183,8 +183,4 @@ export const ko = {
   'heatmap.tooltip_one': '{date} · 메시지 1개',
   'heatmap.tooltip_none': '{date} · 활동 없음',
 
-  // Skills 패널 토글 토스트
-  'skills.toast.enabled': '활성화됨',
-  'skills.toast.disabled': '비활성화됨',
-
 } as const;

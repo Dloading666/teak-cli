@@ -6,7 +6,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "qwen",
     display_name: "Qwen Code",
     binary_name: "qwen",
-    skill_dir_relative: Some(".qwen/skills"),
     has_hook_surface: false,
     // ~/.qwen/projects/<sanitized-cwd>/chats/<session>.jsonl
     history_shape: Some(HistoryShape::QwenProjects {

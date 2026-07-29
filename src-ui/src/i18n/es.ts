@@ -179,8 +179,4 @@ Borra esta nota cuando quieras y empieza tu primera tarea.`,
   'heatmap.tooltip_one': '1 mensaje el {date}',
   'heatmap.tooltip_none': 'Sin actividad el {date}',
 
-  // Avisos del panel de Skills
-  'skills.toast.enabled': 'Activada',
-  'skills.toast.disabled': 'Desactivada',
-
 } as const;

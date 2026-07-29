@@ -4,8 +4,8 @@
 // staged / unstaged / untracked, and produce a per-file unified diff.
 // Stage / unstage / commit / init land in P2; history / branches in P3.
 //
-// Every git call goes through `git_output`, modeled on marketplace.rs's
-// `git()` helper (CREATE_NO_WINDOW on Windows so no console window flashes).
+// Every git call goes through `git_output` (CREATE_NO_WINDOW on Windows so
+// no console window flashes).
 // All repo queries run with the working dir pinned to the repository ROOT —
 // resolved once via `rev-parse --show-toplevel` — so reported paths and diff
 // pathspecs are consistently repo-root-relative even when the tab's folder is

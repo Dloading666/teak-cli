@@ -184,8 +184,4 @@ export const zhTW = {
   'heatmap.tooltip_one': '{date} · 1 則訊息',
   'heatmap.tooltip_none': '{date} · 沒有活動',
 
-  // Skills 面板開關提示
-  'skills.toast.enabled': '已啟用',
-  'skills.toast.disabled': '已關閉',
-
 } as const;

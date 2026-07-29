@@ -13,7 +13,7 @@
 // editable path string. AI CLI agents that support local image paths (e.g.
 // Claude Code) will read the file; agents that don't just see the raw path.
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { clipboardRead, clipboardWrite } from '../../lib/clipboard';
 import { subscribeGambitHistory, getGambitHistorySnapshot, pushGambitHistory } from '../../lib/gambit-history';
@@ -21,7 +21,6 @@ import { commands } from '../../tauri';
 import { useT } from '../../i18n/useT';
 import { useAppState } from '../../store/app-state';
 import { registerFileDropTarget, formatPathsForInsert } from '../../lib/file-drop';
-import { parseFrontmatter, localizedField } from '../../utils/skill-meta';
 import './Gambit.css';
 
 interface GambitProps {
@@ -99,8 +98,8 @@ function GambitImpl({
   // handle to it so the auto-grow effect can preserve / follow its scrollTop.
   const inputRef = useRef<HTMLDivElement>(null);
   // The draft value the auto-grow effect last sized for. Lets it tell a real
-  // content edit (typing / paste) from a non-content trigger (pill toggle,
-  // window resize) so only the former is allowed to move the scroll position.
+  // content edit (typing / paste) from a non-content trigger (window resize)
+  // so only the former is allowed to move the scroll position.
   const lastSizedDraftRef = useRef(draft);
 
   // ─── Prompt history (↑/↓ recall) ──────────────────────────────────
@@ -300,122 +299,17 @@ function GambitImpl({
     return () => clearTimeout(t);
   }, [sendEmpty]);
 
-  // ─── Skill picker ────────────────────────────────────────────────
-  // Picking a skill prepends `/<slug> ` directly into the textarea
-  // draft — no chip, no hidden state. What the user sees in the
-  // textarea is exactly what gets sent. They can edit / delete /
-  // swap the slash command with normal keyboard shortcuts.
   const { state: appState } = useAppState();
-  const lang = appState.currentLang;
-  const [skillPopoverOpen, setSkillPopoverOpen] = useState(false);
-  const [enabledSkills, setEnabledSkills] = useState<{ name: string; displayName: string; path: string }[]>([]);
-  // Skills attached to THIS message as pills. On send each expands to a
-  // one-line instruction pointing the agent at the skill's SKILL.md path.
-  const [attachedSkills, setAttachedSkills] = useState<{ name: string; displayName: string; path: string }[]>([]);
-  // The pills are an absolute overlay on the textarea's first line; the
-  // textarea reserves exactly their width via a first-line text-indent, so a
-  // pill reads as inline "skinned text" — typed text sits next to it on line
-  // 1 and wraps back to the LEFT margin on line 2 (no hanging indent).
-  const pillsRef = useRef<HTMLDivElement | null>(null);
-  const [pillsWidth, setPillsWidth] = useState(0);
-  const skillPopoverRef = useRef<HTMLDivElement | null>(null);
-  // "+" button + portaled popover refs. The popover is portaled to <body>
-  // with fixed positioning so the Gambit window's `overflow: hidden`
-  // (rounded corners) can't clip its top items. popoverPos is the button's
-  // screen rect captured on open.
-  const skillBtnRef = useRef<HTMLButtonElement | null>(null);
-  const popoverContentRef = useRef<HTMLDivElement | null>(null);
-  const [popoverPos, setPopoverPos] = useState<{ left: number; bottom: number } | null>(null);
-  const toggleSkillPopover = useCallback(() => {
-    // Capture the button's screen rect before opening so the portaled
-    // (position:fixed) popover can anchor 6px above its top edge.
-    if (!skillPopoverOpen) {
-      const r = skillBtnRef.current?.getBoundingClientRect();
-      if (r) setPopoverPos({ left: r.left, bottom: window.innerHeight - r.top + 6 });
-    }
-    setSkillPopoverOpen(o => !o);
-  }, [skillPopoverOpen]);
 
-  // Refresh on mount AND every popover open. Mount fetch drives the
-  // visibility of the "+" button itself: when the user has no skills
-  // enabled, we hide the button entirely rather than show an empty
-  // popover with a "go enable some" hint — less visual noise. Popover-
-  // open re-fetch covers the case where the user toggles in the
-  // Library page while Gambit is also open.
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      commands.skillsList(),
-      commands.listMarketplaces().catch(() => []),
-    ])
-      .then(([list, markets]) => {
-        if (cancelled) return;
-        // Bundled skills + enabled marketplace plugins both feed the picker.
-        // Plugin `key` ("market::plugin") is unique so it can't collide with
-        // a bundled skill name in the dedup check.
-        const bundled = list.filter(s => s.enabled).map(s => {
-          const fm = parseFrontmatter(s.skillMd);
-          return { name: s.name, displayName: localizedField(fm, 'name', lang) || s.name, path: s.path };
-        });
-        const plugins = markets.flatMap(m =>
-          m.plugins.filter(p => p.enabled).map(p => ({ name: p.key, displayName: p.displayName, path: p.path })),
-        );
-        setEnabledSkills([...bundled, ...plugins]);
-      })
-      .catch(() => { if (!cancelled) setEnabledSkills([]); });
-    return () => { cancelled = true; };
-  }, [skillPopoverOpen, lang]);
-
-  // Outside-click dismiss for the skill popover. Same pattern as ctxMenu.
-  useEffect(() => {
-    if (!skillPopoverOpen) return;
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      // The "+" button lives in skillPopoverRef; the popover itself is
-      // portaled to <body> under popoverContentRef. A click in either is
-      // "inside" — only close on a genuine outside click.
-      if (skillPopoverRef.current?.contains(target)) return;
-      if (popoverContentRef.current?.contains(target)) return;
-      setSkillPopoverOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSkillPopoverOpen(false); };
-    document.addEventListener('mousedown', onDown, true);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('mousedown', onDown, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  }, [skillPopoverOpen]);
-
-  // Attach a skill as a pill (deduped). On send it expands to a one-line
-  // instruction pointing the agent at the skill's SKILL.md path — no
-  // junction, no slash command, works with any file-reading CLI.
-  const addSkill = useCallback((skill: { name: string; displayName: string; path: string }) => {
-    setAttachedSkills(prev => (prev.some(s => s.name === skill.name) ? prev : [...prev, skill]));
-    setSkillPopoverOpen(false);
-    setTimeout(() => textareaRef.current?.focus(), 0);
-  }, []);
-  const removeSkill = useCallback((name: string) => {
-    setAttachedSkills(prev => prev.filter(s => s.name !== name));
-    // Keep focus in the composer — the ×-button's mousedown stops
-    // propagation, so without this the global focus enforcer (CenterPanel)
-    // would yank focus to the active terminal after a pill is removed.
-    textareaRef.current?.focus();
-  }, []);
-
-  // Auto-grow the textarea to fit its content so attached pills can sit
-  // inline on the first line and the box grows downward as the user types.
-  // Deps: draft (content) and attachedSkills.length (a pill changes the
-  // first-line width left for the textarea).
+  // Auto-grow the textarea to fit its content as the user types.
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     const scroller = inputRef.current;
     // Did this run come from an actual content edit (typing / paste), or from
-    // one of the effect's other triggers — a pill add/remove or a window
-    // resize? Only a content edit may move the scroll position; a resize or a
-    // pill toggle must hold the view exactly where the user left it (even if
-    // the caret happens to be parked at the very end).
+    // a window resize? Only a content edit may move the scroll position; a
+    // resize must hold the view exactly where the user left it (even if the
+    // caret happens to be parked at the very end).
     const contentChanged = lastSizedDraftRef.current !== draft;
     lastSizedDraftRef.current = draft;
     const prevScrollTop = scroller?.scrollTop ?? 0;
@@ -432,25 +326,18 @@ function GambitImpl({
     // user is actively typing at
     // the very end of the draft, follow the caret to the bottom instead so the
     // newest line stays visible.
-    //   Known gap: an edit that pushes a MID-text caret below the fold isn't
-    //   chased (we just hold position) — doing so would need caret-pixel
-    //   measurement, and the simpler "let the textarea scroll itself" cure is
-    //   blocked by the absolutely-positioned skill-pill overlay (text would
-    //   slide under the stationary pills). Still strictly better than the old
-    //   jump-to-top, so accepted.
+    //   Known gap: an edit that pushes a MID-text caret below the fold is not
+    //   chased (we just hold position) - doing so would need caret-pixel
+    //   measurement, which is out of scope here. Still strictly better than
+    //   the old jump-to-top, so accepted.
     const followCaretToBottom =
       contentChanged &&
       document.activeElement === ta &&
       ta.selectionStart === ta.value.length &&
       ta.selectionEnd === ta.value.length;
     scroller.scrollTop = followCaretToBottom ? scroller.scrollHeight : prevScrollTop;
-  }, [draft, attachedSkills.length]);
+  }, [draft]);
 
-  // Measure the pill overlay → first-line indent for the textarea. +8px so
-  // text doesn't butt right against the last pill. 0 when there are no pills.
-  useLayoutEffect(() => {
-    setPillsWidth(pillsRef.current ? pillsRef.current.offsetWidth + 8 : 0);
-  }, [attachedSkills]);
 
   // ─── Context menu ─────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; hasSelection: boolean } | null>(null);
@@ -624,36 +511,25 @@ function GambitImpl({
     // would be sent twice, making the AI see the same image reference
     // duplicated in its prompt.
     const text = draft.trim();
-    if (!text && attachedSkills.length === 0) {
+    if (!text) {
       setSendEmpty(true);
       return;
     }
-    // Attached skill pills expand to one instruction line each, pointing
-    // the agent at the skill's on-disk SKILL.md. Prepended before the
-    // user's text so the agent reads the skill first, then the request.
-    const preamble = attachedSkills
-      .map(s => `Use the "${s.displayName}" skill — study the directory "${s.path}", read whatever instructions it contains (e.g. SKILL.md, README, or other docs), and follow them to do the task.`)
-      .join('\n');
     const body = wrapImagePathsForSend(text);
-    const finalText = preamble ? (body ? `${preamble}\n\n${body}` : preamble) : body;
-    const ok = onSend(finalText);
+    const ok = onSend(body);
     if (!ok) {
-      // Preserve draft + pills so the user doesn't lose anything. They
+      // Preserve draft so the user does not lose what they typed. They
       // likely just need to click the target pane first, then Send again.
       setSendFailed(true);
       return;
     }
-    // Record the user's RAW prompt (not `finalText`, which carries the
-    // skill preamble we generated) so ↑ recall shows what they actually
-    // typed. Skill-only sends (empty `text`) push nothing — there's no
-    // user prompt to recall. pushGambitHistory trims + dedupes + caps.
+    // Record the user prompt so recall shows what they actually typed.
     pushGambitHistory(text);
-    // Sent → leave history navigation mode so the next ↑ starts from the
-    // newest entry (which is the one we just pushed).
+    // Sent -> leave history navigation mode so the next recall starts from
+    // the newest entry (which is the one we just pushed).
     historyCursorRef.current = null;
     onDraftChange('');
-    setAttachedSkills([]);
-  }, [draft, attachedSkills, onSend, onDraftChange]);
+  }, [draft, onSend, onDraftChange]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // IME composition in progress — let the IME keep Enter for confirming
@@ -667,13 +543,6 @@ function GambitImpl({
     // selection). The placeholder advertises "Alt+↑↓ 翻历史".
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.altKey) {
       if (navigateHistory(e.key === 'ArrowUp' ? -1 : 1)) e.preventDefault();
-      return;
-    }
-    // Backspace at the very start of an empty draft pops the last skill
-    // pill — mirrors how chip inputs let you delete attachments with ⌫.
-    if (e.key === 'Backspace' && draft.length === 0 && attachedSkills.length > 0) {
-      e.preventDefault();
-      setAttachedSkills(prev => prev.slice(0, -1));
       return;
     }
     // Send key is user-configurable (settings modal → Keyboard), because the
@@ -781,49 +650,28 @@ function GambitImpl({
       {/* Top-edge handle for vertical height resize (VS Code bottom-panel style). */}
       <div className="gambit-dock-resize" onMouseDown={onDockResizeStart} />
 
-      {/* Input box: skill pills are an absolute overlay on the textarea's
-          first line; the textarea's first-line text-indent reserves their
-          width, so a pill reads as inline "skinned text" — typed text sits
-          next to it on line 1 and wraps to the LEFT margin on line 2. */}
+      {/* Input box: the textarea auto-grows to fit its content. */}
       <div
         className="gambit-input"
         ref={inputRef}
         onContextMenu={onContextMenu}
         onMouseDown={(e) => {
-          // Click anywhere in the box (padding, the pill overlay, a pill
-          // chip body) → focus the textarea. preventDefault stops focus
-          // from landing on a non-input element, which would let the global
-          // focus enforcer (CenterPanel) yank it back to the active
-          // terminal. The pill ×-button stops propagation, so it's exempt.
+          // Click anywhere in the box (padding) -> focus the textarea.
+          // preventDefault stops focus from landing on a non-input element,
+          // which would let the global focus enforcer (CenterPanel) yank it
+          // back to the active terminal.
           const tgt = e.target as HTMLElement;
-          if (tgt !== textareaRef.current && !tgt.closest('.gambit-skill-pill-x')) {
+          if (tgt !== textareaRef.current) {
             e.preventDefault();
             textareaRef.current?.focus();
           }
         }}
       >
-        {attachedSkills.length > 0 && (
-          <div className="gambit-pills" ref={pillsRef}>
-            {attachedSkills.map(s => (
-              <span key={s.name} className="gambit-skill-pill">
-                <span className="gambit-skill-pill-name">{s.displayName}</span>
-                <button
-                  type="button"
-                  className="gambit-skill-pill-x"
-                  onClick={() => removeSkill(s.name)}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  aria-label={`Remove ${s.displayName}`}
-                >×</button>
-              </span>
-            ))}
-          </div>
-        )}
         <textarea
           ref={textareaRef}
           className="gambit-textarea"
-          style={{ textIndent: pillsWidth }}
           value={draft}
-          placeholder={attachedSkills.length > 0 ? '' : t('gambit.placeholder', { send: sendCombo, newline: newlineCombo })}
+          placeholder={t('gambit.placeholder', { send: sendCombo, newline: newlineCombo })}
           onChange={(e) => onDraftChange(e.target.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
@@ -833,51 +681,6 @@ function GambitImpl({
       </div>
 
       <div className="gambit-footer">
-        {/* Skill picker — only renders when at least one skill is
-            enabled. No skills = no button, no empty popover, no
-            visual noise. User enables skills in the Library →
-            Skills page and the button reappears on next mount /
-            on next popover-open list refresh. Same 30×30 footprint
-            as a thumbnail so the footer height stays constant when
-            the button is present. */}
-        {enabledSkills.length > 0 && (
-          <div className="gambit-skill-bar" ref={skillPopoverRef}>
-            <button
-              ref={skillBtnRef}
-              className="gambit-skill-add"
-              onClick={toggleSkillPopover}
-              aria-label="Attach skill"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <line x1="7" y1="2" x2="7" y2="12" />
-                <line x1="2" y1="7" x2="12" y2="7" />
-              </svg>
-            </button>
-            {skillPopoverOpen && popoverPos && createPortal(
-              <div
-                className="gambit-skill-popover"
-                ref={popoverContentRef}
-                style={{ position: 'fixed', left: popoverPos.left, bottom: popoverPos.bottom, top: 'auto', right: 'auto', zIndex: 10000 }}
-              >
-                {enabledSkills.map(s => {
-                  const attached = attachedSkills.some(a => a.name === s.name);
-                  return (
-                    <button
-                      key={s.name}
-                      className="gambit-skill-popover-item"
-                      onClick={() => addSkill(s)}
-                      disabled={attached}
-                    >
-                      <span>{s.displayName}</span>
-                      {attached && <span className="gambit-skill-popover-slash">✓</span>}
-                    </button>
-                  );
-                })}
-              </div>,
-              document.body,
-            )}
-          </div>
-        )}
 
         {/* Thumbnail strip lives in the footer, left-aligned, so it shares
             the same row as the send button. Empty when no image paths are
@@ -916,7 +719,7 @@ function GambitImpl({
           </span>
         )}
         <button
-          className={`gambit-send${sendFailed ? ' gambit-send--failed' : ''}${!draft.trim() && attachedSkills.length === 0 ? ' gambit-send--empty' : ''}`}
+          className={`gambit-send${sendFailed ? ' gambit-send--failed' : ''}${!draft.trim() ? ' gambit-send--empty' : ''}`}
           onClick={handleSend}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

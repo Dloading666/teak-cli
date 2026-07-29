@@ -28,9 +28,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "mimocode",
     display_name: "MiMo Code",
     binary_name: "mimo",
-    // Skills mirror not wired for MiMo Code yet (would be
-    // `.config/mimocode/skills` if it mirrors OpenCode's layout).
-    skill_dir_relative: None,
     // See module doc — MiMo Code ships an opaque #000 TUI default just like
     // OpenCode, so it needs the tui.json transparency write via dispatch.
     has_hook_surface: true,

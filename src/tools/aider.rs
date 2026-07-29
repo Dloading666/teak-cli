@@ -11,7 +11,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "aider",
     display_name: "Aider",
     binary_name: "aider",
-    skill_dir_relative: None,
     has_hook_surface: false,
     history_shape: None,
     default_args: &[],

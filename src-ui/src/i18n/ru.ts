@@ -180,8 +180,4 @@ export const ru = {
   'heatmap.tooltip_one': '{date} · 1 сообщение',
   'heatmap.tooltip_none': '{date} · нет активности',
 
-  // Уведомления панели Skills
-  'skills.toast.enabled': 'Включено',
-  'skills.toast.disabled': 'Выключено',
-
 } as const;

@@ -3820,17 +3820,6 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             get_tool_config,
             get_all_tool_configs,
             set_tool_config,
-            crate::skills::skills_ensure_dirs,
-            crate::skills::skills_write_file,
-            crate::skills::skills_list,
-            crate::skills::skills_toggle,
-            crate::skills::skills_delete,
-            crate::marketplace::add_marketplace,
-            crate::marketplace::list_marketplaces,
-            crate::marketplace::set_marketplace_plugin_enabled,
-            crate::marketplace::update_marketplace,
-            crate::marketplace::delete_marketplace,
-            crate::marketplace::open_marketplace_dir,
             crate::git::git_changes,
             crate::git::git_show_file,
             crate::git::git_init,
@@ -3841,14 +3830,6 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             // Install Claude/Qwen hook scripts + settings patches.
             // Runs once per launch; safe to call on a machine without either agent.
             crate::hook_installer::install_all();
-
-            // Seed bundled skills (screenshot, vibeid) into
-            // ~/.coffee-cli/skills-library/ so first-time users find
-            // them in the Skills panel without having to open it
-            // once to trigger seeding. Idempotent.
-            if let Err(e) = crate::skills::skills_ensure_dirs() {
-                log::warn!("[skills] seed at boot failed: {}", e);
-            }
 
             // Start loopback TCP listener that receives events from the hook
             // script and forwards them to the frontend as `agent-status` events.

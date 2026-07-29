@@ -10,10 +10,7 @@ mod fs_watcher;
 mod launch;
 mod tool_config;
 mod tools;
-mod skills;
-mod marketplace;
 mod git;
-mod paths;
 mod shell_probe;
 #[cfg(target_os = "windows")]
 mod windows_path;

@@ -34,7 +34,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "kimicode",
     display_name: "Kimi Code",
     binary_name: "kimi",
-    skill_dir_relative: None,
     has_hook_surface: true,
     // ~/.kimi-code/ — flat on all OS (override KIMI_CODE_HOME). Bypasses
     // the file-walk pipeline; server.rs `kimi_root` + `find_kimi_sessions`

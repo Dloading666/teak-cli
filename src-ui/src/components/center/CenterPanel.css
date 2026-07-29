@@ -337,9 +337,7 @@
   right: 16px;
 }
 
-/* Library chrome: back button at top-left. Tab pill (.library-tabs--top)
-   self-positions via its own rule. Pin counter is plain inline text
-   inside the Agents tab — no separate styled element. */
+/* Library chrome: back button at top-left. */
 .launchpad-chrome--library > .launchpad-chrome-back {
   position: absolute;
   top: 16px;
@@ -711,48 +709,6 @@
 
 /* (folder button is now a transparent overlay — no per-shape overrides needed) */
 
-/* ─── Premium Toast Notification ─── */
-
-/* iOS-style top banner — Portaled to document.body, so positioned
-   against the real viewport rather than any inner container.
-   `position: fixed` + viewport-relative top means the slide-down
-   animation truly reads as "drops in from the top edge of the
-   window" (system-banner idiom), not "slides out from inside
-   the terminal area." top:48 sits a comfortable margin under
-   the custom titlebar (~40px on Windows / Linux Tauri) without
-   landing on the chrome-tabs-header. */
-@keyframes slideDownToast {
-  0% { transform: translate(-50%, -200%); opacity: 0; }
-  15% { transform: translate(-50%, 0); opacity: 1; }
-  85% { transform: translate(-50%, 0); opacity: 1; }
-  100% { transform: translate(-50%, -200%); opacity: 0; }
-}
-
-.toast-notification {
-  position: fixed;
-  top: 48px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-panel);
-  color: var(--text-1);
-  border: 1px solid var(--border);
-  padding: 14px 28px;
-  /* Capsule (iOS-style banner shape) — fully rounded ends instead of
-     the project's standard --radius-md rectangles. Keeps the toast
-     visually distinct from cards / panels / modals (which all use
-     --radius-md), so it reads instantly as "transient notification"
-     rather than another piece of permanent chrome. */
-  border-radius: 999px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20), 0 6px 20px rgba(0, 0, 0, 0.22);
-  z-index: 1000;
-  font-size: 16px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  animation: slideDownToast 3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  pointer-events: none;
-}
 /* ─── Mode Switch Button (Library vs Desktop) ─────────────── */
 /* Naked glyph — no bg, no border, no plate. Chrome is the enemy of
    high-end feel; a 48px filled pill around a 24px icon makes the
@@ -827,17 +783,13 @@
      Triple", "Personality Test") force columns past 1/4 width and the
      last column overflows the panel. Pairs with min-width:0 on
      .library-item-name so the ellipsis can actually clip. */
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
   align-content: start;
 }
 
-/* Agent Tools sub-grid: same 4-col layout as the AI CLIs grid above,
-   so every row holds 4 cards:
-     Row 1: multi-agent | three-agent | two-agent | installer
-     Row 2: four-split  | three-split | two-split | hyper-agent
-   协作 counts and 独立 counts line up column-by-column (4↔4, 3↔3, 2↔2). */
+/* Agent Tools sub-grid (3-col, same as the AI CLIs grid). */
 .library-grid.library-grid--tools {
   margin-top: 8px;
 }
@@ -863,31 +815,10 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  /* Unselected cards sit at reduced opacity so the SELECTED ones (full
-     opacity + accent border) visually pop forward. Inverse of the usual
-     "highlight selected" — we instead "fade unselected", which keeps the
-     selected look clean (no background tint, no shadow, just normal). */
-  opacity: 0.55;
-  transition: opacity 0.18s, border-color 0.18s;
 }
 
-.library-item:hover {
-  opacity: 0.85;
-  border-color: var(--accent);
-}
 
-/* Selected state — pinned to launchpad. Same 1px border width as the
-   default (only the COLOR changes), so toggling pinned never shifts
-   the card by even a pixel. Combined with full opacity, the card
-   "comes into focus" while its peers stay muted. No background tint:
-   the contrast against still-faded neighbors is enough. */
-.library-item.is-pinned {
-  opacity: 1;
-  border-color: var(--accent);
-}
-.library-item.is-pinned:hover {
-  opacity: 1;
-}
+/* Selection state is shown by the toggle switch on the right; the card itself stays uniform - no pinned border highlight. */
 
 .library-item-icon {
   width: 40px;
@@ -927,9 +858,8 @@
   white-space: nowrap;
 }
 
-/* (.library-pin-btn removed — pin state is now signaled by border +
-   opacity on .library-item.is-pinned, no right-side checkmark. The
-   right slot is reserved for the launch-settings gear on CLI tools.) */
+/* (Removed .library-pin-btn; the right slot holds the toggle switch,
+   with the launch-settings gear nested to its left on CLI tools.) */
 
 /* Per-tool launch settings gear, shown in the same right-edge slot
    formerly occupied by the pin checkmark. Only rendered for the 7 CLI
@@ -969,480 +899,6 @@
   height: 18px;
 }
 
-/* ─── Library tab switcher (Agents / Skills) ──────────────────────────── */
-
-/* Top-center pill, anchored to launchpad-container (lives outside the
-   sliding track so it doesn't animate with the page content). Bottom
-   stays clear for Gambit's compose panel. The legacy bottom-positioned
-   .library-tabs (without the --top modifier) would still work if any
-   caller wants it back, but we removed all bottom callers. */
-.library-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  z-index: 3;
-}
-
-.library-tabs--top {
-  position: absolute;
-  /* top:24 — vertically centered against the back button (top:16,
-     h:48 → center y:40; tab pill h:~36 → center y at 24+18 = 42).
-     Equal 24px gap above the pill (to container top) AND below the
-     pill (to cards padding-top:84) — symmetric header band, no more
-     "tab feels squeezed against cards" asymmetry. */
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  /* Self-fading opacity (see hoist rationale in CenterPanel.tsx). */
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-
-.library-tabs--top.is-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.library-tab {
-  padding: 8px 28px;
-  border: none;
-  background: transparent;
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 500;
-  /* Concentric corners — inner radius = outer radius − padding (4px).
-     Hardcoding var(--radius-sm) broke in the soft theme where
-     --radius-md is 4 but --radius-sm is 3, making the inner
-     active-tab corner round PAST the outer pill. max(0,…) clamps
-     for the square-corner theme. */
-  border-radius: max(0px, calc(var(--radius-md) - 4px));
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
-}
-
-.library-tab:hover { color: var(--text-1); }
-
-.library-tab.active {
-  background: var(--accent);
-  color: #1a1917;
-}
-
-/* ─── Skills panel (toggle list inside Library tab) ────────────────────── */
-
-/* ─── Skills marketplace header (tabs + add / manage) ────────── */
-.skills-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 4px;
-  /* One row, never wraps: extra market tabs scroll horizontally inside
-     .skills-tabs instead of stacking into more rows and growing the header
-     taller (which would eat the card area and strand the actions mid-height).
-     Stays put because the CARD LIST owns the scroll (see
-     .library-page--skills), so the header never bleeds into the top pill. */
-  flex-shrink: 0;
-}
-
-/* Skills tab: the card list scrolls internally instead of the whole page.
-   Without this, cards scroll up behind the semi-transparent Agents/Skills
-   pill and "bleed through" at the top. Making the grid the scroll area
-   clips cards below the (static) header. */
-.library-page--skills {
-  overflow: hidden;
-  align-items: stretch;
-}
-.library-page--skills .launchpad-inner {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 0;
-  min-height: 0;
-}
-.library-page--skills .skills-grid {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  /* Pack rows to the top at their natural height. Without this, the grid's
-     default align-content: stretch expands rows to fill the flex:1 height,
-     making cards balloon when there are only a few. */
-  align-content: start;
-}
-.library-page--skills .skills-empty { flex: 1; }
-.skills-tabs {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-  /* Many markets scroll sideways here, keeping the header one row tall. */
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-}
-.skills-tabs::-webkit-scrollbar { height: 4px; }
-.skills-tabs::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
-}
-.skills-tabs::-webkit-scrollbar-track { background: transparent; }
-.skills-tab {
-  flex-shrink: 0;
-  padding: 4px 10px;
-  border: none;
-  background: transparent;
-  color: var(--text-2);
-  font-size: 13px;
-  border-radius: var(--radius-sm, 6px);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 0.12s, background-color 0.12s;
-}
-.skills-tab:hover { color: var(--text-1); background: var(--bg-hover); }
-.skills-tab.is-active { color: var(--accent); font-weight: 600; }
-.skills-header-actions { display: flex; gap: 10px; flex-shrink: 0; }
-.skills-link-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-2);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 2px;
-  transition: color 0.12s;
-}
-.skills-link-btn:hover { color: var(--accent); }
-
-/* ─── Add-marketplace modal ──────────────────────────────────── */
-.skills-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
-}
-.skills-modal {
-  width: 440px;
-  max-width: 92vw;
-  padding: 20px;
-  background: var(--bg-panel, #28241e);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-}
-.skills-modal-title { font-size: 15px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; }
-.skills-modal-hint { font-size: 12px; color: var(--text-3); line-height: 1.5; margin-bottom: 12px; }
-.skills-modal-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 9px 12px;
-  background: var(--bg-app, #1a1917);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
-  color: var(--text-1);
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-}
-.skills-modal-input:focus { border-color: var(--accent); }
-.skills-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.skills-modal-btn {
-  padding: 7px 16px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-1);
-  font-size: 13px;
-  border-radius: var(--radius-sm, 6px);
-  cursor: pointer;
-  transition: background-color 0.12s, border-color 0.12s, opacity 0.12s;
-}
-.skills-modal-btn:hover:not(:disabled) { background: var(--bg-hover); }
-.skills-modal-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.skills-modal-btn:disabled { opacity: 0.5; cursor: default; }
-
-/* ─── Manage marketplaces list (升级 / 删除 per market) ───────── */
-.skills-manage { width: 560px; }
-.skills-manage-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 50vh;
-  overflow-y: auto;
-  margin: 4px 0;
-}
-.skills-manage-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
-}
-.skills-manage-info { flex: 1; min-width: 0; }
-.skills-manage-titlerow { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.skills-manage-name { font-size: 13px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.skills-manage-meta { font-size: 12px; color: var(--text-2); flex-shrink: 0; }
-.skills-manage-path {
-  font-size: 11px;
-  color: var(--text-3);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.skills-manage-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.skills-manage-del {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-2);
-  border-radius: var(--radius-sm, 6px);
-  cursor: pointer;
-  transition: color 0.12s, border-color 0.12s;
-}
-.skills-manage-del:hover:not(:disabled) { color: #e85454; border-color: #e85454; }
-.skills-manage-del:disabled { opacity: 0.5; cursor: default; }
-
-/* ─── Skill card skeletons (first-load shimmer) + lazy sentinel ─ */
-.skills-card-skeleton { pointer-events: none; opacity: 0.7; }
-.skills-skel-icon,
-.skills-skel-bar {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--text-3) 18%, transparent) 0%,
-    color-mix(in srgb, var(--text-3) 35%, transparent) 50%,
-    color-mix(in srgb, var(--text-3) 18%, transparent) 100%
-  );
-  background-size: 200% 100%;
-  animation: skills-skel-shimmer 1.4s ease-in-out infinite;
-}
-.skills-skel-icon {
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-md);
-}
-.skills-skel-bar { display: block; height: 12px; border-radius: var(--radius-xs, 4px); }
-.skills-skel-title { width: 55%; }
-.skills-skel-desc { width: 80%; height: 10px; margin-top: 6px; }
-@keyframes skills-skel-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-.skills-sentinel { width: 100%; height: 1px; }
-
-.skills-empty {
-  padding: 60px 24px;
-  text-align: center;
-  color: var(--text-3);
-  font-size: 14px;
-}
-
-.skills-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-  padding: 8px 4px 80px;
-}
-
-/* Single-row card layout: [icon] [name+desc] [toggle].
-   Description truncates to one line with ellipsis; full text is
-   exposed on hover via the mouse-tracked tooltip rendered into
-   document.body via portal (see .skills-tooltip below).
-   min-width: 0 here is the *grid item* equivalent of the flex-child
-   trick: without it, the card refuses to shrink below its intrinsic
-   min-content, and a long English description forces the card wider
-   than its grid column — the description then visually overflows
-   the panel without ever triggering text-overflow: ellipsis on the
-   inner desc element (because the desc element thinks it has
-   unlimited width). */
-.skills-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  min-width: 0;
-}
-
-/* No accent border for enabled state — the right-side toggle is the
-   canonical state indicator. An accent border on the card visually
-   reads as "selected/focused", which we don't have here (skills are
-   on/off, not selectable). Keep border neutral; the toggle alone
-   communicates state. */
-
-/* Big bare icon — no background plate, no rounded clip, no border.
-   The icon's own art carries the visual weight. object-fit: contain
-   preserves aspect ratio so non-square assets (an SVG with whitespace
-   around the glyph, etc) don't get cropped. Fallback first-letter
-   renders at the same size for visual rhythm. */
-.skills-card-icon {
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.skills-card-icon img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  /* Theme-aware corner radius — matches the card's --radius-md so
-     icon corners visually rhyme with the card they sit in. Effect
-     is real for opaque filled-canvas icons (screenshot-style); a
-     no-op for transparent-glyph icons (vibeid-style) since the
-     corners are already empty pixels. Either way, harmless. */
-  border-radius: var(--radius-md);
-}
-
-.skills-card-icon-fallback {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-2);
-}
-
-/* Vertical stack of name + truncated description, takes up all
-   horizontal space between icon and toggle. min-width: 0 is the
-   flex hack that lets the description's text-overflow: ellipsis
-   actually fire — without it the flex item refuses to shrink
-   below its content's intrinsic width.
-   position: relative anchors the hover tooltip below — it has to
-   live HERE rather than on .skills-card-desc because the desc
-   itself uses overflow: hidden for the ellipsis, which would clip
-   the absolutely-positioned pseudo-element tooltip. cursor: help
-   on this whole region (name + desc) hints "hover for more". */
-.skills-card-text {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  cursor: help;
-}
-
-.skills-card-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.skills-card-desc {
-  font-size: 12.5px;
-  line-height: 1.4;
-  color: var(--text-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Mouse-tracked tooltip — rendered into document.body via portal
-   (see SkillsPanel.tsx). Pure-CSS pseudo-element approach failed
-   because (a) .skills-card-desc's overflow:hidden clipped the tip
-   when anchored on the desc itself, and (b) anchoring on a parent
-   then meant the tip couldn't avoid viewport edges (top of small
-   windows / left rail). Portal + position:fixed + JS clamp dodges
-   both. Style mirrors the heatmap tooltip (var(--bg-panel) /
-   var(--text-1) / var(--border)) so theme changes cascade. */
-.skills-tooltip {
-  position: fixed;
-  max-width: min(420px, calc(100vw - 24px));
-  width: max-content;
-  padding: 8px 12px;
-  background: var(--bg-panel);
-  color: var(--text-1);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: normal;
-  pointer-events: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20), 0 6px 20px rgba(0, 0, 0, 0.22);
-  z-index: 10000;
-}
-
-/* iOS-style toggle switch — 36×20 track, 16×16 thumb. */
-.skills-toggle {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  padding: 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.skills-toggle:disabled {
-  cursor: progress;
-}
-
-/* Busy state — backend toggle in flight (junction creation +
-   per-CLI mirroring). The thumb's solid white fill is swapped for a
-   rotating ring so the click has a clear "I'm working" affordance,
-   the same idiom Codex desktop uses for in-flight switches. The
-   thumb keeps its current position (we don't optimistically move
-   it; the refresh after the backend returns is what shifts the
-   thumb to the new state). */
-.skills-toggle.is-busy .skills-toggle-thumb {
-  background: transparent;
-  box-shadow: none;
-}
-
-.skills-toggle.is-busy .skills-toggle-thumb::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-.skills-toggle-track {
-  position: relative;
-  display: inline-block;
-  width: 36px;
-  height: 20px;
-  background: var(--border);
-  border-radius: 10px;
-  transition: background-color 0.2s;
-}
-
-.skills-toggle.on .skills-toggle-track {
-  background: var(--accent);
-}
-
-.skills-toggle-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-  transition: transform 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
-}
-
-.skills-toggle.on .skills-toggle-thumb {
-  transform: translateX(16px);
-}
 
 /* ─── Tool launch-override modal ─────────────────────────────────── */
 /* Theme-driven: reads --bg-panel / --text-1 / --accent / --border-*  */
@@ -1885,4 +1341,43 @@
   background: #ef4444;
   color: #fff;
   box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+/* Pin toggle switch (right edge of each library card) - explicit on/off
+   for "show on home screen", clearer than border+opacity alone. */
+.library-toggle {
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--border, #3a3a3a);
+  position: relative;
+  transition: background-color 0.18s ease;
+  margin-left: 8px;
+}
+.library-toggle.on { background: var(--accent); }
+.library-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.18s ease;
+}
+.library-toggle.on .library-toggle-knob { transform: translateX(16px); }
+
+/* Pin counter header above the agents grid (restores the N/6 hint lost
+   when the Agents/Skills tab strip was removed). */
+.library-counter {
+  position: absolute;
+  top: 26px;
+  right: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2, #aaa);
+  letter-spacing: 0.04em;
+  user-select: none;
+  z-index: 3;
 }

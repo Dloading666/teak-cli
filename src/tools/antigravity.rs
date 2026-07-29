@@ -68,9 +68,6 @@
 //!
 //! ## What we ship in v1
 //!
-//! `binary_name` = `agy`, `skill_dir_relative` = `.gemini/antigravity/
-//! skills` (junctioned skills land alongside whatever the IDE / 3rd-
-//! party installers put there — same shared dir, just a sibling).
 //! Allowed-paths include `~/.gemini/antigravity-cli/` so the security
 //! gate on `read_native_session` accepts conversation paths under it.
 //! Resume uses `--conversation <uuid>` (wired in `terminal::AGENT_PRESETS`).
@@ -93,7 +90,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "antigravity",
     display_name: "Antigravity CLI",
     binary_name: "agy",
-    skill_dir_relative: Some(".gemini/antigravity/skills"),
     has_hook_surface: false,
     // agy writes session JSONL to `~/.gemini/tmp/<project>/chats/
     // session-*.jsonl` using the format inherited from the retired

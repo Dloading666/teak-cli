@@ -11,7 +11,6 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "copilot",
     display_name: "Copilot CLI",
     binary_name: "copilot",
-    skill_dir_relative: None,
     has_hook_surface: false,
     history_shape: None,
     default_args: &[],
