@@ -659,7 +659,7 @@ dependencies = [
 
 [[package]]
 name = "coffee-cli"
-version = "3.2.4"
+version = "3.2.5"
 dependencies = [
  "anyhow",
  "axum",
@@ -678,6 +678,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",

@@ -57,6 +57,10 @@ base64 = "0.22.1"
 # to PNG before writing the temp file the AI CLI references by path. Reuses
 # the same png 0.17.x already pulled in transitively by tauri, no extra build.
 png = "0.17"
+# Codex hooks trust-hash computation (see hook_installer.rs::compute_codex_trusted_hash).
+# Reproduces codex-rs/hooks command_hook_hash so we can pre-grant trust at install
+# time — the island lights without a manual /hooks approval. Pure Rust.
+sha2 = "0.10"
 # In-app self-update downloader (Windows). Blocking + rustls, runs on a
 # spawn_blocking thread; streams the installer so we can emit download %.
 ureq = "2"

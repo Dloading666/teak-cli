@@ -184,25 +184,88 @@ fn forward_codex(args: &[String]) -> Option<()> {
 /// coincidence). Gated on COFFEE_CLI_TOOL=codex so a globally-installed hook
 /// stays silent for Codex sessions started outside Coffee CLI.
 fn forward_codex_hook() -> Option<()> {
-    let ctx = HookCtx::from_env()?;
+    // TEMP DIAGNOSTIC: log every codex hook invocation (event name + status +
+    // env + post result) to see what codex 0.146 actually sends. Always-on so
+    // it works without COFFEE_HOOK_DEBUG (which the codex tab env doesn't set).
+    // Remove once the 0.146 event mapping is confirmed.
+    let ctx = match HookCtx::from_env() {
+        Some(c) => c,
+        None => {
+            codex_diag("no COFFEE_CLI_TAB_ID/PORT env — no-op");
+            return None;
+        }
+    };
     if ctx.tool != "codex" {
+        codex_diag(&format!("tool={} (not codex) — no-op", ctx.tool));
         return None;
     }
 
     let mut buf = String::new();
-    std::io::stdin().read_to_string(&mut buf).ok()?;
+    let read_ok = std::io::stdin().read_to_string(&mut buf).is_ok();
+    codex_diag(&format!("stdin_read={} bytes={}", read_ok, buf.len()));
     let buf = buf.trim_start_matches('\u{feff}');
-    let data: Value = serde_json::from_str(buf).ok()?;
-
+    let data: Value = match serde_json::from_str(buf) {
+        Ok(d) => d,
+        Err(e) => {
+            codex_diag(&format!("json parse fail: {}", e));
+            return None;
+        }
+    };
+    let keys: Vec<&str> = data
+        .as_object()
+        .map(|o| o.keys().map(|s| s.as_str()).collect())
+        .unwrap_or_default();
     let event = data
         .get("hook_event_name")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let status = map_codex_hook_status(&event)?;
-
-    post(ctx.port, &ctx.tab_id, &ctx.tool, &status, &event);
+    let status = match map_codex_hook_status(&event) {
+        Some(s) => s,
+        None => {
+            codex_diag(&format!("event={} unmapped (no-op) keys={:?}", event, keys));
+            return None;
+        }
+    };
+    let ok = post(ctx.port, &ctx.tab_id, &ctx.tool, &status, &event);
+    codex_diag(&format!(
+        "event={} status={} post={} keys={:?}",
+        event,
+        status,
+        if ok { "ok" } else { "fail" },
+        keys
+    ));
     Some(())
+}
+
+/// TEMP DIAGNOSTIC: always-on one-line log for the codex hook path (the claude
+/// path uses env-gated debug_log; codex tabs don't carry COFFEE_HOOK_DEBUG so
+/// this is unconditional). Capped at 256KB. Safe — logs only event names, env
+/// presence, byte counts, status, and top-level JSON keys; never prompt/token.
+fn codex_diag(msg: &str) {
+    let Some(home) = dirs::home_dir() else {
+        return;
+    };
+    let dir = home.join(".coffee-cli").join("hooks");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let path = dir.join("codex-hook-debug.log");
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if meta.len() > 256 * 1024 {
+            let _ = std::fs::write(&path, "");
+        }
+    }
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let line = format!("[{}] {}\n", ts, msg);
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .and_then(|mut f| f.write_all(line.as_bytes()));
 }
 
 /// stdin hook path for Kimi Code (9 events installed as `[[hooks]]` in

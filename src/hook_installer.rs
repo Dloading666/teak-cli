@@ -59,6 +59,8 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use sha2::{Digest, Sha256};
+
 const HOOK_SCRIPT: &str = include_str!("../scripts/coffee-cli-hook.py");
 const SCRIPT_FILENAME: &str = "coffee-cli-hook.py";
 
@@ -248,61 +250,173 @@ fn install_claude(home: &Path) {
     }
 }
 
-/// Codex notify forwarder — registers `notify = ["<exe>", "__codex-notify"]`
-/// in ~/.codex/config.toml if (and only if) the user doesn't already have a
-/// top-level notify. The forwarder is the Coffee CLI binary itself (no
-/// Python). We never overwrite a user's custom notify command — too high a
-/// risk of stomping on their setup.
+/// Codex dynamic-island support has been REMOVED. Codex's hook trust system
+/// churns per version (0.129 trust gate, 0.146 event/trust drift), making a
+/// reliable hook-driven 3-color island infeasible without an app-server RPC
+/// trust grantor we don't ship. Codex tabs now show a static placeholder dot.
+/// We still drop the protocol-reference script copy and — critically — STRIP
+/// any prior Coffee CLI codex hook / notify / trust install so existing setups
+/// stop firing the broken hooks and stop hitting codex's "hooks need review"
+/// prompt.
 fn install_codex(home: &Path) {
-    // Protocol-reference copy alongside the other forwarders' debug copies.
-    // No longer the registered command, so a write failure is non-fatal.
     if let Err(e) = write_aux_script(home, CODEX_NOTIFY_FILENAME, CODEX_NOTIFY_SCRIPT) {
         eprintln!("[hook-installer] failed to write codex notify reference copy: {}", e);
     }
+    cleanup_codex_island_install(home);
+}
 
-    let exe = match std::env::current_exe() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[hook-installer] current_exe() failed — cannot install codex notify: {}", e);
-            return;
-        }
-    };
-
-    let config_path = home.join(".codex").join("config.toml");
-    if let Err(e) = patch_codex_config(&config_path, &exe) {
-        eprintln!(
-            "[hook-installer] failed to patch {}: {}",
-            config_path.display(),
-            e
-        );
-    }
-
-    // Hooks system (SessionStart / UserPromptSubmit / PermissionRequest / Stop)
-    // — the full 3-color status bus. `notify` only carries turn-complete (idle),
-    // so without these hooks Codex's island never shows working (orange) or
-    // wait_input (blue). See install_codex_hooks + patch_codex_features.
-    let hook_cmd = match hook_command(CODEX_HOOK_SUBCOMMAND) {
-        Some(c) => c,
-        None => {
-            eprintln!("[hook-installer] current_exe() failed — cannot install codex hooks");
-            return;
-        }
-    };
+/// Remove every Coffee CLI codex dynamic-island artifact from ~/.codex so a
+/// prior install (hooks.json entries, the `notify` line, `[hooks.state]` trust
+/// blocks) stops firing the broken/renamed hooks. Idempotent; preserves
+/// user-owned codex hooks and all other config. Errors are logged, not fatal.
+fn cleanup_codex_island_install(home: &Path) {
     let hooks_path = home.join(".codex").join("hooks.json");
-    if let Err(e) = install_codex_hooks(&hooks_path, &hook_cmd) {
-        eprintln!(
-            "[hook-installer] failed to patch {}: {}",
-            hooks_path.display(),
-            e
-        );
+    let config_path = home.join(".codex").join("config.toml");
+    if let Err(e) = strip_codex_managed_hooks(&hooks_path) {
+        eprintln!("[hook-installer] failed to strip codex managed hooks: {}", e);
     }
-    if let Err(e) = patch_codex_features(&config_path) {
-        eprintln!(
-            "[hook-installer] failed to enable [features].hooks in {}: {}",
-            config_path.display(),
-            e
-        );
+    if let Err(e) = strip_codex_notify(&config_path) {
+        eprintln!("[hook-installer] failed to strip codex notify line: {}", e);
     }
+    if let Err(e) = strip_codex_managed_trust(&config_path, &hooks_path) {
+        eprintln!("[hook-installer] failed to strip codex managed trust: {}", e);
+    }
+}
+
+/// Remove our `__codex-hook` entries from the 4 managed events in
+/// ~/.codex/hooks.json, dropping events left empty. A malformed or user-owned
+/// file is left untouched.
+fn strip_codex_managed_hooks(hooks_path: &Path) -> anyhow::Result<()> {
+    if !hooks_path.exists() {
+        return Ok(());
+    }
+    let text = fs::read_to_string(hooks_path).unwrap_or_default();
+    let mut root: Value = serde_json::from_str(&text).unwrap_or_else(|_| json!({}));
+    if !root.is_object() {
+        return Ok(()); // malformed — don't touch
+    }
+    let Some(hooks) = root.get_mut("hooks").and_then(|h| h.as_object_mut()) else {
+        return Ok(());
+    };
+    for event in ["SessionStart", "UserPromptSubmit", "PermissionRequest", "Stop"] {
+        let Some(arr) = hooks.get_mut(event).and_then(|e| e.as_array_mut()) else {
+            continue;
+        };
+        for group in arr.iter_mut() {
+            if let Some(hs) = group.get_mut("hooks").and_then(|h| h.as_array_mut()) {
+                hs.retain(|h| !is_coffee_codex_entry(h));
+            }
+        }
+        arr.retain(|g| {
+            g.get("hooks")
+                .and_then(|h| h.as_array())
+                .map(|a| !a.is_empty())
+                .unwrap_or(true)
+        });
+        if arr.is_empty() {
+            hooks.remove(event);
+        }
+    }
+    let hooks_empty = root
+        .get("hooks")
+        .and_then(|h| h.as_object())
+        .map(|o| o.is_empty())
+        .unwrap_or(false);
+    if hooks_empty {
+        if let Some(obj) = root.as_object_mut() {
+            obj.remove("hooks");
+        }
+    }
+    let out = serde_json::to_string_pretty(&root)?;
+    fs::write(hooks_path, out)?;
+    Ok(())
+}
+
+/// Remove our top-level `notify = ["<exe>", "__codex-notify"]` line from
+/// ~/.codex/config.toml (only the top-level one — a notify inside a [section]
+/// is a different key we don't touch). Byte-preserving line edit.
+fn strip_codex_notify(config_path: &Path) -> anyhow::Result<()> {
+    if !config_path.exists() {
+        return Ok(());
+    }
+    let existing = fs::read_to_string(config_path).unwrap_or_default();
+    let mut out: Vec<String> = Vec::new();
+    let mut seen_section = false;
+    let mut changed = false;
+    for line in existing.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('[') && !trimmed.starts_with("[[") {
+            seen_section = true;
+        }
+        if !seen_section && is_our_notify_line(trimmed) {
+            changed = true;
+            continue;
+        }
+        out.push(line.to_string());
+    }
+    if changed {
+        let mut joined = out.join("\n");
+        if !joined.ends_with('\n') {
+            joined.push('\n');
+        }
+        fs::write(config_path, joined)?;
+    }
+    Ok(())
+}
+
+fn is_our_notify_line(trimmed: &str) -> bool {
+    let Some(rest) = trimmed.strip_prefix("notify") else {
+        return false;
+    };
+    let rest = rest.trim_start();
+    if !rest.starts_with('=') {
+        return false;
+    }
+    rest.contains(CODEX_NOTIFY_SUBCOMMAND)
+}
+
+/// Remove our `[hooks.state."<our-source>:<event>:g:h"]` blocks from
+/// ~/.codex/config.toml — keyed by our hooks.json path + the 4 managed event
+/// labels. Other tools'/user's trust blocks are preserved.
+fn strip_codex_managed_trust(config_path: &Path, hooks_path: &Path) -> anyhow::Result<()> {
+    if !config_path.exists() {
+        return Ok(());
+    }
+    let existing = fs::read_to_string(config_path).unwrap_or_default();
+    let source_prefix = format!("{}:", hooks_path.to_string_lossy());
+    let labels = ["session_start", "user_prompt_submit", "permission_request", "stop"];
+    let lines: Vec<&str> = existing.lines().collect();
+    let mut out: Vec<String> = Vec::new();
+    let mut changed = false;
+    let mut i = 0;
+    while i < lines.len() {
+        let trimmed = lines[i].trim_start();
+        if let Some(key) = parse_codex_state_header(trimmed) {
+            let is_ours = key.starts_with(&source_prefix)
+                && labels
+                    .iter()
+                    .any(|l| key[source_prefix.len()..].starts_with(&format!("{}:", l)));
+            if is_ours {
+                let mut j = i + 1;
+                while j < lines.len() && !is_toml_table_header(lines[j]) {
+                    j += 1;
+                }
+                changed = true;
+                i = j;
+                continue;
+            }
+        }
+        out.push(lines[i].to_string());
+        i += 1;
+    }
+    if changed {
+        let mut joined = out.join("\n");
+        if !joined.ends_with('\n') {
+            joined.push('\n');
+        }
+        fs::write(config_path, joined)?;
+    }
+    Ok(())
 }
 
 /// OpenCode-family plugin — written directly to ~/.config/<config_subdir>/plugins/
@@ -989,6 +1103,249 @@ fn is_coffee_codex_entry(entry: &Value) -> bool {
         .unwrap_or(false)
 }
 
+// ─── Codex hooks trust state (config.toml [hooks.state]) ──────────────────
+//
+// Codex 0.129+ gates each managed hook on a `[hooks.state."<key>"]` block in
+// ~/.codex/config.toml carrying `trusted_hash` + `enabled = true`. Without it
+// the hook sits in "review required" and NEVER fires — the dynamic island
+// stays dark until the user manually approves every hook in `/hooks`. We
+// reproduce codex's `command_hook_hash` (reverse-engineered via orca's
+// config-toml-trust.ts; verified byte-for-byte against the hashes codex itself
+// wrote on a real install) so install pre-grants trust: the island lights the
+// moment a tab spawns codex, no manual approval.
+//
+// Hash identity (canonical JSON, keys sorted — built via BTreeMap so it is
+// invariant to serde_json's preserve_order feature, matching codex's
+// canonical_json):
+//   { event_name, hooks:[{type:"command", command, timeout, async:false}], matcher? }
+// codex drops `matcher` for user_prompt_submit/stop before hashing; we install
+// none there. SessionStart keeps its `startup|resume` matcher.
+
+const CODEX_TRUST_LABEL: &[(&str, &str)] = &[
+    ("SessionStart", "session_start"),
+    ("UserPromptSubmit", "user_prompt_submit"),
+    ("PermissionRequest", "permission_request"),
+    ("Stop", "stop"),
+];
+
+fn compute_codex_trusted_hash(
+    command: &str,
+    event_label: &str,
+    matcher: Option<&str>,
+    timeout: u64,
+) -> String {
+    // BTreeMap → keys serialize sorted regardless of serde_json's
+    // preserve_order feature, so to_string IS canonical (matches codex).
+    let mut handler: std::collections::BTreeMap<String, Value> =
+        std::collections::BTreeMap::new();
+    handler.insert("async".into(), json!(false));
+    handler.insert("command".into(), json!(command));
+    handler.insert("timeout".into(), json!(timeout.max(1)));
+    handler.insert("type".into(), json!("command"));
+    let handler_value = serde_json::to_value(&handler).unwrap_or(Value::Null);
+
+    let mut identity: std::collections::BTreeMap<String, Value> =
+        std::collections::BTreeMap::new();
+    identity.insert("event_name".into(), json!(event_label));
+    identity.insert(
+        "hooks".into(),
+        Value::Array(vec![handler_value]),
+    );
+    if let Some(m) = matcher {
+        identity.insert("matcher".into(), json!(m));
+    }
+    let serialized = serde_json::to_string(&identity).unwrap_or_default();
+    let digest = Sha256::digest(serialized.as_bytes());
+    let hex: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+    format!("sha256:{}", hex)
+}
+
+/// `<sourcePath>:<eventLabel>:<groupIndex>:<handlerIndex>` — sourcePath is
+/// the native hooks.json path (backslashes on Windows, matching codex 0.140's
+/// key shape after a `/hooks` approval).
+fn codex_trust_key(
+    source_path: &str,
+    event_label: &str,
+    group_idx: usize,
+    handler_idx: usize,
+) -> String {
+    format!("{}:{}:{}:{}", source_path, event_label, group_idx, handler_idx)
+}
+
+/// Find our managed group's actual (groupIndex, handlerIndex) in the
+/// freshly-written hooks.json so the trust key's positional part matches what
+/// codex derives. Returns (0, 0) if absent (defensive — codex then just asks
+/// for review rather than trusting a stale position).
+fn find_codex_managed_position(hooks_root: &Value, event: &str) -> (usize, usize) {
+    let groups = hooks_root
+        .get("hooks")
+        .and_then(|h| h.get(event))
+        .and_then(|e| e.as_array());
+    let Some(groups) = groups else {
+        return (0, 0);
+    };
+    for (gidx, group) in groups.iter().enumerate() {
+        let Some(hs) = group.get("hooks").and_then(|h| h.as_array()) else {
+            continue;
+        };
+        for (hidx, hook) in hs.iter().enumerate() {
+            if is_coffee_codex_entry(hook) {
+                return (gidx, hidx);
+            }
+        }
+    }
+    (0, 0)
+}
+
+struct CodexTrustExpected {
+    key: String,
+    hash: String,
+}
+
+/// Compute the 4 expected trust entries from the written hooks.json + command.
+fn expected_codex_trust_entries(
+    hooks_json_path: &Path,
+    hook_cmd: &str,
+) -> Vec<CodexTrustExpected> {
+    let hooks_text = fs::read_to_string(hooks_json_path).unwrap_or_default();
+    let hooks_root: Value = serde_json::from_str(&hooks_text).unwrap_or_else(|_| json!({}));
+    let source_path = hooks_json_path.to_string_lossy().to_string();
+    let mut out = Vec::new();
+    for (event, label) in CODEX_TRUST_LABEL {
+        let (matcher, timeout) = CODEX_HOOK_EVENTS
+            .iter()
+            .find(|(e, _, _)| *e == *event)
+            .map(|(_, m, t)| (*m, *t))
+            .unwrap_or((None, 45));
+        let (gidx, hidx) = find_codex_managed_position(&hooks_root, event);
+        let hash = compute_codex_trusted_hash(hook_cmd, label, matcher, timeout);
+        let key = codex_trust_key(&source_path, label, gidx, hidx);
+        out.push(CodexTrustExpected { key, hash });
+    }
+    out
+}
+
+/// Parse a `[hooks.state.'<key>']` / `[hooks.state."<key>"]` header line,
+/// returning the raw key string. Returns None for the bare `[hooks.state]`
+/// parent table or any other header.
+fn parse_codex_state_header(line: &str) -> Option<String> {
+    let t = line.trim();
+    let rest = t.strip_prefix("[hooks.state.")?;
+    if let Some(r) = rest.strip_prefix('\'') {
+        // literal string — read until the next single quote
+        let end = r.find('\'')?;
+        let after = r[end + 1..].trim_start();
+        if after.starts_with(']') {
+            Some(r[..end].to_string())
+        } else {
+            None
+        }
+    } else if let Some(r) = rest.strip_prefix('"') {
+        // basic string — read until an unescaped double quote
+        let mut key = String::new();
+        let mut chars = r.chars().peekable();
+        let mut closed = false;
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                if let Some(&n) = chars.peek() {
+                    key.push(n);
+                    chars.next();
+                }
+                continue;
+            }
+            if c == '"' {
+                closed = true;
+                break;
+            }
+            key.push(c);
+        }
+        if closed {
+            Some(key)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn is_toml_table_header(line: &str) -> bool {
+    line.trim_start().starts_with('[')
+}
+
+/// Pre-grant codex hook trust by writing `[hooks.state]` blocks with the
+/// verified trusted_hash + `enabled = true` into ~/.codex/config.toml.
+/// Idempotent: refreshes matching blocks in place (adds `enabled = true` if a
+/// block carried only `trusted_hash`), appends missing ones, and preserves all
+/// other content (user hook trust blocks, comments, ordering) verbatim.
+fn patch_codex_trust(config_toml: &Path, hooks_json_path: &Path, hook_cmd: &str) -> anyhow::Result<()> {
+    if let Some(parent) = config_toml.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let expected = expected_codex_trust_entries(hooks_json_path, hook_cmd);
+
+    let existing = if config_toml.exists() {
+        fs::read_to_string(config_toml).unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    let lines: Vec<&str> = existing.lines().collect();
+    let mut out: Vec<String> = Vec::with_capacity(lines.len() + expected.len() * 4);
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    let mut i = 0;
+    while i < lines.len() {
+        let trimmed = lines[i].trim_start();
+        if let Some(key) = parse_codex_state_header(trimmed) {
+            // Block spans until the next table header (or EOF).
+            let mut j = i + 1;
+            while j < lines.len() && !is_toml_table_header(lines[j]) {
+                j += 1;
+            }
+            if let Some(exp) = expected.iter().find(|e| e.key == key) {
+                // Ours — rewrite the body fresh so enabled=true is guaranteed
+                // even if the existing block only carried trusted_hash.
+                out.push(format!("[hooks.state.'{}']", key));
+                out.push("enabled = true".to_string());
+                out.push(format!("trusted_hash = \"{}\"", exp.hash));
+                out.push(String::new());
+                seen.insert(key);
+            } else {
+                // Not ours (different source path / event) — preserve verbatim.
+                for k in i..j {
+                    out.push(lines[k].to_string());
+                }
+            }
+            i = j;
+            continue;
+        }
+        out.push(lines[i].to_string());
+        i += 1;
+    }
+
+    // Append any expected blocks not found above.
+    for exp in &expected {
+        if !seen.contains(&exp.key) {
+            if !out.is_empty() && out.last().map(|s| !s.is_empty()).unwrap_or(false) {
+                out.push(String::new());
+            }
+            out.push(format!("[hooks.state.'{}']", exp.key));
+            out.push("enabled = true".to_string());
+            out.push(format!("trusted_hash = \"{}\"", exp.hash));
+        }
+    }
+
+    let mut joined = out.join("\n");
+    if !joined.ends_with('\n') {
+        joined.push('\n');
+    }
+    if joined != existing || !config_toml.exists() {
+        fs::write(config_toml, joined)?;
+    }
+    Ok(())
+}
+
 /// Remove the stale Grok hook config that the T1 build (has_hook_surface:
 /// true) wrote to ~/.grok/hooks/coffee-cli-status.json. Grok is now T2 (no
 /// island) - if this file remains, grok fires `<exe> __grok-hook` on every
@@ -1585,6 +1942,123 @@ mod tests {
         let after = fs::read_to_string(&cfg).unwrap();
         assert!(!after.contains("hooks = false"));
         assert!(after.contains("hooks = true"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // ─── Codex trust hash + [hooks.state] pre-grant ──────────────────────
+
+    #[test]
+    fn codex_trust_hash_matches_codex_byte_for_byte() {
+        // Verified against the trusted_hash values codex itself wrote to
+        // ~/.codex/config.toml on a real install — these exact bytes.
+        let cmd = "\"C:/Users/eben/AppData/Local/Coffee CLI/coffee-cli.exe\" __codex-hook";
+        assert_eq!(
+            compute_codex_trusted_hash(cmd, "session_start", Some("startup|resume"), 45),
+            "sha256:f6883bdb22002ec700a5c66ad14d91c957cc9c5ea6d0f319f5ac9b16a88cd792"
+        );
+        assert_eq!(
+            compute_codex_trusted_hash(cmd, "user_prompt_submit", None, 45),
+            "sha256:c07231d3b3e88e7c2045f1fe20776d1968d10a1a71248f552b3e0a0d3101601b"
+        );
+        assert_eq!(
+            compute_codex_trusted_hash(cmd, "permission_request", None, 3600),
+            "sha256:e455ecd9e55bae793c72907fdbad309df1aaeaa9b4d1cce47e1affbb888ed09a"
+        );
+        assert_eq!(
+            compute_codex_trusted_hash(cmd, "stop", None, 45),
+            "sha256:b32206eb88dd9af10cda03c38c7e193096fa081532c9a95553b331555a06cf4b"
+        );
+    }
+
+    static TRUST_DIR_N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+    fn codex_trust_temp_dir(name: &str) -> PathBuf {
+        let n = TRUST_DIR_N.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let mut p = std::env::temp_dir();
+        p.push(format!("coffee-codex-trust-{}-{}-{}", name, std::process::id(), n));
+        let _ = fs::remove_dir_all(&p);
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    #[test]
+    fn codex_trust_grants_four_blocks_then_idempotent() {
+        let dir = codex_trust_temp_dir("grant");
+        let hooks_path = dir.join("hooks.json");
+        let cfg = dir.join("config.toml");
+        let cmd = "\"/fake/coffee-cli.exe\" __codex-hook";
+        install_codex_hooks(&hooks_path, cmd).unwrap();
+        // No config.toml yet — patch creates it.
+        patch_codex_trust(&cfg, &hooks_path, cmd).unwrap();
+
+        let text = fs::read_to_string(&cfg).unwrap();
+        assert_eq!(text.matches("[hooks.state.'").count(), 4, "4 managed events: {}", text);
+        for (event, label) in CODEX_TRUST_LABEL {
+            let (matcher, timeout) = CODEX_HOOK_EVENTS
+                .iter()
+                .find(|(e, _, _)| *e == *event)
+                .map(|(_, m, t)| (*m, *t))
+                .unwrap();
+            let h = compute_codex_trusted_hash(cmd, label, matcher, timeout);
+            assert!(text.contains(&format!("trusted_hash = \"{}\"", h)), "{}: {}", event, text);
+        }
+        assert_eq!(text.matches("enabled = true").count(), 4, "{}", text);
+
+        // Idempotent — running again does not accumulate blocks.
+        patch_codex_trust(&cfg, &hooks_path, cmd).unwrap();
+        patch_codex_trust(&cfg, &hooks_path, cmd).unwrap();
+        let text2 = fs::read_to_string(&cfg).unwrap();
+        assert_eq!(text2.matches("[hooks.state.'").count(), 4, "idempotent: {}", text2);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_trust_adds_enabled_to_block_missing_it() {
+        let dir = codex_trust_temp_dir("enabled");
+        let hooks_path = dir.join("hooks.json");
+        let cfg = dir.join("config.toml");
+        let cmd = "\"/fake/coffee-cli.exe\" __codex-hook";
+        install_codex_hooks(&hooks_path, cmd).unwrap();
+        // Seed a session_start block with the RIGHT hash but NO enabled line —
+        // simulating the trust-without-enable state we suspect on the user's
+        // machine (only permission_request carried enabled=true).
+        let source = hooks_path.to_string_lossy().to_string();
+        let key = codex_trust_key(&source, "session_start", 0, 0);
+        let hash = compute_codex_trusted_hash(cmd, "session_start", Some("startup|resume"), 45);
+        fs::write(&cfg, format!("[hooks.state.'{}']\ntrusted_hash = \"{}\"\n", key, hash)).unwrap();
+
+        patch_codex_trust(&cfg, &hooks_path, cmd).unwrap();
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(after.contains("enabled = true"), "enabled added: {}", after);
+        assert_eq!(
+            after.matches("[hooks.state.'").count(),
+            4,
+            "other 3 appended: {}",
+            after
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_trust_preserves_user_blocks() {
+        let dir = codex_trust_temp_dir("preserve");
+        let hooks_path = dir.join("hooks.json");
+        let cfg = dir.join("config.toml");
+        let cmd = "\"/fake/coffee-cli.exe\" __codex-hook";
+        install_codex_hooks(&hooks_path, cmd).unwrap();
+        // A user's own codex hook trust block (different source path) must
+        // survive verbatim — we only manage entries whose key is ours.
+        let user = "[hooks.state.'C:/user/own:session_start:0:0']\nenabled = true\ntrusted_hash = \"sha256:deadbeef\"\n";
+        fs::write(&cfg, user).unwrap();
+        patch_codex_trust(&cfg, &hooks_path, cmd).unwrap();
+        let after = fs::read_to_string(&cfg).unwrap();
+        assert!(after.contains("deadbeef"), "user block kept: {}", after);
+        assert_eq!(
+            after.matches("[hooks.state.'").count(),
+            5,
+            "user + 4 ours: {}",
+            after
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 
