@@ -175,6 +175,7 @@ fn dispatch_install(tool: &crate::tools::ToolDescriptor, home: &Path) {
         }
         "hermes" => install_hermes(home),
         "kimicode" => install_kimi(home),
+        "grok" => install_grok(home),
         other => {
             eprintln!(
                 "[hook-installer] tool '{}' declares a hook surface but has no installer — \
@@ -2181,5 +2182,90 @@ mod tests {
             );
         }
         let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Grok Build hooks
+// ──────────────────────────────────────────────────────────────────────────────
+
+const GROK_HOOK_SUBCOMMAND: &str = "__grok-hook";
+
+/// Grok Build events we register. Grok Build's hook system is nearly identical
+/// to Claude Code's, so we use the same event set (minus SubagentStart which
+/// Grok Build doesn't fire). The hooks are installed as JSON files in
+/// $GROK_HOME/hooks/ where Grok Build auto-discovers them.
+const GROK_HOOK_EVENTS: &[&str] = &[
+    "SessionStart",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PostToolUse",
+    "Notification",
+    "Stop",
+    "StopFailure",
+    "PreCompact",
+    "PostCompact",
+];
+
+/// Grok Build hooks — write our hook JSON files to $GROK_HOME/hooks/.
+/// Errors are logged, never fatal.
+fn install_grok(home: &Path) {
+    let cmd = match hook_command(GROK_HOOK_SUBCOMMAND) {
+        Some(c) => c,
+        None => {
+            eprintln!("[hook-installer] current_exe() failed — cannot install grok hooks");
+            return;
+        }
+    };
+
+    // Grok Build uses $GROK_HOME for config, defaults to ~/.grok
+    let grok_home = std::env::var("GROK_HOME")
+        .ok()
+        .and_then(|s| if s.is_empty() { None } else { Some(PathBuf::from(s)) })
+        .unwrap_or_else(|| home.join(".grok"));
+
+    let hooks_dir = grok_home.join("hooks");
+    if let Err(e) = fs::create_dir_all(&hooks_dir) {
+        eprintln!(
+            "[hook-installer] failed to create {}: {}",
+            hooks_dir.display(),
+            e
+        );
+        return;
+    }
+
+    // Write one JSON file per event. Grok Build's hook JSON format:
+    // {
+    //   "hooks": {
+    //     "EventName": [{
+    //       "hooks": [{
+    //         "type": "command",
+    //         "command": "<exe> __grok-hook"
+    //       }]
+    //     }]
+    //   }
+    // }
+    for event in GROK_HOOK_EVENTS {
+        let hook_json = serde_json::json!({
+            "hooks": {
+                (*event): [{
+                    "hooks": [{
+                        "type": "command",
+                        "command": cmd
+                    }]
+                }]
+            }
+        });
+
+        let filename = format!("coffee-cli-{}.json", event.to_lowercase().replace("_", "-"));
+        let hook_path = hooks_dir.join(&filename);
+
+        if let Err(e) = fs::write(&hook_path, serde_json::to_string_pretty(&hook_json).unwrap()) {
+            eprintln!(
+                "[hook-installer] failed to write {}: {}",
+                hook_path.display(),
+                e
+            );
+        }
     }
 }

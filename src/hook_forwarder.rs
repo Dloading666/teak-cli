@@ -2,6 +2,7 @@
 //
 // Invoked as a Claude Code hook (`<exe> __hook`, event JSON on stdin), a
 // Kimi Code hook (`<exe> __kimi-hook`, same Claude-shaped stdin JSON), a
+// Grok Build hook (`<exe> __grok-hook`, stdin JSON with hook_event_name), a
 // Codex hooks-system target (`<exe> __codex-hook`, stdin JSON), or a Codex
 // `notify` target (`<exe> __codex-notify <json>`, payload as final
 // argv). Maps the event to Coffee CLI's 3-state agent status and forwards a
@@ -85,6 +86,15 @@ pub fn run_codex_hook() -> ! {
 /// write to the loopback socket. Never returns.
 pub fn run_kimi_hook() -> ! {
     let _ = forward_kimi();
+    std::process::exit(0);
+}
+
+/// `<exe> __grok-hook` — Grok Build hooks (stdin protocol, Claude-shaped JSON
+/// with `hook_event_name`). Installed by `install_grok` into $GROK_HOME/hooks/.
+/// Grok Build's hook system is nearly identical to Claude Code's, so we reuse
+/// the same mapping logic. Never returns.
+pub fn run_grok_hook() -> ! {
+    let _ = forward_grok();
     std::process::exit(0);
 }
 
@@ -320,6 +330,29 @@ fn map_kimi_status(event: &str) -> Option<&'static str> {
         // plus anything unrecognized → busy.
         _ => Some("working"),
     }
+}
+
+/// stdin hook path for Grok Build (installed in $GROK_HOME/hooks/). Reads the
+/// payload the same way Claude's `__hook` does — Grok Build's hook JSON is
+/// Claude-shaped, with `hook_event_name` naming the event. Grok Build's hook
+/// system is nearly identical to Claude Code's, so we reuse map_claude_status.
+fn forward_grok() -> Option<()> {
+    let ctx = HookCtx::from_env()?;
+
+    let mut buf = String::new();
+    std::io::stdin().read_to_string(&mut buf).ok()?;
+    let buf = buf.trim_start_matches('\u{feff}');
+    let data: Value = serde_json::from_str(buf).ok()?;
+
+    let event = data
+        .get("hook_event_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let status = map_claude_status(&data, &event)?;
+
+    post(ctx.port, &ctx.tab_id, &ctx.tool, &status, &event);
+    Some(())
 }
 
 /// Map a Codex hooks-system event to a tab status. Covers the 4 events we

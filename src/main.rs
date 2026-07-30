@@ -21,13 +21,14 @@ fn main() -> Result<()> {
     // ── Native hook forwarder (fast path) ───────────────────────────────
     // Invoked by Claude Code (`<exe> __hook`), Codex hooks (`<exe>
     // __codex-hook`, stdin JSON), Codex legacy notify (`<exe>
-    // __codex-notify <json>`), and Kimi Code hooks (`<exe> __kimi-hook`,
-    // Claude-shaped stdin JSON) to forward agent status to the dynamic
-    // island. This MUST run before any GUI / Linux-backend / PATH-inherit
-    // setup below — the PATH fix spawns a login shell, which we don't want
-    // firing on every tool-call hook. Each arm calls process::exit and
-    // never returns. See hook_forwarder.rs for why this replaced the Python
-    // forwarders (no more `python`-not-found errors on Windows).
+    // __codex-notify <json>`), Kimi Code hooks (`<exe> __kimi-hook`,
+    // Claude-shaped stdin JSON), and Grok Build hooks (`<exe> __grok-hook`,
+    // stdin JSON) to forward agent status to the dynamic island. This MUST
+    // run before any GUI / Linux-backend / PATH-inherit setup below — the
+    // PATH fix spawns a login shell, which we don't want firing on every
+    // tool-call hook. Each arm calls process::exit and never returns. See
+    // hook_forwarder.rs for why this replaced the Python forwarders (no more
+    // `python`-not-found errors on Windows).
     {
         let argv: Vec<String> = std::env::args().collect();
         match argv.get(1).map(|s| s.as_str()) {
@@ -35,6 +36,7 @@ fn main() -> Result<()> {
             Some("__codex-hook") => hook_forwarder::run_codex_hook(),
             Some("__codex-notify") => hook_forwarder::run_codex_notify(&argv),
             Some("__kimi-hook") => hook_forwarder::run_kimi_hook(),
+            Some("__grok-hook") => hook_forwarder::run_grok_hook(),
             // Unknown `__`-prefixed subcommand: a hook config written by a
             // NEWER build (or another install) pointing at an OLDER exe that
             // doesn't know it yet (downgrade, dual install). Exit 0 quietly
