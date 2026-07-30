@@ -249,6 +249,9 @@ pub struct AgentStatusEvent {
     pub silence_ms: u64,
     /// The specific AI tool backing this session
     pub tool: Option<String>,
+    /// Event name for filtering (e.g. "AutoIdleFallback", "SessionCleanup")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
 }
 
 // ─── Agent Presets for Session Resume ─────────────────────
@@ -1080,6 +1083,7 @@ pub fn spawn(
                     status: new_status,
                     silence_ms,
                     tool: tool_name_for_ticker.clone(),
+                    event: Some("AutoIdleFallback".to_string()),
                 });
             }
         }
@@ -1363,6 +1367,7 @@ pub fn spawn(
                 status: "idle".to_string(),
                 silence_ms: 0,
                 tool: None,
+                event: Some("SessionCleanup".to_string()),
             },
         );
 

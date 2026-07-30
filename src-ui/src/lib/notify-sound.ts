@@ -99,11 +99,14 @@ export function initNotifySound(getActiveTabId: () => string | null): () => void
     prevStatus.set(p.tab_id, p.status);
 
     // The 30s stale-status fallback (AutoIdleFallback) is housekeeping, not
-    // a real "agent finished" signal — never chime for it.
+    // a real "agent finished" signal — never chime for it. SessionCleanup is
+    // emitted when a PTY exits (including user closing the tab) — also not a
+    // "turn finished" signal, so skip it too.
     const becameIdle =
       (prev === 'working' || prev === 'wait_input') &&
       p.status === 'idle' &&
-      p.event !== 'AutoIdleFallback';
+      p.event !== 'AutoIdleFallback' &&
+      p.event !== 'SessionCleanup';
     // Dedupe repeated wait_input emits for the same prompt.
     const becameWaiting = p.status === 'wait_input' && prev !== 'wait_input';
     if (!becameIdle && !becameWaiting) return;
