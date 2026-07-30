@@ -106,7 +106,6 @@ export const pt = {
   'settings.sound': 'Som',
   'settings.sound.done': 'Som de tarefa concluída',
   'settings.sound.wait': 'Som de pedido de permissão',
-  'settings.sound.only_unfocused': 'Apenas com a janela desfocada ou aba inativa',
   'settings.sound.on': 'Ligado',
   'settings.sound.off': 'Desligado',
   'settings.sound.preview': 'Ouvir',

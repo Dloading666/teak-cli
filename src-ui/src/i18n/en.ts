@@ -104,7 +104,6 @@ export const en = {
   'settings.sound': 'Sound',
   'settings.sound.done': 'Task complete chime',
   'settings.sound.wait': 'Permission prompt chime',
-  'settings.sound.only_unfocused': 'Only when window unfocused or tab inactive',
   'settings.sound.on': 'On',
   'settings.sound.off': 'Off',
   'settings.sound.preview': 'Preview',

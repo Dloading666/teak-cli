@@ -106,7 +106,6 @@ export const de = {
   'settings.sound': 'Sound',
   'settings.sound.done': 'Ton bei Aufgabenabschluss',
   'settings.sound.wait': 'Ton bei Berechtigungsanfrage',
-  'settings.sound.only_unfocused': 'Nur wenn Fenster oder Tab inaktiv ist',
   'settings.sound.on': 'An',
   'settings.sound.off': 'Aus',
   'settings.sound.preview': 'Anhören',

@@ -108,7 +108,6 @@ export const vi = {
   'settings.sound': 'Âm thanh',
   'settings.sound.done': 'Chuông khi hoàn thành tác vụ',
   'settings.sound.wait': 'Chuông khi chờ quyền',
-  'settings.sound.only_unfocused': 'Chỉ khi cửa sổ mất focus hoặc tab không hoạt động',
   'settings.sound.on': 'Bật',
   'settings.sound.off': 'Tắt',
   'settings.sound.preview': 'Nghe thử',

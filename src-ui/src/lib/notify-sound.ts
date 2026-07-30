@@ -18,17 +18,26 @@
 //   done — rising two-note (E5 → A5), "turn finished"
 //   wait — lower double-beep (A4 ×2), "needs your input"
 //
-// User controls (Settings ▸ Sound, localStorage `cc-*` keys, all default ON):
-//   cc-sound-done            — chime when a turn completes
-//   cc-sound-wait            — chime on permission / input prompts
-//   cc-sound-only-unfocused  — only chime when the window is unfocused OR the
-//                              finished tab isn't the one being viewed
+// User controls (Settings ▸ Sound, localStorage `cc-*` keys, both default ON):
+//   cc-sound-done  — chime when a turn completes
+//   cc-sound-wait  — chime on permission / input prompts
+// (A "only when window unfocused" toggle was removed — it silently muted all
+// chimes for single-window users, who are always focused on their one tab.)
 
 import type { AgentStatus } from '../store/app-state';
 
 export type NotifyKind = 'done' | 'wait';
 
 let ctx: AudioContext | null = null;
+
+// Persistent across effect re-runs. initNotifySound is called from a useEffect
+// that depends on state.terminals, which produces a new array on every
+// SET_AGENT_STATUS — so the effect re-runs on every status change. If this Map
+// were a function-local, it would be recreated empty each call, `prev` would
+// always be undefined, and the transition detection below would never fire
+// (i.e. no sound ever plays). Module scope keeps the last-seen status alive
+// across calls.
+const prevStatus = new Map<string, AgentStatus>();
 
 /** Lazy singleton AudioContext. Created on first play (almost always after
  *  a user gesture, so autoplay policy is satisfied); resume() covers the
@@ -73,14 +82,8 @@ export function playNotifySound(kind: NotifyKind) {
 
 function enabled(key: string): boolean {
   try {
-    const val = localStorage.getItem(key);
-    // cc-sound-only-unfocused defaults to OFF so users with 1 window hear the chime.
-    // cc-sound-done / cc-sound-wait default to ON.
-    if (key === 'cc-sound-only-unfocused') {
-      return val === 'true';
-    }
-    return val !== 'false';
-  } catch { return key !== 'cc-sound-only-unfocused'; }
+    return localStorage.getItem(key) !== 'false';
+  } catch { return true; }
 }
 
 /** Watch agentStatus changes and chime on meaningful transitions.
@@ -89,10 +92,7 @@ function enabled(key: string): boolean {
  *  Returns a cleanup function. */
 export function initNotifySound(
   terminals: Array<{ id: string; agentStatus?: AgentStatus }>,
-  getActiveTabId: () => string | null,
 ): () => void {
-  const prevStatus = new Map<string, AgentStatus>();
-
   // Check all terminals for transitions
   for (const terminal of terminals) {
     const currentStatus = terminal.agentStatus;
@@ -115,16 +115,12 @@ export function initNotifySound(
     const kind: NotifyKind = becameIdle ? 'done' : 'wait';
     if (!enabled(kind === 'done' ? 'cc-sound-done' : 'cc-sound-wait')) continue;
 
-    // "Only when not looking": skip when the window is focused AND the
-    // finished tab is the one on screen.
-    if (enabled('cc-sound-only-unfocused') &&
-        document.hasFocus() && terminal.id === getActiveTabId()) continue;
-
     playNotifySound(kind);
   }
 
-  // Cleanup function (no-op for this sync implementation)
-  return () => {
-    prevStatus.clear();
-  };
+  // Cleanup: no-op. We deliberately do NOT clear prevStatus here — the
+  // effect re-runs on every terminals change (SET_AGENT_STATUS), and clearing
+  // would wipe the remembered status, reproducing the bug where transitions
+  // were never detected.
+  return () => {};
 }

@@ -114,10 +114,8 @@ export function App() {
   // Completion / permission chimes (Settings ▸ Sound). Reads the terminals
   // array (the same source the dynamic island reads via agentStatus) so chimes
   // match the visual status exactly. This fires on every terminals change.
-  const activeTerminalIdRef = useRef(state.activeTerminalId);
-  activeTerminalIdRef.current = state.activeTerminalId;
   useEffect(() => {
-    return initNotifySound(state.terminals, () => activeTerminalIdRef.current);
+    return initNotifySound(state.terminals);
   }, [state.terminals]);
 
   // Apply theme + shape on mount and change — must sync with the inline script in index.html

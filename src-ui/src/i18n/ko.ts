@@ -105,7 +105,6 @@ export const ko = {
   'settings.sound': '소리',
   'settings.sound.done': '작업 완료 알림음',
   'settings.sound.wait': '권한 요청 알림음',
-  'settings.sound.only_unfocused': '창이 비활성이거나 탭이 비활성일 때만',
   'settings.sound.on': '켜기',
   'settings.sound.off': '끄기',
   'settings.sound.preview': '미리 듣기',

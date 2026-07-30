@@ -105,7 +105,6 @@ export const fr = {
   'settings.sound': 'Son',
   'settings.sound.done': 'Sonnerie de tâche terminée',
   'settings.sound.wait': "Sonnerie de demande d'autorisation",
-  'settings.sound.only_unfocused': 'Uniquement si la fenêtre est inactive ou l’onglet non affiché',
   'settings.sound.on': 'Activé',
   'settings.sound.off': 'Désactivé',
   'settings.sound.preview': 'Écouter',

@@ -105,7 +105,6 @@ export const es = {
   'settings.sound': 'Sonido',
   'settings.sound.done': 'Aviso de tarea completada',
   'settings.sound.wait': 'Aviso de solicitud de permiso',
-  'settings.sound.only_unfocused': 'Solo si la ventana está desenfocada o la pestaña inactiva',
   'settings.sound.on': 'Activado',
   'settings.sound.off': 'Desactivado',
   'settings.sound.preview': 'Escuchar',

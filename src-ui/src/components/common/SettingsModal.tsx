@@ -34,16 +34,11 @@ const ExternalLinkArrow = () => (
 
 // Read a `cc-*` boolean localStorage preference. Module-level
 // so the SettingsModal sound toggles can seed their useState initializers.
-// cc-sound-only-unfocused defaults to OFF so users with 1 window hear the chime.
-// cc-sound-done / cc-sound-wait default to ON.
+// Both sound prefs default to ON (absent = true).
 function readSoundPref(key: string): boolean {
   try {
-    const val = localStorage.getItem(key);
-    if (key === 'cc-sound-only-unfocused') {
-      return val === 'true';
-    }
-    return val !== 'false';
-  } catch { return key !== 'cc-sound-only-unfocused'; }
+    return localStorage.getItem(key) !== 'false';
+  } catch { return true; }
 }
 
 // Per-mode preview glyphs for the Tasks section (checklist vs sticky note).
@@ -144,7 +139,6 @@ export function SettingsModal() {
   // `if (!open) return null` early-return — hooks can't run conditionally.
   const [soundDone, setSoundDone] = useState(() => readSoundPref('cc-sound-done'));
   const [soundWait, setSoundWait] = useState(() => readSoundPref('cc-sound-wait'));
-  const [soundOnlyUnfocused, setSoundOnlyUnfocused] = useState(() => readSoundPref('cc-sound-only-unfocused'));
 
   const open = state.settingsOpen;
   const close = () => dispatch({ type: 'SET_SETTINGS_OPEN', open: false });
@@ -243,14 +237,13 @@ export function SettingsModal() {
 
   // Sound notification toggles — local state + localStorage only. The
   // notify-sound module reads these keys live on every agent-status event,
-  // so no app-state wiring is needed. All three default to ON.
+  // so no app-state wiring is needed. Both default to ON.
   const writeSoundPref = (key: string, setter: (v: boolean) => void) => (v: boolean) => {
     setter(v);
     try { localStorage.setItem(key, String(v)); } catch {}
   };
   const setSoundDonePref = writeSoundPref('cc-sound-done', setSoundDone);
   const setSoundWaitPref = writeSoundPref('cc-sound-wait', setSoundWait);
-  const setSoundOnlyUnfocusedPref = writeSoundPref('cc-sound-only-unfocused', setSoundOnlyUnfocused);
 
   const hasBg = state.bgType !== 'none' && state.bgPath !== '';
   const modKey = IS_MACOS ? '⌘' : 'Ctrl';
@@ -591,7 +584,6 @@ export function SettingsModal() {
                 {([
                   { labelKey: 'settings.sound.done', value: soundDone, set: setSoundDonePref, preview: 'done' as const },
                   { labelKey: 'settings.sound.wait', value: soundWait, set: setSoundWaitPref, preview: 'wait' as const },
-                  { labelKey: 'settings.sound.only_unfocused', value: soundOnlyUnfocused, set: setSoundOnlyUnfocusedPref, preview: null },
                 ]).map(row => (
                   <div key={row.labelKey} style={{ marginBottom: 18 }}>
                     <div className="settings-section-label">{t(row.labelKey as any)}</div>

@@ -105,7 +105,6 @@ export const ja = {
   'settings.sound': 'サウンド',
   'settings.sound.done': 'タスク完了のチャイム',
   'settings.sound.wait': '権限リクエストのチャイム',
-  'settings.sound.only_unfocused': 'ウィンドウが非アクティブまたはタブ非表示時のみ',
   'settings.sound.on': 'オン',
   'settings.sound.off': 'オフ',
   'settings.sound.preview': '試聴',

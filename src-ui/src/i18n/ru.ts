@@ -106,7 +106,6 @@ export const ru = {
   'settings.sound': 'Звук',
   'settings.sound.done': 'Сигнал о завершении задачи',
   'settings.sound.wait': 'Сигнал запроса разрешения',
-  'settings.sound.only_unfocused': 'Только когда окно не в фокусе или вкладка неактивна',
   'settings.sound.on': 'Вкл',
   'settings.sound.off': 'Выкл',
   'settings.sound.preview': 'Прослушать',
