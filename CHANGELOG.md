@@ -7,6 +7,34 @@ For releases prior to v1.5.5, see the
 [GitHub Releases page](https://github.com/edison7009/Coffee-CLI/releases)
 and `git tag --list "v*"`.
 
+## [3.2.6] — 2025-01-30
+
+### Added
+- **Audible notifications when agents finish.** New sound settings (Settings ▸ 
+  Sound) let you hear when an agent completes a turn or needs permission, so 
+  you can work elsewhere without watching the terminal. Two distinct WebAudio-
+  synthesized chimes (no assets, no permission prompts): a rising two-note for 
+  task completion, and a double-beep for input prompts. Toggle independently; 
+  "Current window mute" option (default OFF) silences notifications when you're 
+  actively watching that tab. Supports all T1 tools via the agent-status event.
+  
+- **Grok Build dynamic island support.** Coffee CLI now tracks Grok Build 
+  sessions in the status bar and plays completion sounds. Hooks auto-install 
+  to `$GROK_HOME/hooks/` on first launch. Full event coverage: SessionStart, 
+  UserPromptSubmit, PreToolUse, PostToolUse, Notification, Stop, StopFailure, 
+  PreCompact, PostCompact.
+
+### Changed
+- **Sound notification defaults favor discoverability.** "Current window mute" 
+  now defaults to OFF so single-window users hear the chime immediately and 
+  discover the feature. Users who find it distracting can enable the toggle to 
+  silence notifications when focused on the active tab.
+
+### Fixed
+- **Simplified Chinese/Traditional Chinese UI text.** Sound setting label 
+  refined from "Only play when window unfocused or tab inactive" (16 chars) 
+  to "Current window mute" (7 chars) for better readability.
+
 ## [2.8.6] — 2026-06-24
 
 ### Added
