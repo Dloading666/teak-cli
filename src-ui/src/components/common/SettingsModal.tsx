@@ -32,10 +32,18 @@ const ExternalLinkArrow = () => (
   </svg>
 );
 
-// Read a `cc-*` boolean localStorage preference (default ON). Module-level
+// Read a `cc-*` boolean localStorage preference. Module-level
 // so the SettingsModal sound toggles can seed their useState initializers.
+// cc-sound-only-unfocused defaults to OFF so users with 1 window hear the chime.
+// cc-sound-done / cc-sound-wait default to ON.
 function readSoundPref(key: string): boolean {
-  try { return localStorage.getItem(key) !== 'false'; } catch { return true; }
+  try {
+    const val = localStorage.getItem(key);
+    if (key === 'cc-sound-only-unfocused') {
+      return val === 'true';
+    }
+    return val !== 'false';
+  } catch { return key !== 'cc-sound-only-unfocused'; }
 }
 
 // Per-mode preview glyphs for the Tasks section (checklist vs sticky note).

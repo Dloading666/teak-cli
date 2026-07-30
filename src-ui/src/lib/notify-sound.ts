@@ -75,7 +75,15 @@ export function playNotifySound(kind: NotifyKind) {
 }
 
 function enabled(key: string): boolean {
-  try { return localStorage.getItem(key) !== 'false'; } catch { return true; }
+  try {
+    const val = localStorage.getItem(key);
+    // cc-sound-only-unfocused defaults to OFF so users with 1 window hear the chime.
+    // cc-sound-done / cc-sound-wait default to ON.
+    if (key === 'cc-sound-only-unfocused') {
+      return val === 'true';
+    }
+    return val !== 'false';
+  } catch { return key !== 'cc-sound-only-unfocused'; }
 }
 
 /** Subscribe to agent-status events and chime on meaningful transitions.
