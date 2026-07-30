@@ -104,7 +104,7 @@ export const zhTW = {
   'settings.sound': '聲音',
   'settings.sound.done': '任務完成提示音',
   'settings.sound.wait': '等待權限提示音',
-  'settings.sound.only_unfocused': '僅在後台時播放',
+  'settings.sound.only_unfocused': '目前視窗不播放',
   'settings.sound.on': '開',
   'settings.sound.off': '關',
   'settings.sound.preview': '試聽',

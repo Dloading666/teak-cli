@@ -104,7 +104,7 @@ export const zhCN = {
   'settings.sound': '声音',
   'settings.sound.done': '任务完成提示音',
   'settings.sound.wait': '等待权限提示音',
-  'settings.sound.only_unfocused': '仅在后台时播放',
+  'settings.sound.only_unfocused': '当前窗口不播放',
   'settings.sound.on': '开',
   'settings.sound.off': '关',
   'settings.sound.preview': '试听',
