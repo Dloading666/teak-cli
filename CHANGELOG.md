@@ -7,6 +7,22 @@ For releases prior to v1.5.5, see the
 [GitHub Releases page](https://github.com/edison7009/Coffee-CLI/releases)
 and `git tag --list "v*"`.
 
+## [3.2.7] — 2025-01-31
+
+### Added
+- **Grok Build promoted to T1.** Grok Build now has full dynamic island support 
+  with live status updates. The hook infrastructure added in v3.2.6 is now 
+  enabled (`has_hook_surface: true`), making Grok Build the 5th T1 tool 
+  alongside Claude Code, OpenCode, mimocode, and Kimi Code.
+
+### Fixed
+- **Spurious notification sound when closing tabs.** Fixed a bug where closing 
+  a tab after a conversation ended would trigger the "done" chime. The cleanup 
+  event emitted by `terminal.rs` now includes an `event: "SessionCleanup"` 
+  marker that `notify-sound.ts` filters out, preventing false "agent finished" 
+  signals. This also ensures T2 tools (Codex, Hermes, etc.) with fake static 
+  islands don't trigger notification sounds.
+
 ## [3.2.6] — 2025-01-30
 
 ### Added
