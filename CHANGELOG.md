@@ -16,12 +16,15 @@ and `git tag --list "v*"`.
   alongside Claude Code, OpenCode, mimocode, and Kimi Code.
 
 ### Fixed
-- **Spurious notification sound when closing tabs.** Fixed a bug where closing 
-  a tab after a conversation ended would trigger the "done" chime. The cleanup 
-  event emitted by `terminal.rs` now includes an `event: "SessionCleanup"` 
-  marker that `notify-sound.ts` filters out, preventing false "agent finished" 
-  signals. This also ensures T2 tools (Codex, Hermes, etc.) with fake static 
-  islands don't trigger notification sounds.
+- **Spurious notification sounds.** Fixed two issues where notification sounds 
+  would play incorrectly:
+  1. Closing a tab after conversation ended would trigger the "done" chime
+  2. Auto-approved permissions would still play the "wait" chime
+  
+  Root cause: notification sounds used a separate event listener that duplicated 
+  the dynamic island's status logic, causing false positives. Refactored to read 
+  from the same Redux store the dynamic island uses, ensuring audio notifications 
+  match visual status exactly. Single source of truth eliminates all false positives.
 
 ## [3.2.6] — 2025-01-30
 
