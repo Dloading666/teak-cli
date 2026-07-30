@@ -1,12 +1,9 @@
 //! Grok Build (xAI) - `grok` binary.
 //!
-//! T2 tier - launchpad tile + resume + history + heatmap + changes, but NO
-//! dynamic island. Closed-source login app; full T1 hook integration was
-//! tried and rolled back - the hook forwarder blocked grok's startup (grok
-//! fires `<exe> __grok-hook` on every event and waits, stalling the TUI).
-//! Like codex/hermes/antigravity/qwen: a fake static-green island via
-//! TAB_STATUS_TOOLS, no live status bus. `has_hook_surface: false` makes
-//! hook_installer skip it entirely.
+//! T1 tier - full integration with dynamic island, history, heatmap, changes.
+//! Hook system nearly identical to Claude Code, fires events on SessionStart,
+//! UserPromptSubmit, PreToolUse, PostToolUse, Notification, Stop, etc.
+//! The native `__grok-hook` forwarder maps events to the 3-color status bus.
 //!
 //! Session storage (verified against on-disk files 2026-07-10): each session
 //! lives in its own dir `~/.grok/sessions/<url-encoded-cwd>/<uuid>/` with a
@@ -28,7 +25,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "grok",
     display_name: "Grok Build",
     binary_name: "grok",
-    has_hook_surface: false,
+    has_hook_surface: true,
     // ~/.grok/sessions/<encoded-cwd>/<uuid>/{summary.json, chat_history.jsonl}
     // Bespoke second pass - bypasses the generic mtime-then-parse pipeline
     // (the session metadata is in summary.json, not the JSONL filename/mtime).
