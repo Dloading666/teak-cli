@@ -392,9 +392,13 @@ fn map_claude_status(data: &Value, event: &str) -> Option<String> {
                 _ => None,
             }
         }
+        // PreCompact is internal context maintenance — it runs between turns
+        // and should NOT flip the status to "working", which would cause a
+        // second "done" chime when the compact finishes (idle_prompt fires
+        // right after → spurious working→idle transition).
+        "PreCompact" => None,
         // UserPromptSubmit / PreToolUse / PostToolUse / SubagentStart /
-        // PreCompact / etc. (and a missing event name) → busy. One bucket,
-        // one color.
+        // etc. (and a missing event name) → busy. One bucket, one color.
         _ => Some("working".to_string()),
     }
 }
