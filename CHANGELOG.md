@@ -7,6 +7,18 @@ For releases prior to v1.5.5, see the
 [GitHub Releases page](https://github.com/edison7009/Coffee-CLI/releases)
 and `git tag --list "v*"`.
 
+## [Unreleased]
+
+## [3.2.8] — 2026-07-31
+
+### Fixed
+- **Notification sounds never played.** The `prevStatus` Map tracking each
+  tab's last status was a function-local, recreated empty on every effect
+  re-run (which fires on every `SET_AGENT_STATUS`), so transitions were
+  never detected. Hoisted to module scope.
+- **Removed the "only when window unfocused" sound toggle** — a footgun for
+  single-window users, who would never hear a chime after enabling it.
+
 ## [3.2.7] — 2025-01-31
 
 ### Added
