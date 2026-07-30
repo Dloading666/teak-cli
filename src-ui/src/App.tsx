@@ -111,15 +111,14 @@ export function App() {
     });
   }, [dispatch]);
 
-  // Completion / permission chimes (Settings ▸ Sound). Uses its own raw
-  // listener rather than subscribeAgentStatus so the bus's singleton
-  // activeEmit stays with the dispatch above. The getter lets the module
-  // suppress the chime when the finished tab is the one being watched.
+  // Completion / permission chimes (Settings ▸ Sound). Reads the terminals
+  // array (the same source the dynamic island reads via agentStatus) so chimes
+  // match the visual status exactly. This fires on every terminals change.
   const activeTerminalIdRef = useRef(state.activeTerminalId);
   activeTerminalIdRef.current = state.activeTerminalId;
   useEffect(() => {
-    return initNotifySound(() => activeTerminalIdRef.current);
-  }, []);
+    return initNotifySound(state.terminals, () => activeTerminalIdRef.current);
+  }, [state.terminals]);
 
   // Apply theme + shape on mount and change — must sync with the inline script in index.html
   useEffect(() => {

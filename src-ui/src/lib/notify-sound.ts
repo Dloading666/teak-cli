@@ -2,11 +2,16 @@
 // waiting for permission, so the user doesn't have to keep watching the
 // terminal to know it's done.
 //
-// Signal source: the same `agent-status` Tauri event the status bus
-// consumes (see agent-status-bus.ts). We deliberately do NOT use
-// subscribeAgentStatus() here: its `activeEmit` is a singleton that every
-// subscriber overwrites, and App.tsx's dispatch must stay the winner for
-// Codex optimistic updates — so we open our own raw listen() instead.
+// Signal source: Redux store's agentStatus (driven by subscribeAgentStatus in
+// App.tsx), which is the SAME source the dynamic island uses. This ensures
+// audio notifications match the visual status exactly — if the island says
+// "idle", the chime plays; if it says "wait_input", the beep plays.
+//
+// Previous design used a separate raw listen() to agent-status events, which
+// duplicated the bus logic and caused false positives (e.g., playing "wait"
+// sounds even when permissions were auto-approved). By reading the store
+// instead, we inherit all the bus's deduplication, auto-idle fallback
+// filtering, and state-transition logic.
 //
 // Sounds are synthesized with WebAudio — no audio assets, no WebView2
 // permission prompts. Two distinct chimes:
@@ -19,15 +24,7 @@
 //   cc-sound-only-unfocused  — only chime when the window is unfocused OR the
 //                              finished tab isn't the one being viewed
 
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AgentStatus } from '../store/app-state';
-
-interface AgentStatusPayload {
-  tab_id: string;
-  tool: string;
-  status: AgentStatus;
-  event: string;
-}
 
 export type NotifyKind = 'done' | 'wait';
 
@@ -86,45 +83,48 @@ function enabled(key: string): boolean {
   } catch { return key !== 'cc-sound-only-unfocused'; }
 }
 
-/** Subscribe to agent-status events and chime on meaningful transitions.
- *  Returns an unsubscribe function. */
-export function initNotifySound(getActiveTabId: () => string | null): () => void {
+/** Watch agentStatus changes and chime on meaningful transitions.
+ *  Call this from a useEffect that depends on state.terminals (which contain
+ *  agentStatus), so it fires whenever Redux updates any terminal's status.
+ *  Returns a cleanup function. */
+export function initNotifySound(
+  terminals: Array<{ id: string; agentStatus?: AgentStatus }>,
+  getActiveTabId: () => string | null,
+): () => void {
   const prevStatus = new Map<string, AgentStatus>();
-  let unlisten: UnlistenFn | null = null;
-  let cancelled = false;
 
-  listen<AgentStatusPayload>('agent-status', (evt) => {
-    const p = evt.payload;
-    const prev = prevStatus.get(p.tab_id);
-    prevStatus.set(p.tab_id, p.status);
+  // Check all terminals for transitions
+  for (const terminal of terminals) {
+    const currentStatus = terminal.agentStatus;
+    if (!currentStatus) continue;
 
-    // The 30s stale-status fallback (AutoIdleFallback) is housekeeping, not
-    // a real "agent finished" signal — never chime for it. SessionCleanup is
-    // emitted when a PTY exits (including user closing the tab) — also not a
-    // "turn finished" signal, so skip it too.
-    const becameIdle =
-      (prev === 'working' || prev === 'wait_input') &&
-      p.status === 'idle' &&
-      p.event !== 'AutoIdleFallback' &&
-      p.event !== 'SessionCleanup';
-    // Dedupe repeated wait_input emits for the same prompt.
-    const becameWaiting = p.status === 'wait_input' && prev !== 'wait_input';
-    if (!becameIdle && !becameWaiting) return;
+    const prev = prevStatus.get(terminal.id);
+
+    // Update tracking
+    prevStatus.set(terminal.id, currentStatus);
+
+    // Skip if no previous state or no change
+    if (!prev || prev === currentStatus) continue;
+
+    // Detect meaningful transitions
+    const becameIdle = (prev === 'working' || prev === 'wait_input') && currentStatus === 'idle';
+    const becameWaiting = currentStatus === 'wait_input' && prev !== 'wait_input';
+
+    if (!becameIdle && !becameWaiting) continue;
 
     const kind: NotifyKind = becameIdle ? 'done' : 'wait';
-    if (!enabled(kind === 'done' ? 'cc-sound-done' : 'cc-sound-wait')) return;
+    if (!enabled(kind === 'done' ? 'cc-sound-done' : 'cc-sound-wait')) continue;
+
     // "Only when not looking": skip when the window is focused AND the
     // finished tab is the one on screen.
     if (enabled('cc-sound-only-unfocused') &&
-        document.hasFocus() && p.tab_id === getActiveTabId()) return;
-    playNotifySound(kind);
-  }).then((fn) => {
-    if (cancelled) fn();
-    else unlisten = fn;
-  });
+        document.hasFocus() && terminal.id === getActiveTabId()) continue;
 
+    playNotifySound(kind);
+  }
+
+  // Cleanup function (no-op for this sync implementation)
   return () => {
-    cancelled = true;
-    if (unlisten) unlisten();
+    prevStatus.clear();
   };
 }
