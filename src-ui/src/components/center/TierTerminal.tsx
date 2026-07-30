@@ -648,9 +648,22 @@ function TierTerminalImpl({
       // whole word/phrase. Clicks still re-anchor between compositions.
       if (!__IS_LINUX__ && navigator.userAgent.toLowerCase().includes('win')) {
         const imeTextarea = termRef.current.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
-        if (imeTextarea) {
+        const screenEl = termRef.current.querySelector('.xterm-screen') as HTMLElement | null;
+        if (imeTextarea && screenEl) {
           const freeze = () => {
-            imeFrozenRef.current = { left: imeTextarea.style.left, top: imeTextarea.style.top };
+            // Calculate the correct buffer cursor position at composition start,
+            // rather than trusting the current textarea position (which may have
+            // been dragged to an animation position by xterm's updateCompositionElements).
+            const cellW = term.cols > 0 ? screenEl.clientWidth / term.cols : 8;
+            const cellH = term.rows > 0 ? screenEl.clientHeight / term.rows : 17;
+            const cx = Math.min(term.buffer.active.cursorX, term.cols - 1);
+            const cy = term.buffer.active.cursorY;
+            const left = `${cx * cellW}px`;
+            const top = `${cy * cellH}px`;
+            imeFrozenRef.current = { left, top };
+            // Snap textarea to the correct position immediately
+            imeTextarea.style.left = left;
+            imeTextarea.style.top = top;
           };
           const unfreeze = () => { imeFrozenRef.current = null; };
           imeTextarea.addEventListener('compositionstart', freeze, { capture: true });
@@ -671,6 +684,18 @@ function TierTerminalImpl({
             }
           });
           unlisteners.push(() => cursorMoveListener.dispose());
+          // CRITICAL: Windows CompositionHelper.updateCompositionElements runs
+          // in onRender (not just onCursorMove), and has a setTimeout async tail
+          // that moves textarea AFTER our synchronous onCursorMove override. We must
+          // also override in onRender to catch both the sync and async updates.
+          const renderListener = term.onRender(() => {
+            const f = imeFrozenRef.current;
+            if (f) {
+              imeTextarea.style.left = f.left;
+              imeTextarea.style.top = f.top;
+            }
+          });
+          unlisteners.push(() => renderListener.dispose());
         }
       }
 
