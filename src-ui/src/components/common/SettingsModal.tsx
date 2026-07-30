@@ -14,6 +14,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAppState, useAppDispatch, HOTKEY_SCHEMES, type HotkeyScheme, type TitlebarToggleDisplay, type ThemeColor, type ThemeShape, type IconTheme } from '../../store/app-state';
+import { playNotifySound } from '../../lib/notify-sound';
 import { useT } from '../../i18n/useT';
 import { IS_MACOS, IS_WINDOWS } from '../../lib/platform';
 import { TERM_COLOR_SCHEMES } from '../center/TierTerminal';
@@ -22,7 +23,7 @@ import { FontPicker } from './FontPicker';
 import { THEME_COLORS, THEME_SHAPES, ICON_ART_THEMES, LANGUAGES, TASK_VIEW_MODES, isMaskTintTheme } from '../../lib/personalization';
 import './SettingsModal.css';
 
-type Section = 'appearance' | 'wallpaper' | 'terminal' | 'gambit' | 'tasks' | 'language' | 'feedback';
+type Section = 'appearance' | 'wallpaper' | 'terminal' | 'gambit' | 'sound' | 'tasks' | 'language' | 'feedback';
 
 // Trailing "opens outside the app" affordance on the feedback cards.
 const ExternalLinkArrow = () => (
@@ -30,6 +31,12 @@ const ExternalLinkArrow = () => (
     <path d="M7 17 17 7" /><path d="M7 7h10v10" />
   </svg>
 );
+
+// Read a `cc-*` boolean localStorage preference (default ON). Module-level
+// so the SettingsModal sound toggles can seed their useState initializers.
+function readSoundPref(key: string): boolean {
+  try { return localStorage.getItem(key) !== 'false'; } catch { return true; }
+}
 
 // Per-mode preview glyphs for the Tasks section (checklist vs sticky note).
 const TASK_VIEW_ICONS: Record<'list' | 'note' | 'prompt', ReactNode> = {
@@ -88,6 +95,11 @@ const ICONS: Record<Section, ReactNode> = {
       <circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" />
     </svg>
   ),
+  sound: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  ),
   feedback: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="m8 2 1.88 1.88" /><path d="M14.12 3.88 16 2" />
@@ -119,6 +131,12 @@ export function SettingsModal() {
     fish_available?: boolean; sh_available?: boolean;
     wsl_available: boolean;
   } | null>(null);
+
+  // Sound notification toggles (Settings ▸ Sound). State must live above the
+  // `if (!open) return null` early-return — hooks can't run conditionally.
+  const [soundDone, setSoundDone] = useState(() => readSoundPref('cc-sound-done'));
+  const [soundWait, setSoundWait] = useState(() => readSoundPref('cc-sound-wait'));
+  const [soundOnlyUnfocused, setSoundOnlyUnfocused] = useState(() => readSoundPref('cc-sound-only-unfocused'));
 
   const open = state.settingsOpen;
   const close = () => dispatch({ type: 'SET_SETTINGS_OPEN', open: false });
@@ -215,6 +233,17 @@ export function SettingsModal() {
     try { localStorage.setItem('cc-titlebar-toggle-display', value); } catch {}
   };
 
+  // Sound notification toggles — local state + localStorage only. The
+  // notify-sound module reads these keys live on every agent-status event,
+  // so no app-state wiring is needed. All three default to ON.
+  const writeSoundPref = (key: string, setter: (v: boolean) => void) => (v: boolean) => {
+    setter(v);
+    try { localStorage.setItem(key, String(v)); } catch {}
+  };
+  const setSoundDonePref = writeSoundPref('cc-sound-done', setSoundDone);
+  const setSoundWaitPref = writeSoundPref('cc-sound-wait', setSoundWait);
+  const setSoundOnlyUnfocusedPref = writeSoundPref('cc-sound-only-unfocused', setSoundOnlyUnfocused);
+
   const hasBg = state.bgType !== 'none' && state.bgPath !== '';
   const modKey = IS_MACOS ? '⌘' : 'Ctrl';
 
@@ -223,6 +252,7 @@ export function SettingsModal() {
     { id: 'wallpaper',  label: t('settings.wallpaper' as any) },
     { id: 'terminal',   label: t('settings.terminal' as any) },
     { id: 'gambit',     label: t('settings.gambit' as any) },
+    { id: 'sound',      label: t('settings.sound' as any) },
     { id: 'tasks',      label: t('settings.tasks' as any) },
     { id: 'language',   label: t('settings.language' as any) },
     { id: 'feedback',   label: t('settings.feedback' as any) },
@@ -542,6 +572,47 @@ export function SettingsModal() {
                     );
                   })}
                 </div>
+              </>
+            )}
+
+            {section === 'sound' && (
+              <>
+                {/* Each row: setting label + On/Off cards (same settings-key-card
+                    idiom as the other toggles). The two sound kinds get a
+                    preview button that plays the chime immediately. */}
+                {([
+                  { labelKey: 'settings.sound.done', value: soundDone, set: setSoundDonePref, preview: 'done' as const },
+                  { labelKey: 'settings.sound.wait', value: soundWait, set: setSoundWaitPref, preview: 'wait' as const },
+                  { labelKey: 'settings.sound.only_unfocused', value: soundOnlyUnfocused, set: setSoundOnlyUnfocusedPref, preview: null },
+                ]).map(row => (
+                  <div key={row.labelKey} style={{ marginBottom: 18 }}>
+                    <div className="settings-section-label">{t(row.labelKey as any)}</div>
+                    <div className="settings-key-row">
+                      <button
+                        className={`settings-key-card${row.value ? ' active' : ''}`}
+                        onClick={() => row.set(true)}
+                        aria-pressed={row.value}
+                      >
+                        <span className="settings-key-combo">{t('settings.sound.on' as any)}</span>
+                      </button>
+                      <button
+                        className={`settings-key-card${!row.value ? ' active' : ''}`}
+                        onClick={() => row.set(false)}
+                        aria-pressed={!row.value}
+                      >
+                        <span className="settings-key-combo">{t('settings.sound.off' as any)}</span>
+                      </button>
+                      {row.preview && (
+                        <button
+                          className="settings-key-card"
+                          onClick={() => playNotifySound(row.preview!)}
+                        >
+                          <span className="settings-key-combo">{t('settings.sound.preview' as any)}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </>
             )}
 
