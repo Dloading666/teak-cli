@@ -9,6 +9,13 @@ and `git tag --list "v*"`.
 
 ## [Unreleased]
 
+## [3.2.9] — 2026-07-31
+
+### Fixed
+- **Duplicate completion chime after Claude Code context compaction.** `PreCompact`
+  is now ignored for status mapping, so internal context maintenance no longer
+  creates a fake `working → idle` transition and a second done sound.
+
 ## [3.2.8] — 2026-07-31
 
 ### Fixed
