@@ -25,6 +25,7 @@ import { registerFileDropTarget, formatPathsForInsert } from '../../lib/file-dro
 import { parseClaudeTerminalTitle } from '../../lib/claude-terminal-title';
 import { parseCodexTerminalTitle } from '../../lib/codex-terminal-title';
 import { parseGrokTerminalTitle } from '../../lib/grok-terminal-title';
+import { markNotifySoundPromptSubmitted } from '../../lib/notify-sound';
 import { onWindowForeground } from '../../lib/window-focus-filter';
 import { commands } from '../../tauri';
 import { supportsNativeAgentStatus, useAppDispatch, useAppState, type AgentStatus, type ToolType, type ThemeColor } from '../../store/app-state';
@@ -140,9 +141,10 @@ function deriveSelectionBg(hex: string, isDark: boolean): string {
 
 // In AI-agent tabs the upstream TUI (each agent's input box, the Compose
 // textarea) paints its own caret, so xterm's cursor is either redundant or a
-// stranded artifact — paint it in the background color so the WebGL renderer
-// effectively erases it (the DOM renderer is covered by
-// `.xterm-cursor { display: none }` in TierTerminal.css).
+// stranded artifact. Paint its cell in the terminal background, but keep
+// cursorAccent equal to the foreground so xterm does not erase the character
+// beneath that cell. The DOM renderer is also covered by `.xterm-cursor {
+// display: none }` in TierTerminal.css.
 // Raw-shell tabs (local terminal / remote SSH) are the exception: no TUI
 // draws a caret there, so the xterm cursor is the only input-position
 // indicator — keep it visible with the foreground color (issue #95).
@@ -198,10 +200,10 @@ function buildXtermTheme(themeName: string, hasBg: boolean | undefined, schemeId
     ...base,
     background: bg,
     foreground: fg,
-    // AI-agent tabs: cursor painted in bg color = invisible (see comment at
-    // the top of this section). Raw shells get a real, visible caret.
+    // AI-agent tabs: the cursor cell blends into the background while its
+    // character remains readable. Raw shells get a real, visible caret.
     cursor: rawShell ? fg : bgOpaque,
-    cursorAccent: bgOpaque,
+    cursorAccent: fg,
   };
 }
 
@@ -866,6 +868,9 @@ function TierTerminalImpl({
     // listener below calls the same function for IME-committed text that
     // xterm drops (issue #107, WKWebView commit-first ordering).
     const forwardInput = (data: string) => {
+      if (data.includes('\r') || data.includes('\n')) {
+        markNotifySoundPromptSubmitted(sessionId, tool);
+      }
       commands.tierTerminalInput(sessionId, data).catch(() => {});
     };
     term.onData(forwardInput);
@@ -1563,6 +1568,7 @@ function TierTerminalImpl({
         // the delay is harmless there.
         term.paste(normalizePasteNewlines(text));
         setTimeout(() => {
+          markNotifySoundPromptSubmitted(sessionId, tool);
           commands.tierTerminalInput(sessionId, '\r').catch(() => {});
         }, 150);
         return true;
@@ -1592,7 +1598,7 @@ function TierTerminalImpl({
       },
     });
     return unregister;
-  }, [sessionId]);
+  }, [sessionId, tool]);
 
   // ── File-drop target ────────────────────────────────────────────────────
   // Match OS-native terminal behavior: dragging a file onto the terminal

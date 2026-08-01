@@ -1295,7 +1295,7 @@ export function CenterPanel() {
             >
               {icon}
               <span className="tab-title" style={{ flex: '0 1 auto', minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{title}</span>
-              <div className="tab-actions">
+              <div className={`tab-actions${supportsNativeAgentStatus(session.tool) ? '' : ' tab-actions--close-only'}`}>
                 {/* Only Claude/Codex/Grok expose authoritative native OSC
                     state. All other tabs go straight to the close button. */}
                 {supportsNativeAgentStatus(session.tool) && (

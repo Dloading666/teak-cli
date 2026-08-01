@@ -7,7 +7,8 @@
 // their native terminal titles.
 //
 // Reading the store keeps sound transitions identical to the visible native
-// title state and avoids an independent event path.
+// title state and avoids an independent event path. Codex additionally requires
+// a local user-submission marker solely to exclude its startup title cycle.
 //
 // Sounds are synthesized with WebAudio — no audio assets, no WebView2
 // permission prompts. Two distinct chimes:
@@ -39,11 +40,16 @@ let ctx: AudioContext | null = null;
 // across calls.
 const prevStatus = new Map<string, AgentStatus>();
 
-// Codex uses its activity title while starting up (including MCP init), then
-// returns to idle before the user has submitted a turn. Keep that first cycle
-// visually accurate but silent; normal notification behavior begins after the
-// first idle title confirms startup is complete.
-const codexSoundReady = new Set<string>();
+// Codex emits real working/idle title transitions during startup. Seeing an
+// initial idle title is not enough to distinguish that cycle from a completed
+// turn, so Codex notifications stay muted until the user actually submits
+// input in that terminal. This is local UI state, not a CLI hook.
+const codexPromptSubmitted = new Set<string>();
+
+/** Arm Codex notifications after a real terminal/Gambit submission. */
+export function markNotifySoundPromptSubmitted(sessionId: string, tool: ToolType) {
+  if (tool === 'codex') codexPromptSubmitted.add(sessionId);
+}
 
 /** Lazy singleton AudioContext. Created on first play (almost always after
  *  a user gesture, so autoplay policy is satisfied); resume() covers the
@@ -108,8 +114,8 @@ export function initNotifySound(
   for (const id of prevStatus.keys()) {
     if (!currentNativeIds.has(id)) prevStatus.delete(id);
   }
-  for (const id of codexSoundReady) {
-    if (!currentCodexIds.has(id)) codexSoundReady.delete(id);
+  for (const id of codexPromptSubmitted) {
+    if (!currentCodexIds.has(id)) codexPromptSubmitted.delete(id);
   }
 
   // Check all terminals for transitions
@@ -122,11 +128,9 @@ export function initNotifySound(
     // Update tracking
     prevStatus.set(terminal.id, currentStatus);
 
-    // Codex's first working -> idle transition is CLI initialization, not a
-    // completed user turn. Arm sounds at that idle boundary and suppress all
-    // startup transitions; the dynamic island remains unaffected.
-    if (terminal.tool === 'codex' && !codexSoundReady.has(terminal.id)) {
-      if (currentStatus === 'idle') codexSoundReady.add(terminal.id);
+    // Codex drives the island immediately, but startup transitions remain
+    // silent until this session has received an actual user submission.
+    if (terminal.tool === 'codex' && !codexPromptSubmitted.has(terminal.id)) {
       continue;
     }
 

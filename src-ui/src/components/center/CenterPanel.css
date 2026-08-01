@@ -148,6 +148,13 @@
   pointer-events: auto;
 }
 
+/* Tabs without an authoritative native status have no island to occupy this
+   slot, so their close action stays visible instead of leaving an empty gap. */
+.tab-actions--close-only .tab-close-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .tab-close-btn:hover {
   background-color: rgba(239, 68, 68, 0.15);
   color: #ef4444;
