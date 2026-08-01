@@ -1349,7 +1349,7 @@ export function CenterPanel() {
               <line x1="8" y1="17" x2="16" y2="17"/>
             </svg>
             <span className="tab-title" style={{ flex: '0 1 auto', minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{diffTabTitle}</span>
-            <div className="tab-actions">
+            <div className="tab-actions tab-actions--close-only">
               <button
                 className="tab-close-btn"
                 onClick={(e) => { e.stopPropagation(); dispatch({ type: 'CLEAR_DIFF' }); }}
