@@ -52,10 +52,12 @@ Coffee CLI can launch **any** command-line agent — but the ones below get deep
 
 | Tier | What you get | CLIs |
 |---|---|---|
-| **T1** | Dynamic Island · History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | **Claude Code** · OpenCode · mimocode · Kimi Code · Grok Build |
-| **T2** | History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | Codex CLI · OpenClaw · Hermes Agent · Antigravity · Qwen Code · Pi |
+| **T1** | Dynamic Island · History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | **Claude Code** · **Codex CLI** · **Grok Build** |
+| **T2** | History · Heatmap · Changes · Brand icon · One-click launch · Custom launch args | OpenCode · mimocode · Kimi Code · OpenClaw · Hermes Agent · Antigravity · Qwen Code · Pi |
 | **T3** | Brand icon · One-click launch | Crush · Aider · Goose · Copilot CLI |
 | **T4** | Open a terminal tab and type the command to launch | any other CLI |
+
+*Dynamic Island status is hook-free and currently available only for Claude Code, Codex CLI, and Grok Build. Coffee CLI reads each tool's native terminal title state and does not install status hooks.*
 
 *T1 and T2 CLIs ship today; T3 integrations are rolling in.*
 
