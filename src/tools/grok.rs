@@ -1,9 +1,7 @@
 //! Grok Build (xAI) - `grok` binary.
 //!
-//! T1 tier - full integration with dynamic island, history, heatmap, changes.
-//! Hook system nearly identical to Claude Code, fires events on SessionStart,
-//! UserPromptSubmit, PreToolUse, PostToolUse, Notification, Stop, etc.
-//! The native `__grok-hook` forwarder maps events to the 3-color status bus.
+//! Hookless integration with native OSC-title dynamic island, history, heatmap,
+//! changes, and resume. Startup removes Grok hook JSON written by old builds.
 //!
 //! Session storage (verified against on-disk files 2026-07-10): each session
 //! lives in its own dir `~/.grok/sessions/<url-encoded-cwd>/<uuid>/` with a
@@ -25,7 +23,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "grok",
     display_name: "Grok Build",
     binary_name: "grok",
-    has_hook_surface: true,
+    has_legacy_hook_artifacts: true,
     // ~/.grok/sessions/<encoded-cwd>/<uuid>/{summary.json, chat_history.jsonl}
     // Bespoke second pass - bypasses the generic mtime-then-parse pipeline
     // (the session metadata is in summary.json, not the JSONL filename/mtime).

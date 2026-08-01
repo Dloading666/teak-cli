@@ -6,7 +6,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "claude",
     display_name: "Claude Code",
     binary_name: "claude",
-    has_hook_surface: true,
+    has_legacy_hook_artifacts: true,
     // ~/.claude/projects/<hash>/<hash>.jsonl
     history_shape: Some(HistoryShape::GenericJsonl {
         root_under_home: ".claude/projects",

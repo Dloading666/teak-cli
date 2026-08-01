@@ -123,8 +123,7 @@ export const commands = {
     invoke<void>('tier_terminal_start', { sessionId, tool, toolData: toolData ?? null, cols, rows, themeMode, locale: locale ?? null, cwd: cwd ?? null, resumeToken: resumeToken ?? null, shell: shell ?? null }),
   tierTerminalInput: (sessionId: string, data: string) => 
     invoke<void>('tier_terminal_input', { sessionId, data }),
-  /** Raw write to PTY — does NOT trigger agent-status detection.
-   *  Used for system-generated input (auto-skip prompts, etc.). */
+  /** Raw write used for system-generated input (auto-skip prompts, etc.). */
   tierTerminalRawWrite: (sessionId: string, data: string) =>
     invoke<void>('tier_terminal_raw_write', { sessionId, data }),
   tierTerminalKill: (sessionId: string) => 
@@ -196,12 +195,9 @@ export const commands = {
    *  Loaded once at app boot and cached; see `lib/tool-info.ts`. */
   listTools: () => invoke<{ id: string; displayName: string }[]>('list_tools'),
 
-  /** Install hook scripts + upstream config patches for one tool.
-   *  Call when the focus-rescan detects a CLI flipped to installed —
-   *  picks up tab status indicators without forcing a Coffee CLI
-   *  restart. No-op for tools the hook installer doesn't manage. */
-  installHookForTool: (tool: string) =>
-    invoke<void>('install_hook_for_tool', { tool }),
+  /** Re-run legacy cleanup and non-hook presentation migration for one tool. */
+  maintainToolIntegration: (tool: string) =>
+    invoke<void>('maintain_tool_integration', { tool }),
 
   /** Gambit — save a clipboard-pasted image to a temp file and return its path.
    *  The returned absolute path is inserted into the textarea so the AI CLI agent
@@ -211,7 +207,7 @@ export const commands = {
 
   /** Read an image from the OS clipboard and persist it as a PNG temp file,
    *  returning its absolute path (or null when the clipboard has no image).
-   *  Replaces navigator.clipboard.read() — no WebView2 permission prompt. */
+   *  Uses the native backend so WebView2 never shows a permission prompt. */
   readClipboardImage: () => invoke<string | null>('read_clipboard_image'),
 
   listDirectory: (path: string) => invoke<DirEntryInfo[]>('list_directory', { path }),

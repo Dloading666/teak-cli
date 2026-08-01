@@ -22,10 +22,12 @@ import * as outputScheduler from '../../lib/terminal-output-scheduler';
 import { registerTerminalFocus } from '../../lib/focus-registry';
 import { registerTabActions, getTabActions } from '../../lib/tab-actions';
 import { registerFileDropTarget, formatPathsForInsert } from '../../lib/file-drop';
-import { notifyUserInputSubmitted } from '../../lib/agent-status-bus';
+import { parseClaudeTerminalTitle } from '../../lib/claude-terminal-title';
+import { parseCodexTerminalTitle } from '../../lib/codex-terminal-title';
+import { parseGrokTerminalTitle } from '../../lib/grok-terminal-title';
 import { onWindowForeground } from '../../lib/window-focus-filter';
 import { commands } from '../../tauri';
-import { useAppDispatch, useAppState, type ToolType, type ThemeColor } from '../../store/app-state';
+import { supportsNativeAgentStatus, useAppDispatch, useAppState, type AgentStatus, type ToolType, type ThemeColor } from '../../store/app-state';
 import { useT } from '../../i18n/useT';
 import { getToolDisplayName } from '../../lib/tool-info';
 import '@xterm/xterm/css/xterm.css';
@@ -463,6 +465,7 @@ function TierTerminalImpl({
   // only after N losses on the same terminal instance, the signal that WebGL
   // is unstable here. Not reset on successful re-attach.
   const contextLossAttemptsRef = useRef(0);
+  const grokPermissionReleaseTimerRef = useRef<number | undefined>(undefined);
 
   // ── Startup splash state ─────────────────────────────────────────────────
   const [showSplash, setShowSplash] = useState(true);
@@ -858,46 +861,12 @@ function TierTerminalImpl({
 
     // Forward keyboard input to Rust PTY backend.
     //
-    // Status indicator wiring:
-    //   - Claude   → UserPromptSubmit / Stop hooks are authoritative (coffee-cli-hook.py)
-    //   - OpenCode → session.status events are authoritative (coffee-cli-opencode-plugin.js)
-    //   - Codex    → notify only emits agent-turn-complete (idle); there is NO upstream
-    //                "working" signal, so we keep an Enter-based optimistic update for
-    //                Codex only. Local slash commands (/init, /diff, /clear, /quit, ...)
-    //                are filtered via a tiny per-line buffer so they don't strand the
-    //                dot in "working" until the 30s auto-idle fallback.
-    let codexLine = '';
     // Single entry point for user-typed data on its way to the PTY. term.onData
     // covers xterm's own key handling; the macOS IME symbol-passthrough input
     // listener below calls the same function for IME-committed text that
     // xterm drops (issue #107, WKWebView commit-first ordering).
     const forwardInput = (data: string) => {
       commands.tierTerminalInput(sessionId, data).catch(() => {});
-      if (tool !== 'codex') return;
-      for (let i = 0; i < data.length; i++) {
-        const ch = data[i];
-        if (ch === '\r' || ch === '\n') {
-          const submitted = codexLine.trimStart();
-          codexLine = '';
-          // Skip blank lines and Codex local slash commands.
-          if (submitted.length > 0 && !submitted.startsWith('/')) {
-            notifyUserInputSubmitted(sessionId, tool);
-          }
-        } else if (ch === '\x7f' || ch === '\b') {
-          codexLine = codexLine.slice(0, -1);
-        } else if (ch === '\x1b') {
-          // Skip ANSI escape sequence (CSI / SS3 / etc.) — arrow keys, function keys.
-          // Cheap consume: skip until we see a letter or '~', or end of chunk.
-          i++;
-          while (i < data.length) {
-            const c = data[i];
-            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c === '~') break;
-            i++;
-          }
-        } else if (ch >= ' ') {
-          codexLine += ch;
-        }
-      }
     };
     term.onData(forwardInput);
 
@@ -954,9 +923,8 @@ function TierTerminalImpl({
           // Image-first paste (issue #89): if the clipboard holds a still
           // image, persist it as a temp file and paste that path so the AI
           // CLI can read it off the local filesystem. Routed through the
-          // Tauri backend (arboard) — NOT navigator.clipboard.read(), which
-          // would pop a WebView2 "wants to read the clipboard" prompt every
-          // paste (issue #96, project clipboard rule).
+          // Native Tauri backend avoids WebView2's per-paste permission prompt
+          // (issue #96, project clipboard rule).
           (async () => {
             const imgPath = await clipboardReadImage();
             if (imgPath) { term.paste(imgPath); return; }
@@ -1107,10 +1075,61 @@ function TierTerminalImpl({
     // header); near-zero cost — one performance.now() + bounded ring-buffer
     // write per render, no-ops when no output armed this frame.
     term.onRender(() => rig.outputRenderEnd());
+    const usesNativeStatus = supportsNativeAgentStatus(tool);
+
     // Tool sets its own tab title via OSC 0/2 (e.g. Claude Code's conversation
     // summary) → xterm fires onTitleChange → mirror it to the tab title.
-    // Falls back to cwd basename when no tool title is set (renderTabContent).
-    term.onTitleChange(title => dispatch({ type: 'SET_TAB_TITLE', id: sessionId, title }));
+    // Claude, Codex, and Grok also carry their authoritative activity state in the
+    // title. Strip animated prefixes from Coffee's visible tab title so native
+    // title updates do not make the text jitter. Claude's title only exposes
+    // working vs non-working; permission prompts share its static idle prefix.
+    let lastTabTitle: string | undefined;
+    let grokStatus: AgentStatus = 'idle';
+    const clearGrokPermissionRelease = () => {
+      if (grokPermissionReleaseTimerRef.current !== undefined) {
+        window.clearTimeout(grokPermissionReleaseTimerRef.current);
+        grokPermissionReleaseTimerRef.current = undefined;
+      }
+    };
+    const setGrokStatus = (status: AgentStatus) => {
+      if (status === grokStatus) return;
+      grokStatus = status;
+      dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status });
+    };
+    term.onTitleChange((title) => {
+      let displayTitle = title;
+      if (tool === 'claude') {
+        const parsed = parseClaudeTerminalTitle(title);
+        displayTitle = parsed.displayTitle;
+        dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: parsed.status });
+      } else if (tool === 'codex') {
+        const parsed = parseCodexTerminalTitle(title);
+        displayTitle = parsed.displayTitle;
+        dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: parsed.status });
+      } else if (tool === 'grok') {
+        const parsed = parseGrokTerminalTitle(title);
+        displayTitle = parsed.displayTitle;
+
+        // When unfocused, Grok intentionally hides Action Required for half of
+        // each one-second blink cycle. Hold blue briefly so that native blink
+        // does not make Coffee's island alternate between wait and idle.
+        if (parsed.status === 'idle' && grokStatus === 'wait_input') {
+          if (grokPermissionReleaseTimerRef.current === undefined) {
+            grokPermissionReleaseTimerRef.current = window.setTimeout(() => {
+              grokPermissionReleaseTimerRef.current = undefined;
+              setGrokStatus('idle');
+            }, 1200);
+          }
+        } else {
+          clearGrokPermissionRelease();
+          setGrokStatus(parsed.status);
+        }
+      }
+      if (displayTitle !== lastTabTitle) {
+        lastTabTitle = displayTitle;
+        dispatch({ type: 'SET_TAB_TITLE', id: sessionId, title: displayTitle });
+      }
+    });
 
     // Debug: track when cursor moves
     term.onCursorMove(() => {
@@ -1155,7 +1174,6 @@ function TierTerminalImpl({
           }
 
           // Track alt-screen flag for other TUI heuristics (splash, focus).
-          // Agent status is now driven by hooks via agent-status-bus, not PTY scraping.
           if (data.includes('\x1b[?1049h') || data.includes('\x1b[?47h')) {
             altScreenRef.current = true;
           }
@@ -1258,7 +1276,9 @@ function TierTerminalImpl({
         onStatus: (running, _exitCode) => {
           if (!mounted || running) return;
           setProcessExited(true);
-          dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
+          if (usesNativeStatus) {
+            dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
+          }
         },
         onExit: (_exitCode) => {
           // Authoritative "process is actually dead" signal from the Rust
@@ -1272,7 +1292,9 @@ function TierTerminalImpl({
           // already speaks for itself.
           if (!mounted) return;
           setProcessExited(true);
-          dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
+          if (usesNativeStatus) {
+            dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
+          }
         },
         onCwd: (cwd) => {
           if (!mounted) return;
@@ -1415,6 +1437,10 @@ function TierTerminalImpl({
       unregisterFocus();
       ro.disconnect();
       if (resizeTimer !== null) clearTimeout(resizeTimer);
+      if (grokPermissionReleaseTimerRef.current !== undefined) {
+        window.clearTimeout(grokPermissionReleaseTimerRef.current);
+        grokPermissionReleaseTimerRef.current = undefined;
+      }
       term.dispose();
       outputScheduler.unregisterSession(sessionId);
       xtermRef.current = null;

@@ -53,8 +53,8 @@ fn git_output(dir: &str, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-/// True if a `git` binary is on PATH. Not cached — the changes panel only
-/// calls it on folder / agent-status ticks, never on a hot path.
+/// True if a `git` binary is on PATH. Not cached because the changes panel
+/// invokes it only while its polling gate is active.
 fn git_on_path() -> bool {
     let mut cmd = Command::new("git");
     cmd.arg("--version");
@@ -292,9 +292,8 @@ fn join_abs(repo_root: &str, rel: &str) -> String {
     crate::server::normalize_path_key(&format!("{}/{}", repo_root.trim_end_matches('/'), rel))
 }
 
-/// List the active folder's git working-tree changes. One IPC call; the
-/// frontend polls it on the same agent-status / fs-refresh triggers the old
-/// `compute_folder_stats` used.
+/// List the active folder's git working-tree changes. The frontend refreshes
+/// it from filesystem events plus a low-frequency polling backstop.
 #[tauri::command]
 pub fn git_changes(folder: String) -> GitChanges {
     if !git_on_path() {

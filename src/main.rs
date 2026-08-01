@@ -2,8 +2,6 @@
 
 mod terminal;
 mod server;
-mod hook_server;
-mod hook_forwarder;
 mod hook_installer;
 mod fonts;
 mod fs_watcher;
@@ -18,33 +16,14 @@ mod windows_path;
 use anyhow::Result;
 
 fn main() -> Result<()> {
-    // ── Native hook forwarder (fast path) ───────────────────────────────
-    // Invoked by Claude Code (`<exe> __hook`), Codex hooks (`<exe>
-    // __codex-hook`, stdin JSON), Codex legacy notify (`<exe>
-    // __codex-notify <json>`), Kimi Code hooks (`<exe> __kimi-hook`,
-    // Claude-shaped stdin JSON), and Grok Build hooks (`<exe> __grok-hook`,
-    // stdin JSON) to forward agent status to the dynamic island. This MUST
-    // run before any GUI / Linux-backend / PATH-inherit setup below — the
-    // PATH fix spawns a login shell, which we don't want firing on every
-    // tool-call hook. Each arm calls process::exit and never returns. See
-    // hook_forwarder.rs for why this replaced the Python forwarders (no more
-    // `python`-not-found errors on Windows).
+    // ── Legacy hook compatibility (fast path) ────────────────────────────
+    // Current builds install no hooks. Keep the historical subcommands as
+    // silent exit-0 handlers so a stale config that startup could not rewrite
+    // never launches the GUI or blocks its parent CLI.
     {
         let argv: Vec<String> = std::env::args().collect();
-        match argv.get(1).map(|s| s.as_str()) {
-            Some("__hook") => hook_forwarder::run_claude_hook(),
-            Some("__codex-hook") => hook_forwarder::run_codex_hook(),
-            Some("__codex-notify") => hook_forwarder::run_codex_notify(&argv),
-            Some("__kimi-hook") => hook_forwarder::run_kimi_hook(),
-            Some("__grok-hook") => hook_forwarder::run_grok_hook(),
-            // Unknown `__`-prefixed subcommand: a hook config written by a
-            // NEWER build (or another install) pointing at an OLDER exe that
-            // doesn't know it yet (downgrade, dual install). Exit 0 quietly
-            // instead of falling through to a GUI launch inside the agent's
-            // hook spawn — a hanging/failing GUI there surfaces as
-            // "hook exited with code 1" in the agent's transcript.
-            Some(other) if other.starts_with("__") => std::process::exit(0),
-            _ => {}
+        if argv.get(1).map(|arg| arg.starts_with("__")).unwrap_or(false) {
+            std::process::exit(0);
         }
     }
 

@@ -13,7 +13,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "openclaw",
     display_name: "OpenClaw",
     binary_name: "openclaw",
-    has_hook_surface: false,
+    has_legacy_hook_artifacts: false,
     // OpenClaw is NOT collected into the History board. Verified against
     // upstream `openclaw --help` (2026.7.1-2): there is no
     // `openclaw resume <id>`, no `--resume`/`--session` flag — OpenClaw

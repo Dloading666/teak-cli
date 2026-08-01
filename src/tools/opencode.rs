@@ -9,7 +9,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "opencode",
     display_name: "OpenCode",
     binary_name: "opencode",
-    has_hook_surface: true,
+    has_legacy_hook_artifacts: true,
     // ~/.local/share/opencode/storage/db.sqlite (+ legacy jsonl
     // fallback) — see `find_opencode_sessions` for layout details.
     history_shape: Some(HistoryShape::OpenCodeMixed {

@@ -9,7 +9,7 @@ export type ToolType = 'claude' | 'qwen' | 'installer' | 'hermes' | 'opencode' |
 
 /**
  * Tab status shown as an animated 9-dot glyph. Three states only —
- * Claude Code is the only CLI we drive a real status machine for.
+ * Only native Claude/Codex/Grok terminal titles drive this state.
  *
  *   idle       — ready for input (green Wave-Double)
  *   working    — LLM generating / tool call in flight (orange Snake-CCW)
@@ -19,6 +19,11 @@ export type ToolType = 'claude' | 'qwen' | 'installer' | 'hermes' | 'opencode' |
  * (the `wait_input → waiting` rename happens at render time).
  */
 export type AgentStatus = 'idle' | 'working' | 'wait_input';
+
+/** True only when the upstream CLI exposes authoritative state via OSC title. */
+export function supportsNativeAgentStatus(tool: ToolType): boolean {
+  return tool === 'claude' || tool === 'codex' || tool === 'grok';
+}
 
 // Theme: color palette (orthogonal to shape)
 export type ThemeColor =
@@ -425,7 +430,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_TERMINAL_TOOL':
       return {
         ...state,
-        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, toolTitle: undefined } : t)
+        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, toolTitle: undefined, agentStatus: undefined } : t)
       };
     case 'SET_TERMINAL_HIDDEN':
       return {
@@ -436,11 +441,15 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         terminals: state.terminals.map(t =>
-          t.id === action.id ? { ...t, id: action.newId, toolTitle: undefined } : t
+          t.id === action.id ? { ...t, id: action.newId, toolTitle: undefined, agentStatus: undefined } : t
         ),
         activeTerminalId: state.activeTerminalId === action.id ? action.newId : state.activeTerminalId
       };
     case 'SET_AGENT_STATUS':
+      // Native-title tools emit frequent OSC activity frames. Their parsers
+      // dispatch each frame, but equal states must not re-render the app.
+      if (!state.terminals.some(t => t.id === action.id && supportsNativeAgentStatus(t.tool))) return state;
+      if (state.terminals.some(t => t.id === action.id && t.agentStatus === action.status)) return state;
       return {
         ...state,
         terminals: state.terminals.map(t => t.id === action.id ? { ...t, agentStatus: action.status } : t)

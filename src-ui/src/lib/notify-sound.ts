@@ -2,16 +2,12 @@
 // waiting for permission, so the user doesn't have to keep watching the
 // terminal to know it's done.
 //
-// Signal source: Redux store's agentStatus (driven by subscribeAgentStatus in
-// App.tsx), which is the SAME source the dynamic island uses. This ensures
-// audio notifications match the visual status exactly — if the island says
-// "idle", the chime plays; if it says "wait_input", the beep plays.
+// Signal source: Redux store's agentStatus, which is the SAME source the
+// dynamic island uses. Only Claude, Codex, and Grok populate it, directly from
+// their native terminal titles.
 //
-// Previous design used a separate raw listen() to agent-status events, which
-// duplicated the bus logic and caused false positives (e.g., playing "wait"
-// sounds even when permissions were auto-approved). By reading the store
-// instead, we inherit all the bus's deduplication, auto-idle fallback
-// filtering, and state-transition logic.
+// Reading the store keeps sound transitions identical to the visible native
+// title state and avoids an independent event path.
 //
 // Sounds are synthesized with WebAudio — no audio assets, no WebView2
 // permission prompts. Two distinct chimes:
@@ -24,7 +20,11 @@
 // (A "only when window unfocused" toggle was removed — it silently muted all
 // chimes for single-window users, who are always focused on their one tab.)
 
-import type { AgentStatus } from '../store/app-state';
+import {
+  supportsNativeAgentStatus,
+  type AgentStatus,
+  type ToolType,
+} from '../store/app-state';
 
 export type NotifyKind = 'done' | 'wait';
 
@@ -38,6 +38,12 @@ let ctx: AudioContext | null = null;
 // (i.e. no sound ever plays). Module scope keeps the last-seen status alive
 // across calls.
 const prevStatus = new Map<string, AgentStatus>();
+
+// Codex uses its activity title while starting up (including MCP init), then
+// returns to idle before the user has submitted a turn. Keep that first cycle
+// visually accurate but silent; normal notification behavior begins after the
+// first idle title confirms startup is complete.
+const codexSoundReady = new Set<string>();
 
 /** Lazy singleton AudioContext. Created on first play (almost always after
  *  a user gesture, so autoplay policy is satisfied); resume() covers the
@@ -91,10 +97,23 @@ function enabled(key: string): boolean {
  *  agentStatus), so it fires whenever Redux updates any terminal's status.
  *  Returns a cleanup function. */
 export function initNotifySound(
-  terminals: Array<{ id: string; agentStatus?: AgentStatus }>,
+  terminals: Array<{ id: string; tool: ToolType; agentStatus?: AgentStatus }>,
 ): () => void {
+  const nativeTerminals = terminals.filter(terminal => supportsNativeAgentStatus(terminal.tool));
+  const currentNativeIds = new Set(nativeTerminals.map(terminal => terminal.id));
+  const currentCodexIds = new Set(
+    nativeTerminals.filter(terminal => terminal.tool === 'codex').map(terminal => terminal.id),
+  );
+
+  for (const id of prevStatus.keys()) {
+    if (!currentNativeIds.has(id)) prevStatus.delete(id);
+  }
+  for (const id of codexSoundReady) {
+    if (!currentCodexIds.has(id)) codexSoundReady.delete(id);
+  }
+
   // Check all terminals for transitions
-  for (const terminal of terminals) {
+  for (const terminal of nativeTerminals) {
     const currentStatus = terminal.agentStatus;
     if (!currentStatus) continue;
 
@@ -102,6 +121,14 @@ export function initNotifySound(
 
     // Update tracking
     prevStatus.set(terminal.id, currentStatus);
+
+    // Codex's first working -> idle transition is CLI initialization, not a
+    // completed user turn. Arm sounds at that idle boundary and suppress all
+    // startup transitions; the dynamic island remains unaffected.
+    if (terminal.tool === 'codex' && !codexSoundReady.has(terminal.id)) {
+      if (currentStatus === 'idle') codexSoundReady.add(terminal.id);
+      continue;
+    }
 
     // Skip if no previous state or no change
     if (!prev || prev === currentStatus) continue;
@@ -118,9 +145,8 @@ export function initNotifySound(
     playNotifySound(kind);
   }
 
-  // Cleanup: no-op. We deliberately do NOT clear prevStatus here — the
-  // effect re-runs on every terminals change (SET_AGENT_STATUS), and clearing
-  // would wipe the remembered status, reproducing the bug where transitions
-  // were never detected.
+  // Cleanup: no-op. Live native-tab IDs are pruned at the start of each call.
+  // Clearing here would run before every effect re-run and erase the previous
+  // status needed for transition detection.
   return () => {};
 }

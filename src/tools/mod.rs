@@ -1,11 +1,10 @@
 //! Per-tool integration registry — single source of truth for the
 //! per-CLI facts Coffee CLI needs (binary name, history
-//! shape, hook surface, launch argv). Iterate `TOOLS` instead of
+//! shape, legacy-hook cleanup, launch argv). Iterate `TOOLS` instead of
 //! hardcoding lists in callers.
 //!
 //! Adding a new tool: create `src/tools/<id>.rs` with a `ToolDescriptor`
-//! constant, register it in `TOOLS` below, and (if it has a hook
-//! surface) add an arm to `hook_installer::dispatch_install`.
+//! constant and register it in `TOOLS` below.
 
 use std::path::{Path, PathBuf};
 
@@ -181,12 +180,10 @@ pub struct ToolDescriptor {
     /// (Unix). Single source of truth for "is this tool on PATH".
     pub binary_name: &'static str,
 
-    /// `true` if Coffee CLI installs a status-indicator hook for
-    /// this tool. Drives `hook_installer::dispatch_install`. Tools
-    /// without a hook surface (Antigravity / Qwen / OpenClaw today)
-    /// still participate in ChangesBoard because the snapshot diff is
-    /// tool-agnostic — only the live tab status dot is unavailable.
-    pub has_hook_surface: bool,
+    /// `true` when an older Coffee release may have written hook/plugin
+    /// artifacts for this tool. Startup uses this only to dispatch cleanup;
+    /// current releases never install status hooks.
+    pub has_legacy_hook_artifacts: bool,
 
     /// Shape of this tool's on-disk session history. `None` =
     /// tool doesn't expose a scannable history (no entries on
@@ -215,7 +212,7 @@ mod opencode;
 mod qwen;
 // Lower-tier tools — see each module's doc comment for its tier (Pi is T2
 // with history; Aider/Crush/Goose/Copilot are T3 launch-only, no
-// history/hook surface). Kimi Code was promoted to T1 (hook-wired).
+// history/status integration).
 mod aider;
 mod copilot;
 mod crush;
@@ -241,11 +238,10 @@ pub static TOOLS: &[&ToolDescriptor] = &[
     // frontend); it only needs to be in the registry for list_tools + scanning.
     &mimocode::DESCRIPTOR,
     // Pi is T2 (history + heatmap + changes + resume; see its module doc).
-    // Kimi Code is T1 — hook-wired via ~/.kimi-code/config.toml `[[hooks]]`
-    // (install_kimi), same T2 features as Pi otherwise. The other four —
+    // Kimi Code keeps the same history/resume features as Pi. The other four —
     // Crush / Aider / Goose / Copilot — are T3 launch-only: display name +
     // PATH probe + launch binary, history_shape: None and
-    // has_hook_surface: false.
+    // has_legacy_hook_artifacts: false.
     &pi::DESCRIPTOR,
     &crush::DESCRIPTOR,
     &aider::DESCRIPTOR,
@@ -254,9 +250,8 @@ pub static TOOLS: &[&ToolDescriptor] = &[
     &copilot::DESCRIPTOR,
 ];
 
-/// Lookup by id. `None` if the id isn't registered. Used by hook
-/// dispatch (where the `tool` field arrives as a string from a
-/// Python/JS forwarder) and by the launchpad's per-tool actions.
+/// Lookup by id. `None` if the id isn't registered. Used by legacy cleanup
+/// dispatch and by the launchpad's per-tool actions.
 pub fn find(id: &str) -> Option<&'static ToolDescriptor> {
     TOOLS.iter().find(|t| t.id == id).copied()
 }

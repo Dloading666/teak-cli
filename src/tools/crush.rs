@@ -11,7 +11,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "crush",
     display_name: "Crush",
     binary_name: "crush",
-    has_hook_surface: false,
+    has_legacy_hook_artifacts: false,
     history_shape: None,
     default_args: &[],
 };

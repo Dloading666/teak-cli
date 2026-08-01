@@ -1,7 +1,7 @@
 // ChangesBoard.tsx — git working-tree changes for the active tab's folder.
 //
-// Sourced from `useGitStatus()` (which polls `git_changes` on agent-status +
-// fs-refresh). Three top-level states drive the view:
+// Sourced from `useGitStatus()` (which refreshes `git_changes` from filesystem
+// events plus a polling backstop). Three top-level states drive the view:
 //   • no_git   → "install git" prompt (feature unavailable).
 //   • not_repo → "not a git repo" prompt + an "initialize here" button.
 //   • ok       → files grouped into 未提交 (Uncommitted) + 未跟踪 (Untracked).

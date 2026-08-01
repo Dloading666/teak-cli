@@ -1,9 +1,8 @@
 // App.tsx — 3-panel IDE layout (frameless window)
 
 import { useEffect, useRef, useState } from 'react';
-import { useAppState, useAppDispatch } from './store/app-state';
+import { useAppState } from './store/app-state';
 import { retryInvoke } from './tauri';
-import { subscribeAgentStatus } from './lib/agent-status-bus';
 import { initNotifySound } from './lib/notify-sound';
 import { routeFileDrop } from './lib/file-drop';
 import { initHistoryAutoRefresh } from './lib/history-cache';
@@ -93,23 +92,9 @@ function useSlidingPanel(hidden: boolean): { mounted: boolean; collapsed: boolea
 
 export function App() {
   const { state } = useAppState();
-  const dispatch = useAppDispatch();
 
   const leftPanel = useSlidingPanel(state.leftPanelHidden);
   const rightPanel = useSlidingPanel(state.rightPanelHidden);
-
-  // Subscribe to hook-driven agent status events from each AI CLI.
-  // The Rust hook server emits these as they arrive from the per-tool
-  // forwarder script (Python for Claude / Codex, JS for OpenCode).
-  // File-edit attribution per tool was removed in v2.7.x — ChangesBoard
-  // now reads `compute_folder_stats` (tool-agnostic snapshot diff)
-  // inside FileStatsProvider, so this subscription is purely for tab
-  // status indicators.
-  useEffect(() => {
-    return subscribeAgentStatus((payload) => {
-      dispatch({ type: 'SET_AGENT_STATUS', id: payload.tab_id, status: payload.status });
-    });
-  }, [dispatch]);
 
   // Completion / permission chimes (Settings ▸ Sound). Reads the terminals
   // array (the same source the dynamic island reads via agentStatus) so chimes

@@ -6,7 +6,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "qwen",
     display_name: "Qwen Code",
     binary_name: "qwen",
-    has_hook_surface: false,
+    has_legacy_hook_artifacts: false,
     // ~/.qwen/projects/<sanitized-cwd>/chats/<session>.jsonl
     history_shape: Some(HistoryShape::QwenProjects {
         root_under_home: ".qwen/projects",

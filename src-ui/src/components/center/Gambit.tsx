@@ -793,7 +793,7 @@ function GambitImpl({
 
 // React.memo is CRITICAL here — TierTerminal (our parent) is intentionally
 // not memoized (an earlier regression), so it re-renders on every app-wide
-// state change: agent-status events, terminal focus shifts, etc. Without
+// state change, including terminal focus shifts. Without
 // this memo wrapper, every parent re-render during a dock-resize drag would
 // reset the inline height from React, clobbering the direct DOM writes we
 // use for smooth resizing and making the panel visibly snap back.

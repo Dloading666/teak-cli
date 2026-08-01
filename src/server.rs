@@ -9,9 +9,6 @@ use tauri_plugin_dialog::DialogExt;
 /// Shared app state
 pub struct AppState {
     pub terminal_session: terminal::SharedSession,
-    /// Loopback port of the hook TCP server (set once during setup).
-    /// 0 means the hook server failed to start; env var injection is skipped in that case.
-    pub hook_port: std::sync::atomic::AtomicU16,
     /// Active OS fs watcher (one per app instance). Some(...) while a
     /// workspace folder is open; None otherwise. Swapping this Mutex'd
     /// Option replaces the watcher atomically on folder switch.
@@ -110,15 +107,14 @@ pub(crate) fn check_tool_unix(bin: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Install hook scripts + upstream config patches for a single tool.
+/// Re-run legacy cleanup and any non-hook presentation migration for one tool.
 /// Called from the launchpad's focus-rescan when `check_tools_installed`
 /// flips a CLI from not-installed → installed, so users who install a
-/// CLI while Coffee CLI is running pick up tab status indicators
-/// without restarting. No-op for tools the hook installer doesn't
-/// manage. Idempotent.
+/// CLI while Coffee CLI is running also get the OpenCode-family transparent
+/// theme migration without restarting. Idempotent.
 #[tauri::command]
-fn install_hook_for_tool(tool: String) {
-    crate::hook_installer::install_for_tool(&tool);
+fn maintain_tool_integration(tool: String) {
+    crate::hook_installer::maintain_for_tool(&tool);
 }
 
 /// Drain the cold-start external launch request (`launch --tool … --cwd …`),
@@ -860,39 +856,28 @@ fn tier_terminal_input(
     data: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    // Step 1: grab Arc handles while holding the map lock (cheap clones, no IO)
-    let (writer_arc, activity_arc) = {
+    // Grab the writer handle while holding the map lock (cheap clone, no I/O).
+    let writer_arc = {
         let map = state.terminal_session.lock().unwrap();
         match map.get(&session_id) {
-            Some(s) => (s.writer_lock.clone(), s.activity.clone()),
+            Some(s) => s.writer_lock.clone(),
             None => return Err(format!("No active terminal session for id: {}", session_id)),
         }
     };
     // Map lock released — other tabs can now proceed concurrently
 
-    // Step 2: PTY write (syscall, may block under back-pressure)
+    // PTY write may block under back-pressure, after the session-map lock has
+    // already been released so other tabs remain responsive.
     use std::io::Write;
     let mut w = writer_arc.lock().map_err(|e| format!("Writer lock poisoned: {}", e))?;
     w.write_all(data.as_bytes()).map_err(|e| format!("Write failed: {}", e))?;
     w.flush().map_err(|e| format!("Flush failed: {}", e))?;
-    drop(w);
-
-    // Step 3: Dual-signal — detect user prompt submission
-    // Only trigger "working" when user presses Enter while agent is at prompt.
-    // System-generated input (auto-skip) uses tier_terminal_raw_write instead.
-    if data.contains('\r') || data.contains('\n') {
-        if let Ok(mut act) = activity_arc.lock() {
-            if act.last_status == "wait_input" {
-                act.user_submitted_at = Some(std::time::Instant::now());
-            }
-        }
-    }
 
     Ok(())
 }
 
-/// Raw write to PTY without triggering agent-status detection.
-/// Used for system-generated input like auto-skip Enter for Claude trust prompt.
+/// Raw write used for system-generated input like auto-skip Enter for the
+/// Claude trust prompt.
 #[tauri::command]
 fn tier_terminal_raw_write(
     session_id: String,
@@ -3770,7 +3755,6 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(AppState {
             terminal_session,
-            hook_port: std::sync::atomic::AtomicU16::new(0),
             fs_watcher: Mutex::new(None),
             pending_launch: Mutex::new(pending_launch),
         })
@@ -3798,7 +3782,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             check_tools_installed,
             detect_shells,
             crate::tools::list_tools,
-            install_hook_for_tool,
+            maintain_tool_integration,
             take_pending_launch,
             start_fs_watcher,
             stop_fs_watcher,
@@ -3827,22 +3811,9 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             crate::git::git_commit_files,
         ])
         .setup(|app| {
-            // Install Claude/Qwen hook scripts + settings patches.
-            // Runs once per launch; safe to call on a machine without either agent.
-            crate::hook_installer::install_all();
-
-            // Start loopback TCP listener that receives events from the hook
-            // script and forwards them to the frontend as `agent-status` events.
-            match crate::hook_server::start(app.handle().clone()) {
-                Ok(port) => {
-                    app.state::<AppState>()
-                        .hook_port
-                        .store(port, std::sync::atomic::Ordering::SeqCst);
-                }
-                Err(e) => {
-                    eprintln!("[hook-server] start failed: {}", e);
-                }
-            }
+            // Remove Coffee status hooks/plugins left by older releases.
+            // Current integrations are read-only terminal/title parsers.
+            crate::hook_installer::cleanup_all();
 
             // Per-pane MCP servers are spawned lazily inside
             // `tier_terminal_start` when each multi-agent pane boots
@@ -3860,7 +3831,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             // window on Ubuntu 24.04, or any JS error before
             // ReactDOM mount), the `invoke` never fires, the window
             // stays hidden forever, and users see "process is running,
-            // hook-server is listening, but there is no window".
+            // the process is running, but there is no window".
             // Multiple users have hit this across both platforms.
             //
             // Force a reveal after 3s as a safety net. Healthy

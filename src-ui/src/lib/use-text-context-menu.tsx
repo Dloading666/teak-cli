@@ -1,10 +1,8 @@
 // useTextContextMenu - a reusable right-click cut/copy/paste/select-all menu
 // for any text input or textarea. Extracted from Gambit's context menu so the
 // task board (to-do / note / prompt views) gets the same text-edit affordance
-// without re-implementing it. Clipboard goes through lib/clipboard (Tauri
-// plugin-clipboard-manager) - NEVER navigator.clipboard / execCommand, per the
-// project's clipboard rule (WebView2 would otherwise pop a permission dialog
-// on every paste).
+// without re-implementing it. Clipboard goes through lib/clipboard so WebView2
+// does not display a native permission dialog on every paste.
 //
 // Usage:
 //   const { menu, openMenu } = useTextContextMenu();

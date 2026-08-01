@@ -8,12 +8,14 @@
 //! `read_mimocode_session`.
 //!
 //! Divergences / notes vs OpenCode:
-//!   - `has_hook_surface: true` — MiMo Code does NOT self-theme its TUI (an
+//!   - `has_legacy_hook_artifacts: true` — older Coffee builds installed the
+//!     OpenCode status plugin here. Startup now removes it. MiMo Code does NOT
+//!     self-theme its TUI (an
 //!     earlier assumption, disproven 2026-06-22: it ships the same opaque #000
 //!     default canvas as OpenCode). So it joins the install dispatch purely to
 //!     get the `ensure_opencode_tui_theme_default(home, "mimocode")` write that
 //!     stamps `~/.config/mimocode/tui.json` with the transparent `lucent-orng`
-//!     theme. It does not get the OpenCode island/notify plugin.
+//!     theme. Current builds never install the OpenCode island plugin.
 //!   - `binary_name: "mimo"` is a best-guess pending confirmation; correct it
 //!     here if MiMo Code ships under a different command name.
 //!
@@ -30,7 +32,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     binary_name: "mimo",
     // See module doc — MiMo Code ships an opaque #000 TUI default just like
     // OpenCode, so it needs the tui.json transparency write via dispatch.
-    has_hook_surface: true,
+    has_legacy_hook_artifacts: true,
     // Same shape as OpenCode so the registry scan skips it (its SQLite
     // second pass in server.rs emits finished SavedSessions instead).
     history_shape: Some(HistoryShape::OpenCodeMixed {

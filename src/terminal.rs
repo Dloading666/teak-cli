@@ -32,13 +32,11 @@ mod windows_job {
     use std::sync::OnceLock;
     use windows::Win32::Foundation::{CloseHandle, HANDLE};
     use windows::Win32::System::JobObjects::{
-        AssignProcessToJobObject, CreateJobObjectW, SetInformationJobObject,
-        JobObjectExtendedLimitInformation, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
         JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     };
-    use windows::Win32::System::Threading::{
-        OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
-    };
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
 
     // Win32 HANDLE is a raw pointer wrapper; not Send/Sync by default. The
     // Job Object handle is a kernel handle, safe to use from any thread —
@@ -61,14 +59,10 @@ mod windows_job {
             let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
             info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
             let info_ptr = &info as *const _ as *const _;
-            let info_size =
-                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32;
-            if let Err(e) = SetInformationJobObject(
-                job,
-                JobObjectExtendedLimitInformation,
-                info_ptr,
-                info_size,
-            ) {
+            let info_size = std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32;
+            if let Err(e) =
+                SetInformationJobObject(job, JobObjectExtendedLimitInformation, info_ptr, info_size)
+            {
                 eprintln!("[Tier Terminal] SetInformationJobObject failed: {:?}", e);
                 let _ = CloseHandle(job);
                 return None;
@@ -80,19 +74,14 @@ mod windows_job {
     }
 
     pub fn assign_pid(pid: u32) {
-        let Some(job) = get_or_create_job() else { return };
+        let Some(job) = get_or_create_job() else {
+            return;
+        };
         unsafe {
-            let proc = match OpenProcess(
-                PROCESS_SET_QUOTA | PROCESS_TERMINATE,
-                false,
-                pid,
-            ) {
+            let proc = match OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid) {
                 Ok(h) => h,
                 Err(e) => {
-                    eprintln!(
-                        "[Tier Terminal] OpenProcess(pid={}) failed: {:?}",
-                        pid, e
-                    );
+                    eprintln!("[Tier Terminal] OpenProcess(pid={}) failed: {:?}", pid, e);
                     return;
                 }
             };
@@ -239,21 +228,6 @@ pub struct TerminalExitEvent {
     pub exit_code: i32,
 }
 
-/// Agent working status emitted to the frontend every second
-#[derive(Serialize, Clone, Debug, PartialEq)]
-pub struct AgentStatusEvent {
-    pub id: String,
-    /// "working" | "idle" | "wait_input"
-    pub status: String,
-    /// Milliseconds since last PTY output
-    pub silence_ms: u64,
-    /// The specific AI tool backing this session
-    pub tool: Option<String>,
-    /// Event name for filtering (e.g. "AutoIdleFallback", "SessionCleanup")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub event: Option<String>,
-}
-
 // ─── Agent Presets for Session Resume ─────────────────────
 
 pub struct AgentPreset {
@@ -269,8 +243,6 @@ pub struct AgentPreset {
     /// Anchored regex that validates a standalone token string before use in
     /// a resume command.  Prevents flag injection (e.g. "id --skip-permissions").
     pub token_format: Option<&'static str>,
-    /// Characters that indicate the agent is waiting for user input
-    pub prompt_markers: &'static [&'static str],
 }
 
 pub const AGENT_PRESETS: &[AgentPreset] = &[
@@ -279,9 +251,10 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         resume_program: Some("claude"),
         resume_args_before: &["--resume"],
         resume_args_after: &[],
-        session_id_pattern: Some(r"Session ID:\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"),
+        session_id_pattern: Some(
+            r"Session ID:\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+        ),
         token_format: Some(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
-        prompt_markers: &["❯", "> "],
     },
     // Antigravity CLI (Google) — `agy` binary, successor to Gemini CLI.
     // Google retired Gemini CLI for consumers 2026-05-19 in favor of
@@ -290,10 +263,7 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
     // `~/.antigravitycli/<uuid>.json`; nothing in stdout scrapes
     // reliably yet, so session_id_pattern is None and resume tokens
     // can only come from the history reader (deferred until the JSON
-    // schema is observed). prompt_markers `>` is a guess based on
-    // typical Go-CLI conventions — when wrong, the settle-silence
-    // fallback in mcp_server.rs path B still flips idle correctly,
-    // just less promptly.
+    // schema is observed).
     AgentPreset {
         tool_name: "antigravity",
         resume_program: Some("agy"),
@@ -301,7 +271,6 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         resume_args_after: &[],
         session_id_pattern: None,
         token_format: Some(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
-        prompt_markers: &[">"],
     },
     AgentPreset {
         tool_name: "hermes",
@@ -317,7 +286,6 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         // so the flag-injection guard at server.rs:2786 still bites.
         session_id_pattern: Some(r"(\d{8}_\d{6}_[0-9a-f]{4,16})"),
         token_format: Some(r"^\d{8}_\d{6}_[0-9a-f]{4,16}$"),
-        prompt_markers: &["❯"],
     },
     // OpenCode 1.14+ resume: `opencode --session ses_<25-alnum>`. The TUI
     // does not echo the session id to stdout (verified live on 1.14.32),
@@ -327,8 +295,8 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
     // not from PTY scraping. Prompt marker `┃` (U+2503 HEAVY VERTICAL)
     // is the left border of OpenCode's input box, persistently rendered
     // in idle state; combined with the >1.2s silence rule in the status
-    // ticker this reliably maps to "wait_input" only after the agent has
-    // finished streaming.
+    // ticker this reliably maps to "idle" only after the agent has finished
+    // streaming.
     AgentPreset {
         tool_name: "opencode",
         resume_program: Some("opencode"),
@@ -343,7 +311,6 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         // if OpenCode ever shifts the token length, while still preventing
         // whitespace/flag injection (alnum-only character class).
         token_format: Some(r"^ses_[A-Za-z0-9]{20,40}$"),
-        prompt_markers: &["┃"],
     },
     // MiMo Code — Xiaomi's OpenCode fork. Same resume contract as OpenCode
     // (`<bin> --session ses_<...>`), same `ses_` token shape and idle prompt
@@ -357,7 +324,6 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         resume_args_after: &[],
         session_id_pattern: None,
         token_format: Some(r"^ses_[A-Za-z0-9]{20,40}$"),
-        prompt_markers: &["┃"],
     },
     // Codex CLI resume: `codex resume <id>` is a positional subcommand,
     // not a `--resume` flag. Token is the rollout filename stem (UUID).
@@ -368,17 +334,15 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         resume_args_after: &[],
         session_id_pattern: None,
         token_format: Some(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
-        prompt_markers: &["▌"],
     },
     // Grok Build (xAI) - `grok` binary. Resume via `grok --resume <uuid>`
     // (verified against `grok --help`: `-r, --resume <ID>` resumes by ID,
     // errors if not found). Token is the UUIDv7 session id from summary.json
     // (`info.id`), sourced by find_grok_sessions (Grok doesn't echo the id to
-    // stdout on launch, so session_id_pattern is None). Grok is T2 (no island -
-    // a T1 hook forwarder stalled its TUI on startup, rolled back). The prompt
-    // marker only feeds the settle-silence fallback; `❯` is a guess pending
-    // real-TUI verification. Coffee CLI launches grok raw (native OAuth via
-    // ~/.grok/auth.json, no auth injection).
+    // stdout on launch, so session_id_pattern is None). Grok's native OSC title
+    // provides spinner/activity/action-required/idle state; no hook or PTY
+    // status inference is needed. Coffee CLI launches grok raw (native OAuth
+    // via ~/.grok/auth.json, no auth injection).
     AgentPreset {
         tool_name: "grok",
         resume_program: Some("grok"),
@@ -386,7 +350,6 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         resume_args_after: &[],
         session_id_pattern: None,
         token_format: Some(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
-        prompt_markers: &["❯"],
     },
     // Qwen Code is a Gemini-CLI fork — same `--resume <uuid>` flag and
     // UUID token format inherited from upstream. Upstream Gemini CLI
@@ -400,7 +363,6 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         resume_args_after: &[],
         session_id_pattern: None,
         token_format: Some(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
-        prompt_markers: &["✦"],
     },
     // OpenClaw exposes no CLI resume entry point. Verified against
     // upstream `openclaw/openclaw` (TypeScript, registered command
@@ -427,15 +389,12 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         resume_args_after: &[],
         session_id_pattern: None,
         token_format: None,
-        prompt_markers: &["❯"],
     },
     // Pi (earendil-works `pi` binary). Resume via `pi --session <id>` —
     // also accepts a partial UUID / file path (pi.dev/docs sessions). Token
     // is the session UUID (v7) from the JSONL header `id` field, sourced by
     // parse_pi_session_jsonl (Pi doesn't echo the id to stdout on launch, so
-    // session_id_pattern is None). prompt_markers `❯` is a guess — Pi is
-    // hook-less, so the tab status dot is the static "fake island" green
-    // regardless; the settle-silence fallback covers a wrong marker.
+    // session_id_pattern is None).
     AgentPreset {
         tool_name: "pi",
         resume_program: Some("pi"),
@@ -443,15 +402,11 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         resume_args_after: &[],
         session_id_pattern: None,
         token_format: Some(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"),
-        prompt_markers: &["❯"],
     },
     // Kimi Code (Moonshot `kimi` binary). Resume via `kimi --session <id>`
     // (canonical `-S, --session`, verified against `kimi --help`). Token is
     // `session_<uuid>` from session_index.jsonl, sourced by find_kimi_sessions
     // (Kimi doesn't echo the id to stdout, so session_id_pattern is None).
-    // prompt_markers `❯` is a guess — the settle-silence fallback covers a
-    // wrong marker; the live status dot comes from the `__kimi-hook`
-    // forwarder (hook_installer.rs::install_kimi), not these markers.
     AgentPreset {
         tool_name: "kimicode",
         resume_program: Some("kimi"),
@@ -463,7 +418,6 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         // band — leaves headroom if Kimi ever shifts the id shape, while still
         // preventing whitespace/flag injection.
         token_format: Some(r"^session_[A-Za-z0-9._-]+$"),
-        prompt_markers: &["❯"],
     },
 ];
 
@@ -485,8 +439,6 @@ pub struct TerminalSession {
     pub session_token: Mutex<Option<String>>,
     /// Hold PTY master alive — dropping this kills the terminal pipe
     pub(crate) _master: Arc<Mutex<Option<Box<dyn portable_pty::MasterPty + Send>>>>,
-    /// Shared activity state for status detection.
-    pub activity: Arc<Mutex<SessionActivity>>,
     /// True when this session's terminal is actually on-screen — its tab is
     /// the active center-panel tab, or (for split panes) its parent tab is
     /// active. Flipped by `set_session_active`, called from a frontend
@@ -510,26 +462,6 @@ pub struct TerminalSession {
 }
 
 pub type SharedSession = Arc<Mutex<std::collections::HashMap<String, TerminalSession>>>;
-
-/// Per-session I/O tracking for status detection.
-/// Shared between the emitter thread, ticker thread, and the input handler
-/// so that user-submitted-Enter can immediately signal "working".
-///
-/// Liveness (`alive`) has been moved to a separate `Arc<AtomicBool>` so that
-/// the ticker hot-path checks it without acquiring this mutex — the previous
-/// design forced the 500 ms ticker to serialize with the per-read emitter
-/// lock, inflating status-change latency.
-pub struct SessionActivity {
-    pub last_output_at: Instant,
-    pub burst_start: Option<Instant>,
-    pub last_status: String,
-    /// Rolling buffer of recent stripped output for prompt marker detection
-    pub recent_text: String,
-    /// Tracks when user last pressed Enter → immediate "working" signal.
-    /// Cleared when a prompt marker is detected (agent finished & is idle).
-    pub user_submitted_at: Option<Instant>,
-}
-
 
 // ─── Spawn ────────────────────────────────────────────────
 
@@ -556,7 +488,7 @@ pub fn spawn(
     locale: Option<String>,
     extra_env: Vec<(String, String)>,
 ) -> anyhow::Result<()> {
-    use portable_pty::{CommandBuilder, PtySize, native_pty_system};
+    use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 
     // Default to at least 120 cols so wide terminal output (help screens,
     // table output, etc.) doesn't wrap aggressively in small windows.
@@ -580,8 +512,8 @@ pub fn spawn(
             .ok()
             .filter(|p| std::path::Path::new(p).exists())
             .or_else(|| {
-                let sysroot = std::env::var("SystemRoot")
-                    .unwrap_or_else(|_| r"C:\Windows".to_string());
+                let sysroot =
+                    std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_string());
                 let p = format!(r"{}\System32\cmd.exe", sysroot);
                 std::path::Path::new(&p).exists().then_some(p)
             })
@@ -621,7 +553,14 @@ pub fn spawn(
     // it — maximum benefit, zero risk for those that do.
     let is_ai_cli = matches!(
         tool_name.as_deref(),
-        Some("claude") | Some("qwen") | Some("opencode") | Some("mimocode") | Some("hermes") | Some("codex") | Some("grok") | Some("antigravity")
+        Some("claude")
+            | Some("qwen")
+            | Some("opencode")
+            | Some("mimocode")
+            | Some("hermes")
+            | Some("codex")
+            | Some("grok")
+            | Some("antigravity")
     );
 
     if is_ai_cli {
@@ -718,7 +657,10 @@ pub fn spawn(
                 if !needs_prepend.is_empty() {
                     let joined: Vec<String> = needs_prepend.iter().map(|s| (*s).clone()).collect();
                     let new_path = format!("{}:{}", joined.join(":"), current);
-                    eprintln!("[Tier Terminal] PATH prepended with Homebrew dirs for {}", program);
+                    eprintln!(
+                        "[Tier Terminal] PATH prepended with Homebrew dirs for {}",
+                        program
+                    );
                     cmd.env("PATH", new_path);
                 }
             }
@@ -735,42 +677,9 @@ pub fn spawn(
         cmd.env("COFFEE_CODE_LOCALE", loc);
     }
 
-    // ── Hook status injection (claude / codex / opencode / hermes / kimi) ──
-    // Each integrated CLI has its own forwarder, but they all share the same
-    // env-var contract:
-    //   COFFEE_CLI_TAB_ID    — which tab status events should route to
-    //   COFFEE_CLI_HOOK_PORT — loopback port of the Rust hook server
-    //   COFFEE_CLI_TOOL      — "claude" | "codex" | "opencode" | "mimocode" | "hermes" | "kimicode"
-    // Forwarders:
-    //   claude    — coffee-cli-hook.py (Claude Code stdin hook protocol)
-    //   codex     — coffee-cli-codex-notify.py (Codex `notify` config, JSON
-    //               passed as final argv arg)
-    //   opencode  — coffee-cli-opencode-plugin.js (OpenCode Bun plugin auto-
-    //               loaded from ~/.config/opencode/plugins)
-    //   hermes    — coffee-cli-hermes-plugin.py (Hermes Python plugin at
-    //               <HERMES_HOME>/plugins/coffee-cli-status, opt-in via
-    //               `hermes plugins enable coffee-cli-status`. HERMES_HOME
-    //               is `%LOCALAPPDATA%\hermes` on Windows, `~/.hermes`
-    //               elsewhere — see tools/hermes.rs::hermes_home.)
-    //   kimicode  — `<exe> __kimi-hook` native forwarder (Kimi Code
-    //               [[hooks]] in ~/.kimi-code/config.toml, Claude-shaped
-    //               stdin JSON — see hook_installer.rs::install_kimi)
-    // Forwarders no-op if any of these env vars are missing — they're safe to
-    // leave installed even when Coffee CLI isn't the launcher.
-    if let Some(tname) = tool_name.as_deref() {
-        if matches!(tname, "claude" | "codex" | "opencode" | "hermes" | "mimocode" | "kimicode") {
-            use tauri::Manager;
-            let port = app
-                .state::<crate::server::AppState>()
-                .hook_port
-                .load(std::sync::atomic::Ordering::SeqCst);
-            if port != 0 {
-                cmd.env("COFFEE_CLI_TAB_ID", &session_id);
-                cmd.env("COFFEE_CLI_HOOK_PORT", port.to_string());
-                cmd.env("COFFEE_CLI_TOOL", tname);
-            }
-        }
-    }
+    // Status integrations are read-only. Never inject Coffee hook routing
+    // variables into third-party CLIs; startup removes artifacts from older
+    // releases and the PTY/title parsers below drive the tab state directly.
 
     // ── Linux/macOS: Enable OSC 7 CWD reporting ────────────────────────────
     // Unlike Windows PowerShell which natively emits OSC 7, bash/zsh on Linux
@@ -842,7 +751,8 @@ pub fn spawn(
 
     // Get reader/writer from the PTY master
     let mut reader = pair.master.try_clone_reader()?;
-    let writer: Arc<Mutex<Box<dyn Write + Send>>> = Arc::new(Mutex::new(pair.master.take_writer()?));
+    let writer: Arc<Mutex<Box<dyn Write + Send>>> =
+        Arc::new(Mutex::new(pair.master.take_writer()?));
 
     // Drop the slave side — only the master is needed from here
     drop(pair.slave);
@@ -917,22 +827,6 @@ pub fn spawn(
         }
     });
 
-    // Shared activity state for status detection across threads
-    // Initialize last_output_at in the past so the first ticker check doesn't
-    // falsely report "working" (silence_ms starts > 800ms).
-    let activity = Arc::new(Mutex::new(SessionActivity {
-        last_output_at: Instant::now() - std::time::Duration::from_secs(2),
-        burst_start: None,
-        last_status: "wait_input".to_string(),
-        recent_text: String::new(),
-        user_submitted_at: None,
-    }));
-
-    // Liveness flag — lives outside the activity mutex so the ticker can check
-    // it on every 500 ms tick without contending with the high-frequency
-    // emitter lock. Set to false exactly once, from the emitter cleanup path.
-    let alive_flag: Arc<AtomicBool> = Arc::new(AtomicBool::new(true));
-
     // Defaults INACTIVE: a freshly-spawned tab emits at the 200ms background
     // cadence until the frontend's IntersectionObserver confirms it's visible
     // (set_session_active(true)). Prevents a new tab from blasting ~125
@@ -943,37 +837,33 @@ pub fn spawn(
     // `TerminalSession::is_tab_active`.
     let is_tab_active: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
-    // Store session (with shared writer reference + master kept alive + activity)
+    // Store session with shared writer reference and master kept alive.
     let output_buffer: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
     {
         let writer_clone = writer.clone();
         let master_clone = master_arc.clone();
-        let activity_clone = activity.clone();
         let buffer_clone = output_buffer.clone();
         let mut map = session.lock().unwrap();
-        map.insert(session_id.clone(), TerminalSession {
-            writer_lock: writer_clone,
-            kill_tx,
-            tool_name: tool_name.clone(),
-            session_token: Mutex::new(None),
-            _master: master_clone,
-            activity: activity_clone,
-            output_buffer: buffer_clone,
-            is_tab_active: is_tab_active.clone(),
-        });
+        map.insert(
+            session_id.clone(),
+            TerminalSession {
+                writer_lock: writer_clone,
+                kill_tx,
+                tool_name: tool_name.clone(),
+                session_token: Mutex::new(None),
+                _master: master_clone,
+                output_buffer: buffer_clone,
+                is_tab_active: is_tab_active.clone(),
+            },
+        );
     }
 
     // Build session ID regex if this tool supports resume
-    let session_id_regex = tool_name.as_deref()
+    let session_id_regex = tool_name
+        .as_deref()
         .and_then(find_preset)
         .and_then(|p| p.session_id_pattern)
         .and_then(|pat| regex::Regex::new(pat).ok());
-
-    // Get prompt markers for wait_input detection
-    let prompt_markers: Vec<String> = tool_name.as_deref()
-        .and_then(find_preset)
-        .map(|p| p.prompt_markers.iter().map(|s| s.to_string()).collect())
-        .unwrap_or_default();
 
     // ── Handles shared with the emitter thread (below) ───────────────────────
     // The emitter is the sole lifecycle manager now; these clones are consumed
@@ -982,119 +872,12 @@ pub fn spawn(
     let session_for_cleanup = session.clone();
     let sid_cleanup = session_id.clone();
 
-
-    // ── Agent Status Ticker Thread ───────────────────────────────────────────
-    // Dual-signal detection: combines PTY output timing with user-input tracking.
-    // When user presses Enter (detected by tier_terminal_input), we immediately
-    // know the agent is "working" — no need to wait for PTY output to start.
-    // This eliminates the "thinking gap" where silence was misclassified as idle.
-    let activity_for_ticker = activity.clone();
-    let alive_for_ticker = alive_flag.clone();
-    let app_for_ticker = app.clone();
-    let sid_for_ticker = session_id.clone();
-    let markers_for_ticker = prompt_markers.clone();
-    let tool_name_for_ticker = tool_name.clone();
-
-    std::thread::spawn(move || {
-        loop {
-            // 500ms when foreground, 5s when window is hidden — agent status
-            // updates can lag a few seconds when the user isn't looking.
-            //
-            // Deliberately does NOT also check `is_tab_active` the way the
-            // emitter below does (see that flush_interval for the per-tab
-            // signal). The working/idle dot is read from the tab strip even
-            // for a tab that isn't the active one — throttling detection for
-            // a backgrounded-but-still-visible-in-the-strip tab would make
-            // that indicator lag exactly when it's most useful (watching a
-            // background AI-CLI tab finish). Only whole-window hidden
-            // (nothing on screen to read) earns the slower cadence here.
-            let interval_ms = if BACKGROUND_MODE.load(Ordering::Relaxed) { 5000 } else { 500 };
-            std::thread::sleep(std::time::Duration::from_millis(interval_ms));
-            // Cheap atomic check — no mutex contention with the emitter.
-            if !alive_for_ticker.load(Ordering::Relaxed) { break; }
-            let mut act = match activity_for_ticker.lock() {
-                Ok(a) => a,
-                Err(_) => break,
-            };
-
-            let now = Instant::now();
-            let silence_ms = now.duration_since(act.last_output_at).as_millis() as u64;
-
-            // Check prompt markers in the recent output buffer.
-            // Use a safe char-boundary check to avoid panicking on multi-byte
-            // UTF-8 characters (e.g. '─' is 3 bytes, '❯' is 3 bytes).
-            let tail = if act.recent_text.len() > 150 {
-                let start = act.recent_text.len() - 150;
-                // Walk forward to find a valid UTF-8 char boundary
-                let safe_start = (start..act.recent_text.len())
-                    .find(|&i| act.recent_text.is_char_boundary(i))
-                    .unwrap_or(act.recent_text.len());
-                &act.recent_text[safe_start..]
-            } else {
-                &act.recent_text
-            };
-            
-            let is_at_prompt = markers_for_ticker.iter().any(|m| {
-                tail.contains(m.as_str()) || act.recent_text.trim_end().ends_with(m.as_str())
-            });
-
-            // ── 2-State Agent Status Detection ──────────────────────────
-            //
-            // Two states: "working" and "wait_input".
-            // "working" = agent is processing the user's request.
-            // "wait_input" = agent is at its prompt, waiting for input.
-            //
-            // Detection rules:
-            //
-            // 1. WAIT_INPUT: Prompt marker detected + silence > 1200ms
-            //    → Agent finished responding and shows its prompt.
-            //    → Clear user_submitted_at (request cycle complete).
-            //
-            // 2. WORKING: User submitted (pressed Enter at prompt) AND
-            //    no prompt marker has appeared since.
-            //    → This covers: thinking silence, streaming output, tool use.
-            //    → Also covers output flowing (silence < 800ms) after submission.
-            //    → 120s timeout as safety net for stuck sessions.
-            //
-            // 3. WAIT_INPUT (default): No user submission pending.
-            //    → Agent startup output, initialization, idle = all "wait_input".
-            //    → Output flowing without prior user input is just agent booting.
-
-            let user_submitted_recently = act.user_submitted_at
-                .map(|t| now.duration_since(t).as_secs() < 120)
-                .unwrap_or(false);
-
-            let new_status = if is_at_prompt && silence_ms > 1200 {
-                // Agent is at the prompt — request cycle complete
-                act.user_submitted_at = None;
-                "wait_input".to_string()
-            } else if user_submitted_recently {
-                // User submitted a prompt and agent hasn't returned to prompt yet
-                "working".to_string()
-            } else {
-                // No pending submission — agent is at prompt or booting up
-                "wait_input".to_string()
-            };
-
-            if new_status != act.last_status {
-                act.last_status = new_status.clone();
-                let _ = app_for_ticker.emit("agent-status", AgentStatusEvent {
-                    id: sid_for_ticker.clone(),
-                    status: new_status,
-                    silence_ms,
-                    tool: tool_name_for_ticker.clone(),
-                    event: Some("AutoIdleFallback".to_string()),
-                });
-            }
-        }
-    });
-
     // ── PTY reader + emitter (zellij-inspired split) ─────────────────────────
     //
     // Why split what used to be a single thread:
     //
     // The former design read 4 KB at a time, then on the same thread did ANSI
-    // strip + activity mutex + ring-buffer push + synchronous `app.emit()`
+    // strip + ring-buffer push + synchronous `app.emit()`
     // before looping back to `reader.read()`. When the frontend stalled (slow
     // xterm.js write, WebView IPC backlog), emit latency reflected directly
     // into the PTY read cadence — the child process's write-end of the PTY
@@ -1112,7 +895,7 @@ pub fn spawn(
     //
     //   Emitter  : pulls from the channel, accumulates up to an ~8 ms window
     //              (imperceptible to users, collapses AI-CLI token bursts),
-    //              then runs ANSI strip + activity update + OSC 7 detect +
+    //              then runs ANSI strip + OSC 7 detect +
     //              session-token capture + IPC emit + ring-buffer push
     //              ONCE per window. Single lock per batch, single IPC per
     //              batch.
@@ -1157,10 +940,8 @@ pub fn spawn(
     });
 
     // ── Emitter thread ──────────────────────────────────────────────────────
-    let alive_for_emitter = alive_flag.clone();
     let app_out = app.clone();
     let session_id_out = session_id.clone();
-    let activity_for_emitter = activity.clone();
     let output_buffer_for_emitter = output_buffer.clone();
     let is_active_for_emitter = is_tab_active.clone();
 
@@ -1197,10 +978,8 @@ pub fn spawn(
             cwd: String,
         }
 
-        let ansi_re = regex::Regex::new(
-            r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\].*?(?:\x07|\x1b\\)|\x1b.",
-        )
-        .unwrap();
+        let ansi_re =
+            regex::Regex::new(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\].*?(?:\x07|\x1b\\)|\x1b.").unwrap();
 
         let mut pending: Vec<u8> = Vec::with_capacity(131072);
         let mut token_captured = false;
@@ -1262,29 +1041,6 @@ pub fn spawn(
 
                 let data = String::from_utf8_lossy(&pending[..valid_end]).to_string();
                 let stripped = ansi_re.replace_all(&data, "").to_string();
-
-                // One activity-mutex acquisition per batch (not per read).
-                if !stripped.is_empty() {
-                    let now = Instant::now();
-                    if let Ok(mut act) = activity_for_emitter.lock() {
-                        let silence =
-                            now.duration_since(act.last_output_at).as_millis() as u64;
-                        if silence > 2000 {
-                            act.burst_start = Some(now);
-                        }
-                        act.last_output_at = now;
-
-                        act.recent_text.push_str(&stripped);
-                        let char_count = act.recent_text.chars().count();
-                        if char_count > 200 {
-                            if let Some((start_idx, _)) =
-                                act.recent_text.char_indices().nth(char_count - 200)
-                            {
-                                act.recent_text = act.recent_text[start_idx..].to_string();
-                            }
-                        }
-                    }
-                }
 
                 // Session token capture (once per session, for `--resume`).
                 if !token_captured {
@@ -1357,20 +1113,6 @@ pub fn spawn(
             session_id_out
         );
 
-        // Signal ticker to exit on its next iteration.
-        alive_for_emitter.store(false, Ordering::Relaxed);
-
-        let _ = app_out.emit(
-            "agent-status",
-            AgentStatusEvent {
-                id: session_id_out.clone(),
-                status: "idle".to_string(),
-                silence_ms: 0,
-                tool: None,
-                event: Some("SessionCleanup".to_string()),
-            },
-        );
-
         // Drop the master Arc ref by removing the session from the map.
         {
             let mut map = session_for_cleanup.lock().unwrap();
@@ -1395,10 +1137,7 @@ pub fn spawn(
 /// Resolve a program name to a full path.
 #[cfg(not(target_os = "windows"))]
 fn resolve_program(name: &str) -> String {
-    if let Ok(output) = std::process::Command::new("which")
-        .arg(name)
-        .output()
-    {
+    if let Ok(output) = std::process::Command::new("which").arg(name).output() {
         if output.status.success() {
             let resolved = String::from_utf8_lossy(&output.stdout);
             if let Some(first_line) = resolved.lines().next() {
@@ -1433,7 +1172,10 @@ mod tests {
     #[test]
     fn osc7_basic_with_hostname() {
         let data = osc7_bel("myhost", "/home/user/projects");
-        assert_eq!(extract_osc7_cwd(&data), Some("/home/user/projects".to_string()));
+        assert_eq!(
+            extract_osc7_cwd(&data),
+            Some("/home/user/projects".to_string())
+        );
     }
 
     #[test]
@@ -1452,7 +1194,10 @@ mod tests {
     #[test]
     fn osc7_percent_encoded_space() {
         let data = osc7_bel("host", "/home/user/my%20project");
-        assert_eq!(extract_osc7_cwd(&data), Some("/home/user/my project".to_string()));
+        assert_eq!(
+            extract_osc7_cwd(&data),
+            Some("/home/user/my project".to_string())
+        );
     }
 
     #[test]
@@ -1480,7 +1225,10 @@ mod tests {
     fn osc7_windows_style_path() {
         // PowerShell emits file:///C:/Users/foo
         let data = osc7_bel("", "/C:/Users/foo/project");
-        assert_eq!(extract_osc7_cwd(&data), Some("/C:/Users/foo/project".to_string()));
+        assert_eq!(
+            extract_osc7_cwd(&data),
+            Some("/C:/Users/foo/project".to_string())
+        );
     }
 
     // ── find_preset ───────────────────────────────────────────────────────────
@@ -1525,13 +1273,19 @@ mod tests {
 
     #[test]
     fn claude_token_valid_uuid() {
-        assert!(token_matches("claude", "a1b2c3d4-e5f6-7890-abcd-ef1234567890"));
+        assert!(token_matches(
+            "claude",
+            "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        ));
     }
 
     #[test]
     fn claude_token_rejects_injection() {
         // Attacker appends extra flag — must be rejected
-        assert!(!token_matches("claude", "a1b2c3d4-e5f6-7890-abcd-ef1234567890 --dangerously-skip-permissions"));
+        assert!(!token_matches(
+            "claude",
+            "a1b2c3d4-e5f6-7890-abcd-ef1234567890 --dangerously-skip-permissions"
+        ));
         assert!(!token_matches("claude", ""));
         assert!(!token_matches("claude", "../../etc/passwd"));
     }
@@ -1552,7 +1306,10 @@ mod tests {
         assert!(!token_matches("hermes", "20240115_143022_a1b2c3 --extra"));
         // Hex too short / too long sits outside the {4,16} band.
         assert!(!token_matches("hermes", "20240115_143022_abc"));
-        assert!(!token_matches("hermes", &format!("20240115_143022_{}", "a".repeat(20))));
+        assert!(!token_matches(
+            "hermes",
+            &format!("20240115_143022_{}", "a".repeat(20))
+        ));
         // Legacy `session_` filename prefix must not slip through — the
         // server-side parser strips it; the regex would reject it anyway.
         assert!(!token_matches("hermes", "session_20240115_143022_a1b2c3"));
@@ -1572,13 +1329,19 @@ mod tests {
         // Wrong prefix
         assert!(!token_matches("opencode", "1d3161926ffeffCy3Y6l14Ezoy"));
         // Flag injection
-        assert!(!token_matches("opencode", "ses_1d3161926ffeffCy3Y6l14Ezoy --pure"));
+        assert!(!token_matches(
+            "opencode",
+            "ses_1d3161926ffeffCy3Y6l14Ezoy --pure"
+        ));
         // Empty
         assert!(!token_matches("opencode", ""));
         assert!(!token_matches("opencode", "ses_"));
         // Length outside the 20-40 band
         assert!(!token_matches("opencode", "ses_short"));
-        assert!(!token_matches("opencode", &format!("ses_{}", "a".repeat(50))));
+        assert!(!token_matches(
+            "opencode",
+            &format!("ses_{}", "a".repeat(50))
+        ));
         // Disallowed chars
         assert!(!token_matches("opencode", "ses_1d3161926ffeffCy3Y6l14Ezo-"));
         assert!(!token_matches("opencode", "ses_1d3161926ffeffCy3Y6l14Ezo "));

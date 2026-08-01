@@ -8,7 +8,7 @@ import { ToolConfigModal } from './ToolConfigModal';
 import { ContributionHeatmap } from './ContributionHeatmap';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { DiffPanel } from '../right/DiffPanel';
-import { useAppState, type ToolType } from '../../store/app-state';
+import { supportsNativeAgentStatus, useAppState, type ToolType } from '../../store/app-state';
 
 // Dropdown shown when a tool card's folder icon is clicked: the globally
 // recent project folders (any tool that used one) + "Open folder…" last.
@@ -421,18 +421,9 @@ const VALID_PIN_KEYS = new Set<string>([
   'installer', 'four-split', 'three-split', 'two-split',
 ]);
 
-// Tabs that show the status-grid ("Dynamic Island") indicator: every AI CLI.
-// Hook-wired tools (claude/codex/opencode/mimocode/hermes/kimicode) drive it
-// live off session.agentStatus; the rest have no status bus and sit at
-// static 'idle' green — the "fake island" baseline so every AI-CLI tab reads
-// consistently.
-// Non-CLI tabs (terminal/remote/history/splits/installer) get no indicator.
-const TAB_STATUS_TOOLS = new Set<string>([
-  'claude', 'codex', 'grok', 'opencode', 'mimocode', 'hermes',
-  'antigravity', 'qwen', 'openclaw',
-  'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
-]);
-
+// Only tools with an authoritative native OSC title protocol get a Dynamic
+// Island. Every other tab shows the normal close button without a fake idle
+// state or PTY activity guess.
 export function CenterPanel() {
   const { state, dispatch } = useAppState();
   const t = useT();
@@ -618,7 +609,7 @@ export function CenterPanel() {
   // IPC queue between back-click and the next 9-dot click.
   const lastToolsScanAt = useRef<number>(0);
   // Previous toolsInstalled snapshot — diffed against each new scan so
-  // we can fire installHookForTool exactly when a CLI flips from
+  // we can maintain its cleanup/theme integration exactly when a CLI flips from
   // not-installed → installed during a Coffee CLI session. `null`
   // sentinel = "we haven't scanned yet"; the very first scan does not
   // trigger any install IPCs because startup's install_all() already
@@ -630,7 +621,7 @@ export function CenterPanel() {
     if (prev !== null) {
       for (const tool of Object.keys(result)) {
         if (result[tool] === true && prev[tool] === false) {
-          commands.installHookForTool(tool).catch(() => {});
+          commands.maintainToolIntegration(tool).catch(() => {});
         }
       }
     }
@@ -1170,11 +1161,8 @@ export function CenterPanel() {
       case 'codex': return { icon: <SvgCodex />, title: cwd ?? getToolDisplayName('codex'), tooltip: pathTip };
       case 'grok': return { icon: <SvgGrok />, title: cwd ?? getToolDisplayName('grok'), tooltip: pathTip };
       case 'antigravity': return { icon: <SvgAntigravity />, title: cwd ?? getToolDisplayName('antigravity'), tooltip: pathTip };
-      // Directory-aware tabs (icon + cwd basename). Pi and the T3 set
-      // (Crush/Aider/Goose/Copilot) are hookless — no real status bus, so
-      // they get the static "fake" island via TAB_STATUS_TOOLS below.
-      // Kimi Code renders the same shape but is hook-wired (T1): its
-      // island is live off session.agentStatus.
+      // Directory-aware tabs use their icon plus cwd basename. They do not
+      // expose an authoritative native title status, so no island is shown.
       case 'pi': return { icon: <SvgPi />, title: cwd ?? getToolDisplayName('pi'), tooltip: pathTip };
       case 'crush': return { icon: <SvgCrush />, title: cwd ?? getToolDisplayName('crush'), tooltip: pathTip };
       case 'aider': return { icon: <SvgAider />, title: cwd ?? getToolDisplayName('aider'), tooltip: pathTip };
@@ -1308,16 +1296,9 @@ export function CenterPanel() {
               {icon}
               <span className="tab-title" style={{ flex: '0 1 auto', minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{title}</span>
               <div className="tab-actions">
-                {/* Indicator gate — every AI CLI gets the island (see
-                    TAB_STATUS_TOOLS). Hook-wired tools (claude/codex/opencode
-                    via forwarders, mimocode via its preset-driven status
-                    ticker, hermes, kimicode) drive color off session.agentStatus.
-                    Hookless CLIs (antigravity/qwen/openclaw/pi, plus
-                    the T3 set crush/aider/goose/copilot) have no agentStatus,
-                    so the grid sits at
-                    static 'idle' green — the "fake island" baseline. Non-CLI
-                    tabs (terminal/remote/history/splits) get no indicator. */}
-                {TAB_STATUS_TOOLS.has(session.tool as string) && (
+                {/* Only Claude/Codex/Grok expose authoritative native OSC
+                    state. All other tabs go straight to the close button. */}
+                {supportsNativeAgentStatus(session.tool) && (
                   <div className={`tab-status-grid status-${
                     session.agentStatus === 'wait_input' ? 'waiting' : session.agentStatus ?? 'idle'
                   }${__IS_LINUX__ ? ' tab-status-grid--static' : ''}`}>

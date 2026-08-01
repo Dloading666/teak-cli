@@ -61,10 +61,8 @@ requestAnimationFrame(() => {
 // When the OS hides the Coffee CLI window (other Space, app switched
 // away, minimized) tell the Rust backend to widen every per-session
 // worker's sleep / coalesce window. Without this, a backgrounded app
-// keeps paying the full 8ms emitter cadence + 500ms ticker cadence per
-// session forever — measurable as a warm chassis on Apple Silicon
-// laptops left running all day. The cost of being wrong here is a few
-// hundred ms of stale agent-status updates when the user returns.
+// keeps paying the full 8ms emitter cadence per session forever — measurable
+// as a warm chassis on Apple Silicon laptops left running all day.
 const syncBackgroundMode = () => {
   commands.setBackgroundMode(document.hidden).catch(() => {});
 };

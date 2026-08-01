@@ -19,7 +19,6 @@ import type { ReactNode } from 'react';
 import { useAppState, resolveDiffContext } from '../store/app-state';
 import type { ToolType } from '../store/app-state';
 import { commands, type GitChanges, type GitFileEntry } from '../tauri';
-import { subscribeAgentStatus } from './agent-status-bus';
 
 export type FileStats = { added: number; deleted: number; mtimeMs: number };
 type FileStatsMap = Map<string, FileStats>;
@@ -85,7 +84,7 @@ function deriveDirtyDirs(map: FileStatsMap): Set<string> {
 }
 
 // Cheap signature to skip a re-render when a poll returns identical data
-// (e.g. agent-status fired but nothing on disk actually changed).
+// (e.g. a refresh event fired but nothing on disk actually changed).
 function changesSignature(c: GitChanges | null): string {
   if (!c || c.state !== 'ok') return c?.state ?? 'null';
   const f = (e: GitFileEntry) => `${e.rel}\x01${e.status}\x01${e.added}\x01${e.deleted}`;
@@ -182,14 +181,11 @@ export function GitStatusProvider({ children }: { children: ReactNode }) {
 
     const onWindowRefresh = () => schedule();
     window.addEventListener('fs-refresh', onWindowRefresh);
-    const unsubStatus = subscribeAgentStatus(schedule);
-
     return () => {
       cancelled = true;
       window.clearInterval(pollInterval);
       window.removeEventListener('fs-refresh', onWindowRefresh);
       unlistenTauri?.();
-      unsubStatus();
       if (debounceRef.current != null) {
         window.clearTimeout(debounceRef.current);
         debounceRef.current = null;

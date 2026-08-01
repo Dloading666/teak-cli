@@ -121,8 +121,8 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
 
   // Latest badge counts (Rust multiset deltas), mirrored into a ref so the
   // open-time size guard can read them WITHOUT the load effect depending on
-  // them. They are live-polled — file-stats refreshes on every agent-status /
-  // fs-refresh while an agent edits the open file — so as effect deps they
+  // them. They are live-polled from filesystem refreshes while an agent edits
+  // the open file, so as effect deps they
   // blanked the diff to 'loading' and re-ran both IPC reads + double Shiki
   // tokenization on every tick. The guard only needs the value at open time.
   const badgeRef = useRef({ added: 0, deleted: 0 });

@@ -236,7 +236,7 @@ export function SettingsModal() {
   };
 
   // Sound notification toggles — local state + localStorage only. The
-  // notify-sound module reads these keys live on every agent-status event,
+  // notify-sound module reads these keys live on native title state changes,
   // so no app-state wiring is needed. Both default to ON.
   const writeSoundPref = (key: string, setter: (v: boolean) => void) => (v: boolean) => {
     setter(v);

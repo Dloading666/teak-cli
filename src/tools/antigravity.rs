@@ -90,7 +90,7 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "antigravity",
     display_name: "Antigravity CLI",
     binary_name: "agy",
-    has_hook_surface: false,
+    has_legacy_hook_artifacts: false,
     // agy writes session JSONL to `~/.gemini/tmp/<project>/chats/
     // session-*.jsonl` using the format inherited from the retired
     // Gemini CLI (verified on populated session files dated 2026-05-20).

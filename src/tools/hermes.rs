@@ -28,10 +28,8 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     id: "hermes",
     display_name: "Hermes Agent",
     binary_name: "hermes",
-    // Hermes Agent exposes plugin hooks via `<HERMES_HOME>/plugins/<name>/`
-    // Python plugins. Coffee CLI installs `coffee-cli-status` for the
-    // tab indicator only.
-    has_hook_surface: true,
+    // Older Coffee releases installed `coffee-cli-status`; startup removes it.
+    has_legacy_hook_artifacts: true,
     // <HERMES_HOME>/sessions/session_*.json — flat directory of full
     // JSON files (not JSONL); custom parser parse_hermes_json.
     history_shape: Some(HistoryShape::HermesFlatJson),

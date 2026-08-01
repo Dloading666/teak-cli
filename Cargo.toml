@@ -19,12 +19,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # Tier Terminal — PTY (portable-pty, WezTerm's cross-platform PTY library)
 portable-pty = "0.9"
-# tokio: only the features we actually touch (grep'd against src/). Trimmed
-# from "full" to drop unused subsystems (process, signal, tracing, parking_lot
-# pulled in by full but not used here). `rt-multi-thread` + `macros` for
-# #[tokio::main] / spawn; `net` for TcpListener; `time` for sleep; `io-util`
-# for AsyncBufReadExt/AsyncWriteExt; `sync` for Mutex.
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "io-util", "sync"] }
+# Only `task::spawn_blocking` is used by the system-font scanner. The old
+# loopback hook server and its network/runtime features have been removed.
+tokio = { version = "1", features = ["rt"] }
 
 # Regex (used by terminal.rs for ANSI strip)
 regex = "1"
@@ -57,10 +54,6 @@ base64 = "0.22.1"
 # to PNG before writing the temp file the AI CLI references by path. Reuses
 # the same png 0.17.x already pulled in transitively by tauri, no extra build.
 png = "0.17"
-# Codex hooks trust-hash computation (see hook_installer.rs::compute_codex_trusted_hash).
-# Reproduces codex-rs/hooks command_hook_hash so we can pre-grant trust at install
-# time — the island lights without a manual /hooks approval. Pure Rust.
-sha2 = "0.10"
 # In-app self-update downloader (Windows). Blocking + rustls, runs on a
 # spawn_blocking thread; streams the installer so we can emit download %.
 ureq = "2"
