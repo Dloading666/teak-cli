@@ -38,7 +38,7 @@ export const THEME_SHAPES: { code: ThemeShape; label: string }[] = [
   { code: 'glass',  label: 'Glass'  },
   { code: 'panel',  label: 'Panel'  },
   { code: 'carbon', label: 'Carbon' },
-  { code: 'flower', label: 'Flower' },
+  { code: 'monogram', label: 'Monogram' },
 ];
 
 // ─── Task board form (to-do list vs sticky notes) ────────────────────────────

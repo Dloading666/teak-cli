@@ -256,7 +256,7 @@ textarea,
    See the matte-mesh derivation: dark cold base, accent only bleeding
    from the centre, low-contrast lines (matte, not glossy). */
 [data-shape="carbon"],
-[data-shape="flower"] {
+[data-shape="monogram"] {
     --radius-xs: 4px;
     --radius-sm: 8px;
     --radius-md: 16px;
@@ -277,18 +277,13 @@ textarea,
     --carbon-mesh-opacity: 0.38;
 }
 
-[data-shape="flower"] {
-    /* Flower — quiet botanical repeat inspired by pressed floral paper:
-       large flat petals, sparse companion leaves, and lots of breathing room.
-       It reuses Carbon's transparent material pipeline; only the mask artwork changes. */
-    --carbon-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M-8 76C12 66 18 44 39 36s36-2 65-28'/%3E%3Cpath d='M-6 20C12 31 29 16 48 3'/%3E%3Cpath d='M51 101C60 78 73 66 104 58'/%3E%3C/g%3E%3Cg fill='%23fff'%3E%3Cellipse cx='17' cy='61' rx='2.7' ry='6.1' transform='rotate(-38 17 61)'/%3E%3Cellipse cx='25' cy='51' rx='2.3' ry='5.2' transform='rotate(47 25 51)'/%3E%3Cellipse cx='37' cy='37' rx='2.6' ry='5.8' transform='rotate(-55 37 37)'/%3E%3Cellipse cx='51' cy='33' rx='2.2' ry='5.2' transform='rotate(54 51 33)'/%3E%3Cellipse cx='70' cy='24' rx='2.8' ry='6' transform='rotate(-45 70 24)'/%3E%3Cellipse cx='84' cy='14' rx='2.2' ry='5.1' transform='rotate(50 84 14)'/%3E%3Cellipse cx='11' cy='25' rx='2.3' ry='5' transform='rotate(66 11 25)'/%3E%3Cellipse cx='30' cy='17' rx='2.4' ry='5.6' transform='rotate(-60 30 17)'/%3E%3Cellipse cx='66' cy='82' rx='2.4' ry='5.5' transform='rotate(35 66 82)'/%3E%3Cellipse cx='79' cy='69' rx='2.6' ry='5.8' transform='rotate(-50 79 69)'/%3E%3Cellipse cx='91' cy='62' rx='2.1' ry='5' transform='rotate(56 91 62)'/%3E%3C/g%3E%3Cg fill='%23fff'%3E%3Cg transform='translate(63 39) rotate(18)'%3E%3Cellipse cx='0' cy='-5' rx='2.2' ry='5.1'/%3E%3Cellipse cx='0' cy='5' rx='2.2' ry='5.1'/%3E%3Cellipse cx='-5' cy='0' rx='5.1' ry='2.2'/%3E%3Cellipse cx='5' cy='0' rx='5.1' ry='2.2'/%3E%3Ccircle cx='0' cy='0' r='1.7'/%3E%3C/g%3E%3Cg transform='translate(24 78) rotate(-12) scale(.82)'%3E%3Cellipse cx='0' cy='-5' rx='2.2' ry='5.1'/%3E%3Cellipse cx='0' cy='5' rx='2.2' ry='5.1'/%3E%3Cellipse cx='-5' cy='0' rx='5.1' ry='2.2'/%3E%3Cellipse cx='5' cy='0' rx='5.1' ry='2.2'/%3E%3Ccircle cx='0' cy='0' r='1.7'/%3E%3C/g%3E%3Cg transform='translate(7 7) rotate(10) scale(.58)'%3E%3Cellipse cx='0' cy='-5' rx='2.2' ry='5.1'/%3E%3Cellipse cx='0' cy='5' rx='2.2' ry='5.1'/%3E%3Cellipse cx='-5' cy='0' rx='5.1' ry='2.2'/%3E%3Cellipse cx='5' cy='0' rx='5.1' ry='2.2'/%3E%3Ccircle cx='0' cy='0' r='1.7'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    --carbon-hex-size: 72px 72px;
-    --carbon-mesh-opacity: 0.28;
-    /* Override the first draft: bigger, flatter tissue-paper floral marks.
-       No vine strokes, so the repeat reads as calm petals instead of thorns. */
-    --carbon-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23fff'%3E%3Cg transform='translate(72 64)'%3E%3Cellipse cx='0' cy='-28' rx='10' ry='28'/%3E%3Cellipse cx='0' cy='28' rx='10' ry='28'/%3E%3Cellipse cx='-28' cy='0' rx='28' ry='10'/%3E%3Cellipse cx='28' cy='0' rx='28' ry='10'/%3E%3Cellipse cx='-20' cy='-20' rx='9' ry='26' transform='rotate(-45 -20 -20)'/%3E%3Cellipse cx='20' cy='-20' rx='9' ry='26' transform='rotate(45 20 -20)'/%3E%3Cellipse cx='-20' cy='20' rx='9' ry='26' transform='rotate(45 -20 20)'/%3E%3Cellipse cx='20' cy='20' rx='9' ry='26' transform='rotate(-45 20 20)'/%3E%3Ccircle cx='0' cy='0' r='9'/%3E%3C/g%3E%3Cg transform='translate(132 126) rotate(14) scale(.64)'%3E%3Cellipse cx='0' cy='-28' rx='10' ry='28'/%3E%3Cellipse cx='0' cy='28' rx='10' ry='28'/%3E%3Cellipse cx='-28' cy='0' rx='28' ry='10'/%3E%3Cellipse cx='28' cy='0' rx='28' ry='10'/%3E%3Cellipse cx='-20' cy='-20' rx='9' ry='26' transform='rotate(-45 -20 -20)'/%3E%3Cellipse cx='20' cy='-20' rx='9' ry='26' transform='rotate(45 20 -20)'/%3E%3Cellipse cx='-20' cy='20' rx='9' ry='26' transform='rotate(45 -20 20)'/%3E%3Cellipse cx='20' cy='20' rx='9' ry='26' transform='rotate(-45 20 20)'/%3E%3Ccircle cx='0' cy='0' r='9'/%3E%3C/g%3E%3Cg transform='translate(8 148) rotate(-18) scale(.72)'%3E%3Cellipse cx='0' cy='-28' rx='10' ry='28'/%3E%3Cellipse cx='0' cy='28' rx='10' ry='28'/%3E%3Cellipse cx='-28' cy='0' rx='28' ry='10'/%3E%3Cellipse cx='28' cy='0' rx='28' ry='10'/%3E%3Cellipse cx='-20' cy='-20' rx='9' ry='26' transform='rotate(-45 -20 -20)'/%3E%3Cellipse cx='20' cy='-20' rx='9' ry='26' transform='rotate(45 20 -20)'/%3E%3Cellipse cx='-20' cy='20' rx='9' ry='26' transform='rotate(45 -20 20)'/%3E%3Cellipse cx='20' cy='20' rx='9' ry='26' transform='rotate(-45 20 20)'/%3E%3Ccircle cx='0' cy='0' r='9'/%3E%3C/g%3E%3Cellipse cx='25' cy='46' rx='7' ry='20' transform='rotate(-48 25 46)'/%3E%3Cellipse cx='111' cy='41' rx='7' ry='20' transform='rotate(52 111 41)'/%3E%3Cellipse cx='40' cy='116' rx='6' ry='18' transform='rotate(50 40 116)'/%3E%3Cellipse cx='102' cy='104' rx='6' ry='18' transform='rotate(-42 102 104)'/%3E%3Ccircle cx='28' cy='86' r='3.5'/%3E%3Ccircle cx='119' cy='77' r='3'/%3E%3C/g%3E%3C/svg%3E");
-    --carbon-hex-size: 132px 132px;
-    --carbon-mesh-opacity: 0.22;
+[data-shape="monogram"] {
+    /* User-provided pure-vector monogram artwork, cropped to its exact
+       474-by-474 design period. Matching square mask dimensions preserve the
+       geometry and make opposite SVG edges meet without a visible seam. */
+    --carbon-hex: url('/monogram.svg');
+    --carbon-hex-size: 356px 356px;
+    --carbon-mesh-opacity: 0.52;
 }
 
 /* ─── Dark Theme (Claude-inspired & Espresso) ──────────── */
@@ -1575,9 +1570,9 @@ body.gambit-docked .multi-agent-grid-standalone {
    Buttons / inputs / textareas / anchors aren't matched by the
    element list at all, so their own hover/focus bgs are
    untouched. */
-:is([data-shape="glass"], [data-shape="carbon"], [data-shape="flower"]) .panel-left :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
-:is([data-shape="glass"], [data-shape="carbon"], [data-shape="flower"]) .panel-right :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
-:is([data-shape="glass"], [data-shape="carbon"], [data-shape="flower"]) .panel-center :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line) {
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-left :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-right :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-center :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line) {
     background: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;
@@ -1668,7 +1663,7 @@ body.gambit-docked .multi-agent-grid-standalone {
    and shows the body's single --glass-tint / carbon mesh, instead of stacking
    an opaque --bg-terminal fill. The active tab is distinguished by brighter
    text (rule above / --text-1), not a fill — the glass "no local layer" rule. */
-:is([data-shape="glass"], [data-shape="carbon"], [data-shape="flower"]) .chrome-tab {
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .chrome-tab {
     background: transparent !important;
 }
 
@@ -1980,7 +1975,7 @@ body.gambit-docked .multi-agent-grid-standalone {
    ═══════════════════════════════════════════════════════ */
 /* Layer 1 (bottom): cold dark base + soft accent wash + edge vignette. */
 [data-shape="carbon"] #root,
-[data-shape="flower"] #root {
+[data-shape="monogram"] #root {
     position: relative;
     /* Establish a stacking context so the ::before (hex mesh, z-index:-2) and
        ::after (veil, z-index:-1) paint ABOVE #root's own background instead
@@ -2001,7 +1996,7 @@ body.gambit-docked .multi-agent-grid-standalone {
    the SVG hexagon mask. z-index:-2 → above #root's base, below the veil
    and the chrome. */
 [data-shape="carbon"] #root::before,
-[data-shape="flower"] #root::before {
+[data-shape="monogram"] #root::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -2027,7 +2022,7 @@ body.gambit-docked .multi-agent-grid-standalone {
    and mutes the mesh to its tasteful, un-busy strength — the exact role
    the old #root --carbon-tint played, just kept inside #root's clip now. */
 [data-shape="carbon"] #root::after,
-[data-shape="flower"] #root::after {
+[data-shape="monogram"] #root::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -2036,20 +2031,35 @@ body.gambit-docked .multi-agent-grid-standalone {
     background: color-mix(in oklab, var(--bg-app) 68%, transparent);
 }
 
+/* The reference monogram is ivory canvas with warm-gold marks. Carbon's
+   generic light veil intentionally turns its base graphite-gray, so give this
+   one pairing a material-specific palette while retaining the same mask and
+   zero-cost static rendering. */
+[data-shape="monogram"][data-theme="light"] #root {
+    background: #f7f6f1;
+}
+[data-shape="monogram"][data-theme="light"] #root::before {
+    background: #a7834e;
+    opacity: 0.58;
+}
+[data-shape="monogram"][data-theme="light"] #root::after {
+    background: rgba(255, 255, 255, 0.18);
+}
+
 /* Chrome goes transparent so the unified carbon backdrop reads across the
    whole window (same idea as Glass, minus the blur). Inner content keeps
    its own surfaces for readability; per-region tints can be tightened
    later. */
 [data-shape="carbon"] .titlebar,
-[data-shape="flower"] .titlebar,
+[data-shape="monogram"] .titlebar,
 [data-shape="carbon"] .panel-left,
-[data-shape="flower"] .panel-left,
+[data-shape="monogram"] .panel-left,
 [data-shape="carbon"] .panel-right,
-[data-shape="flower"] .panel-right,
+[data-shape="monogram"] .panel-right,
 [data-shape="carbon"] .panel-center,
-[data-shape="flower"] .panel-center,
+[data-shape="monogram"] .panel-center,
 [data-shape="carbon"] .main-content,
-[data-shape="flower"] .main-content {
+[data-shape="monogram"] .main-content {
     background: transparent;
     /* --glass-blur is defined per-theme (not only in the glass shape),
        so .panel-left's backdrop-filter is otherwise active under carbon.
@@ -2065,11 +2075,11 @@ body.gambit-docked .multi-agent-grid-standalone {
    smoked translucent fill so the carbon mesh reads behind them while the
    items stay legible. No blur — keeps carbon's static/zero-cost rule. */
 [data-shape="carbon"] .ctx-menu,
-[data-shape="flower"] .ctx-menu,
+[data-shape="monogram"] .ctx-menu,
 [data-shape="carbon"] .term-ctx-menu,
-[data-shape="flower"] .term-ctx-menu,
+[data-shape="monogram"] .term-ctx-menu,
 [data-shape="carbon"] .history-tool-filter-menu,
-[data-shape="flower"] .history-tool-filter-menu {
+[data-shape="monogram"] .history-tool-filter-menu {
     background-color: color-mix(in oklab, var(--bg-app) 76%, transparent) !important;
     background-image: none !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -2080,9 +2090,9 @@ body.gambit-docked .multi-agent-grid-standalone {
    content area is transparent mesh, so those arcs read as stray white
    corners. Hide them — same as glass/slab/sharp/panel already do. */
 [data-shape="carbon"] .chrome-tab.active::before,
-[data-shape="flower"] .chrome-tab.active::before,
+[data-shape="monogram"] .chrome-tab.active::before,
 [data-shape="carbon"] .chrome-tab.active::after,
-[data-shape="flower"] .chrome-tab.active::after {
+[data-shape="monogram"] .chrome-tab.active::after {
     display: none;
 }
 
@@ -2101,21 +2111,21 @@ body.gambit-docked .multi-agent-grid-standalone {
    the wrapper's overflow:hidden radius. The inner card clears to transparent so
    the wrapper's fill is the single surface. A hairline border + whisper shadow
    give the now-translucent card a defined edge against the mesh. */
-:is([data-shape="carbon"], [data-shape="flower"])[data-theme="light"] .launchpad-card-group {
+:is([data-shape="carbon"], [data-shape="monogram"])[data-theme="light"] .launchpad-card-group {
     background: color-mix(in oklab, #fffdf9 64%, transparent);
     border-color: rgba(0, 0, 0, 0.06);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
-:is([data-shape="carbon"], [data-shape="flower"])[data-theme="light"] .launchpad-card {
+:is([data-shape="carbon"], [data-shape="monogram"])[data-theme="light"] .launchpad-card {
     background: transparent;
 }
 
 /* Session search box (shared by the left Sessions rail and the right
    HistoryBoard) — same warm translucent fill so it reads as part of the
    material, not a white slab. Focus lifts opacity for input legibility. */
-:is([data-shape="carbon"], [data-shape="flower"])[data-theme="light"] .agent-session-search {
+:is([data-shape="carbon"], [data-shape="monogram"])[data-theme="light"] .agent-session-search {
     background: color-mix(in oklab, #fffdf9 64%, transparent);
 }
-:is([data-shape="carbon"], [data-shape="flower"])[data-theme="light"] .agent-session-search:focus {
+:is([data-shape="carbon"], [data-shape="monogram"])[data-theme="light"] .agent-session-search:focus {
     background: color-mix(in oklab, #fffdf9 80%, transparent);
 }
