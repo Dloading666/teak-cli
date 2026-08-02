@@ -2040,7 +2040,7 @@ body.gambit-docked .multi-agent-grid-standalone {
 }
 [data-shape="monogram"][data-theme="light"] #root::before {
     background: #a7834e;
-    opacity: 0.58;
+    opacity: 0.30;
 }
 [data-shape="monogram"][data-theme="light"] #root::after {
     background: rgba(255, 255, 255, 0.18);
