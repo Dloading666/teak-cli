@@ -283,7 +283,7 @@ textarea,
        geometry and make opposite SVG edges meet without a visible seam. */
     --carbon-hex: url('/monogram.svg');
     --carbon-hex-size: 356px 356px;
-    --carbon-mesh-opacity: 0.52;
+    --carbon-mesh-opacity: 0.30;
 }
 
 /* ─── Dark Theme (Claude-inspired & Espresso) ──────────── */
