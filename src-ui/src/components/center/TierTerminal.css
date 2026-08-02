@@ -124,16 +124,16 @@
    scroll lane. Specificity (0,5,0) beats the Glass/Carbon nuclear
    `background: transparent !important` rule (global.css:1541) and the base
    slider rule, so the slider stays colored here. */
-:is([data-shape="glass"], [data-shape="carbon"]) .tier-xterm .xterm-scrollable-element > .scrollbar {
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="flower"]) .tier-xterm .xterm-scrollable-element > .scrollbar {
     background: rgba(255, 255, 255, 0.05) !important;
 }
-:is([data-shape="glass"], [data-shape="carbon"]) .tier-xterm .xterm-scrollable-element > .scrollbar > .slider {
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="flower"]) .tier-xterm .xterm-scrollable-element > .scrollbar > .slider {
     background: var(--accent) !important;
     opacity: 0.6;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
 }
-:is([data-shape="glass"], [data-shape="carbon"]) .tier-xterm .xterm-scrollable-element > .scrollbar > .slider:hover,
-:is([data-shape="glass"], [data-shape="carbon"]) .tier-xterm .xterm-scrollable-element > .scrollbar.active > .slider {
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="flower"]) .tier-xterm .xterm-scrollable-element > .scrollbar > .slider:hover,
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="flower"]) .tier-xterm .xterm-scrollable-element > .scrollbar.active > .slider {
     opacity: 0.9;
 }
 

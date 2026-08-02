@@ -1195,12 +1195,12 @@ export function CenterPanel() {
   // Background state lives in global AppState (set via theme menu in Explorer)
   const bgPath = state.bgPath;
   const bgType = state.bgType;
-  // Glass AND Carbon shapes force terminal-as-transparent even without an
+  // Glass, Carbon, and Flower shapes force terminal-as-transparent even without an
   // in-app wallpaper, so the backdrop bleeds through (body bg is dropped /
-  // replaced by the carbon mesh in those [data-shape] overrides). Without
+  // replaced by the shape texture in those [data-shape] overrides). Without
   // this, the xterm canvas renders its solid `bgOpaque` and covers the
   // backdrop exactly where it matters most — the largest surface.
-  const isBackdropShape = state.currentShape === 'glass' || state.currentShape === 'carbon';
+  const isBackdropShape = state.currentShape === 'glass' || state.currentShape === 'carbon' || state.currentShape === 'flower';
   const hasBg = (bgType !== 'none' && bgPath !== '') || isBackdropShape;
 
   // Convert wallpaper path to a displayable URL. User-picked local

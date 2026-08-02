@@ -33,7 +33,7 @@ export type ThemeColor =
   // Spider-Man hero, intended to pair with the carbon shape).
   | 'crimson' | 'sunset' | 'amber' | 'emerald' | 'teal' | 'indigo' | 'fuchsia';
 // Theme: shape form (orthogonal to color)
-export type ThemeShape = 'soft' | 'slab' | 'sharp' | 'glass' | 'panel' | 'carbon';
+export type ThemeShape = 'soft' | 'slab' | 'sharp' | 'glass' | 'panel' | 'carbon' | 'flower';
 // Icon theme: visual style for file/folder icons in the explorer.
 // 8 themes, each with genuinely distinct folder silhouette + file icon style.
 // Fetched upstream (6): material, vscode-icons, catppuccin-mocha, devicon, fluent, symbols
@@ -607,7 +607,7 @@ const VALID_THEMES: ThemeColor[] = [
   'obsidian', 'cobalt', 'moss',
   'crimson', 'sunset', 'amber', 'emerald', 'teal', 'indigo', 'fuchsia',
 ];
-const VALID_SHAPES: ThemeShape[] = ['soft', 'slab', 'sharp', 'glass', 'panel', 'carbon'];
+const VALID_SHAPES: ThemeShape[] = ['soft', 'slab', 'sharp', 'glass', 'panel', 'carbon', 'flower'];
 const VALID_ICON_THEMES: IconTheme[] = [
   'outline', 'material', 'vscode-icons', 'catppuccin-mocha',
   'devicon', 'fluent', 'symbols', 'coffee',

@@ -133,7 +133,7 @@
  * nuke's (0,3,1). Adding `.panel-center` as an ancestor + the element's
  * own `.diff-panel` class brings it to (0,4,0) — clean win. Carbon (the
  * default theme) shares the same nuke rule, so gate on both shapes. */
-:is([data-shape="glass"], [data-shape="carbon"]) .panel-center .diff-panel.diff-panel--tab {
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="flower"]) .panel-center .diff-panel.diff-panel--tab {
   background: var(--bg-terminal) !important;
   border-color: var(--border) !important;
 }
