@@ -5,7 +5,7 @@
 <h1 align="center">Coffee CLI</h1>
 
 <p align="center">
-  <strong>Coffee and Claude time?</strong>
+  <strong>Vibe Coding on one side, looking stylish on the other.</strong>
 </p>
 
 <p align="center">
