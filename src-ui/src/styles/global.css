@@ -1547,50 +1547,34 @@ body.gambit-docked .multi-agent-grid-standalone {
 }
 
 /* ═══════════════════════════════════════════════════════
-   FROST SHAPE — glass chrome, blurred-wallpaper backdrop
+   FROST SHAPE — glass chrome, native Acrylic backdrop
    Frost reuses the ENTIRE glass treatment (tabs, cards,
    nuclear layer-strip, everything) because App.tsx + index.html
    normalize it to data-shape="glass" + data-frost="frost".
-   The actual frosting is rendered IN-PAGE by FrostBackdrop.tsx:
-   a blurred copy of the desktop wallpaper + a tint overlay,
-   both z-index:-1 behind the app content. CSS backdrop-filter
-   can't sample the OS desktop through a transparent WebView2
-   window, and native Acrylic broke rounded corners + focus, so
-   the webview stays transparent here and the wallpaper layer
-   shows through. --frost-blur / --frost-tint tune it.
+   The actual frosting is the native Windows Acrylic applied in
+   Rust (set_frosted_backdrop): real desktop blur via DWM, with
+   the window made opaque + DWMWCP_ROUND for rounded corners
+   (NOT SetWindowRgn — a region can't clip Acrylic and resets
+   the borderless frame on focus). The webview stays transparent
+   so the blur shows through; no in-page wallpaper layer.
    ═══════════════════════════════════════════════════════ */
 [data-frost="frost"] {
-    /* The Frost backdrop is the blurred desktop wallpaper rendered in-page
-       (FrostBackdrop.tsx) — the webview must stay transparent so it shows. */
+    /* The webview must stay transparent so the DWM Acrylic blur + tint show
+       through. */
     --glass-tint: transparent;
     --glass-blur: none;
-    /* Frost tunables — blur radius + tint strength (higher tint = more
-       frosted / less see-through). */
-    --frost-blur: 28px;
-    --frost-tint: color-mix(in oklab, var(--bg-app) 50%, transparent);
 }
-/* Frost backdrop layers — blurred wallpaper + tint, both behind the app
-   content (z-index -1) and clipped to #root's rounded corners. Pure webview
-   rendering: no DWM / native window manipulation, so rounded corners, focus,
-   and the borderless frame behave exactly like every other shape. */
-[data-frost="frost"] .frost-backdrop {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background-size: cover;
-    background-position: center;
-    filter: blur(var(--frost-blur)) saturate(150%) brightness(1.05);
-    transform: scale(1.15); /* hide blur edge bleed */
-}
-[data-frost="frost"] .frost-tint {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: var(--frost-tint);
-}
-/* Frost — Apple Liquid-Glass: a 1px specular inset along the top edge
-   completes the Apple "top catches light" signature. */
-[data-frost="frost"] #root {
+/* Frost removes the CSS rounded clip — but ONLY on Windows, where the window
+   goes OPAQUE during Frost and DWM rounds the corners via DWMWCP_ROUND (the
+   DWM layer owns the backdrop). Keeping the clip-path there would double-round
+   against DWM. On Linux the window stays transparent + CSS-clip-rounded, so
+   the `html.is-windows` gate is what keeps Linux corners intact. macOS already
+   drops the clip natively (html.is-macos #root). */
+html.is-windows[data-frost="frost"] #root {
+    clip-path: none;
+    border-radius: 0;
+    /* Apple Liquid-Glass: a 1px specular inset along the top edge completes
+       the Apple "top catches light" signature over the native frosted layer. */
     box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
 }
 

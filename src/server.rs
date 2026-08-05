@@ -53,106 +53,106 @@ fn show_main_window(app: tauri::AppHandle) {
     }
 }
 
-/// Windows: resolve the current desktop wallpaper file so the Frost shape can
-/// blur it in-page. CSS backdrop-filter cannot sample the OS desktop through a
-/// transparent WebView2 window, and native Acrylic fought rounded corners +
-/// focus state (square corner layer + default frame reappearing), so the Frost
-/// backdrop is rendered as a blurred copy of the wallpaper image instead.
-/// Returns None on non-Windows or when the wallpaper can't be resolved (Frost
-/// then just looks like plain transparent Glass).
+/// Windows: apply (on=true) or clear (off=false) the native Acrylic frosted
+/// backdrop so the desktop behind the window is genuinely Gaussian-blurred
+/// into diffuse colour — real transparency, not a blurred wallpaper image.
+/// CSS backdrop-filter cannot sample the OS desktop through a transparent
+/// WebView2 window, so the blur comes from the DWM composition layer.
+///
+/// While Frost is on the window is made OPAQUE (WS_EX_LAYERED removed) and
+/// rounded via DWMWCP_ROUND — the standard Win11 Acrylic-window path (Windows
+/// Terminal, Files, etc.). Rounding via DWM, NOT SetWindowRgn: a window region
+/// can't clip the Acrylic layer (square corners) and resets the frameless
+/// borderless state on focus (default frame reappearing). The webview stays
+/// transparent so the Acrylic shows through; the app's rounded corners come
+/// from DWM instead of the CSS clip-path while Frost is active.
 #[tauri::command]
-fn get_wallpaper_path() -> Option<String> {
+fn set_frosted_backdrop(app: tauri::AppHandle, on: bool) {
     #[cfg(target_os = "windows")]
     {
-        use windows::core::w;
-        use windows::Win32::Foundation::WIN32_ERROR;
-        use windows::Win32::System::Registry::{
-            RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ, RRF_RT_REG_EXPAND_SZ,
+        use tauri::Manager;
+        use windows::Win32::Foundation::{BOOL, FALSE, HWND, TRUE};
+        use windows::Win32::Graphics::Dwm::{
+            DWM_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW, DwmSetWindowAttribute,
+            DWMWA_COLOR_DEFAULT, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_WINDOW_CORNER_PREFERENCE,
+            DWMWCP_DONOTROUND, DWMWCP_ROUND, DWMWINDOWATTRIBUTE,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_LAYERED,
         };
 
-        // Phase 1: query byte size of the WallPaper value (REG_SZ).
-        let mut len: u32 = 0;
-        let r: WIN32_ERROR = unsafe {
-            RegGetValueW(
-                HKEY_CURRENT_USER,
-                w!("Control Panel\\Desktop"),
-                w!("WallPaper"),
-                RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ,
-                None,
-                None,
-                Some(&mut len),
-            )
-        };
-        if r.0 != 0 || len < 2 {
-            return None;
-        }
+        if let Some(w) = app.get_webview_window("main") {
+            let win = w.as_ref().window();
+            // tauri's `.hwnd()` returns its own windows-crate HWND (0.61);
+            // re-wrap into OUR windows 0.58 HWND so it unifies with the DWM /
+            // style APIs below (mirrors the setup hook).
+            let Ok(raw) = win.hwnd() else { return };
+            let hwnd = HWND(raw.0 as *mut _);
 
-        // Phase 2: query the data (len is in bytes; UTF-16LE → u16 count).
-        let count = (len as usize) / 2;
-        let mut buf = vec![0u16; count];
-        let r: WIN32_ERROR = unsafe {
-            RegGetValueW(
-                HKEY_CURRENT_USER,
-                w!("Control Panel\\Desktop"),
-                w!("WallPaper"),
-                RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ,
-                None,
-                Some(buf.as_mut_ptr() as *mut core::ffi::c_void),
-                Some(&mut len),
-            )
-        };
-        if r.0 != 0 {
-            return None;
-        }
-        let path = String::from_utf16_lossy(&buf);
-        let path = path.trim_end_matches('\0').to_string();
-        if path.is_empty() {
-            return None;
-        }
-
-        // Prefer the real image file with a known extension so the asset
-        // protocol serves a proper content type.
-        let p = std::path::Path::new(&path);
-        if p.is_file() {
-            let has_img_ext = p
-                .extension()
-                .map(|e| {
-                    ["jpg", "jpeg", "png", "bmp", "gif", "webp"]
-                        .contains(&e.to_string_lossy().to_lowercase().as_str())
-                })
-                .unwrap_or(false);
-            if has_img_ext {
-                return Some(path);
+            // Toggle the layered style so DWM owns the window backdrop.
+            unsafe {
+                let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+                let new_ex = if on { ex & !WS_EX_LAYERED.0 } else { ex | WS_EX_LAYERED.0 };
+                let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex as isize);
             }
-            // Extensionless (e.g. old-style .bmp swaps) → mirror to a temp .jpg.
-            return copy_wallpaper_to_temp_jpg(p);
-        }
 
-        // Fallback: the transcoded copy Windows always keeps (a JPEG with no
-        // extension), mirrored to a temp .jpg so the asset protocol serves it.
-        if let Some(appdata) = std::env::var_os("APPDATA") {
-            let tp = std::path::Path::new(&appdata)
-                .join("Microsoft")
-                .join("Windows")
-                .join("Themes")
-                .join("TranscodedWallpaper");
-            if tp.is_file() {
-                return copy_wallpaper_to_temp_jpg(&tp);
+            if on {
+                // Native acrylic (DWMSBT_TRANSIENTWINDOW). window-vibrancy's
+                // apply_acrylic IGNORES its tint on Win11 22H2+ (only the legacy
+                // fallback uses it), leaving the default LIGHT acrylic → the
+                // "泛白" wash. Drive DWM directly instead:
+                //  - immersive dark mode (attr 20) pushes the acrylic to the
+                //    dark palette;
+                //  - DWMWA_COLOR (attr 35) pins an explicit dark backdrop
+                //    (#1a1917-ish);
+                //  - DWMWCP_ROUND keeps the corners rounded.
+                let backdrop = DWMSBT_TRANSIENTWINDOW;
+                let dark: BOOL = TRUE;
+                let colorref: u32 = 0x0017191A; // 0x00BBGGRR ≈ #1a1917
+                let pref: i32 = DWMWCP_ROUND.0;
+                unsafe {
+                    let _ = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop as *const _ as *const core::ffi::c_void, 4);
+                    let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(20), &dark as *const _ as *const core::ffi::c_void, 4);
+                    let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(35), &colorref as *const _ as *const core::ffi::c_void, 4);
+                    let _ = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &pref as *const _ as *const core::ffi::c_void, 4);
+                }
+            } else {
+                let backdrop = DWM_SYSTEMBACKDROP_TYPE(0); // DWMSBT_DISABLE
+                let dark: BOOL = FALSE;
+                let pref: i32 = DWMWCP_DONOTROUND.0;
+                unsafe {
+                    let _ = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop as *const _ as *const core::ffi::c_void, 4);
+                    let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(20), &dark as *const _ as *const core::ffi::c_void, 4);
+                    let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(35), &DWMWA_COLOR_DEFAULT as *const _ as *const core::ffi::c_void, 4);
+                    let _ = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &pref as *const _ as *const core::ffi::c_void, 4);
+                }
             }
         }
-        None
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     {
-        None
+        use tauri::Manager;
+        use window_vibrancy::{
+            apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
+        };
+        if let Some(w) = app.get_webview_window("main") {
+            if on {
+                // Dark system-level vibrancy (HUD material) — macOS frosted
+                // glass, like Finder/Control Center. Unlike Windows acrylic,
+                // the blur radius is macOS-controllable.
+                let _ = apply_vibrancy(
+                    &w,
+                    NSVisualEffectMaterial::HudWindow,
+                    Some(NSVisualEffectState::FollowsWindowActiveState),
+                    Some(20.0),
+                );
+            } else {
+                let _ = clear_vibrancy(&w);
+            }
+        }
     }
-}
-
-#[cfg(target_os = "windows")]
-fn copy_wallpaper_to_temp_jpg(src: &std::path::Path) -> Option<String> {
-    let dst = std::env::temp_dir().join("coffee-frost-wallpaper.jpg");
-    let _ = std::fs::copy(src, &dst);
-    dst.is_file().then(|| dst.to_string_lossy().into_owned())
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let _ = on; // Linux: no native blur — transparent-glass fallback
 }
 
 #[tauri::command]
@@ -3867,7 +3867,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             window_maximize,
             window_close,
             show_main_window,
-            get_wallpaper_path,
+            set_frosted_backdrop,
             tier_terminal_start,
             tier_terminal_input,
             tier_terminal_raw_write,

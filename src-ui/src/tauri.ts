@@ -118,13 +118,6 @@ export const commands = {
   windowMaximize: () => invoke<void>('window_maximize'),
   windowClose: () => invoke<void>('window_close'),
 
-  /** Windows-only: current desktop wallpaper file path, so the Frost shape can
-   *  render it blurred in-page (CSS backdrop-filter can't sample the OS desktop
-   *  through a transparent WebView2 window; native Acrylic broke corners +
-   *  focus, so we blur the wallpaper image instead). null when unavailable. */
-  getWallpaperPath: () =>
-    invoke<string | null>('get_wallpaper_path'),
-
   // Tier Terminal API
   tierTerminalStart: (sessionId: string, tool: string | null, cols: number, rows: number, themeMode: string, locale?: string, toolData?: string, cwd?: string, resumeToken?: string, shell?: string) =>
     invoke<void>('tier_terminal_start', { sessionId, tool, toolData: toolData ?? null, cols, rows, themeMode, locale: locale ?? null, cwd: cwd ?? null, resumeToken: resumeToken ?? null, shell: shell ?? null }),

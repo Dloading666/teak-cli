@@ -688,6 +688,7 @@ dependencies = [
  "ttf-parser",
  "ureq",
  "uuid",
+ "window-vibrancy",
  "windows 0.58.0",
 ]
 
