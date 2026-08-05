@@ -1795,6 +1795,42 @@ html.is-windows[data-frost="frost"] #root {
     background: rgba(255, 255, 255, 0.06);
 }
 
+/* Left-panel controls in the transparent shapes — workspace dir button +
+   history search box + the directory-filter dropdown trigger next to the
+   search box. The nuclear layer-strip rule only targets div/section
+   descendants; inputs/buttons keep their own `--bg-card`/`--border` fills,
+   which read as pure-white in light themes. Same faint-glass slot treatment
+   as .tool-config-input. (Frost normalizes to data-shape="glass", so the
+   family covers all four shapes.) */
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .workspace-dir-btn,
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .agent-session-search,
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .history-tool-filter-trigger {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+}
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .workspace-dir-btn:hover,
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .history-tool-filter-trigger:hover,
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .agent-session-search:focus {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+/* Light themes: the white wash above is invisible against the near-white
+   glass backdrop (light `--bg-card` is #ffffff), so the controls stayed
+   pure-white. Swap to a genuinely translucent version of the theme card
+   colour so the frosted backdrop shows through — "符合半透明主题". */
+[data-theme="light"]:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .workspace-dir-btn,
+[data-theme="light"]:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .agent-session-search,
+[data-theme="light"]:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .history-tool-filter-trigger {
+    background: color-mix(in oklab, var(--bg-card) 65%, transparent);
+    border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+}
+[data-theme="light"]:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .workspace-dir-btn:hover,
+[data-theme="light"]:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .history-tool-filter-trigger:hover,
+[data-theme="light"]:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .agent-session-search:focus {
+    background: color-mix(in oklab, var(--bg-card) 72%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+}
+
 /* Modal scrim under the SSH/WS form + tool-config modal — kill it
    entirely in Glass. The original 40-50%-black + blur was tuned
    for opaque themes; stacked on a panel/app shell that already
