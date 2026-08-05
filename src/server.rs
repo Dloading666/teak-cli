@@ -53,6 +53,108 @@ fn show_main_window(app: tauri::AppHandle) {
     }
 }
 
+/// Windows: resolve the current desktop wallpaper file so the Frost shape can
+/// blur it in-page. CSS backdrop-filter cannot sample the OS desktop through a
+/// transparent WebView2 window, and native Acrylic fought rounded corners +
+/// focus state (square corner layer + default frame reappearing), so the Frost
+/// backdrop is rendered as a blurred copy of the wallpaper image instead.
+/// Returns None on non-Windows or when the wallpaper can't be resolved (Frost
+/// then just looks like plain transparent Glass).
+#[tauri::command]
+fn get_wallpaper_path() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::core::w;
+        use windows::Win32::Foundation::WIN32_ERROR;
+        use windows::Win32::System::Registry::{
+            RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ, RRF_RT_REG_EXPAND_SZ,
+        };
+
+        // Phase 1: query byte size of the WallPaper value (REG_SZ).
+        let mut len: u32 = 0;
+        let r: WIN32_ERROR = unsafe {
+            RegGetValueW(
+                HKEY_CURRENT_USER,
+                w!("Control Panel\\Desktop"),
+                w!("WallPaper"),
+                RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ,
+                None,
+                None,
+                Some(&mut len),
+            )
+        };
+        if r.0 != 0 || len < 2 {
+            return None;
+        }
+
+        // Phase 2: query the data (len is in bytes; UTF-16LE → u16 count).
+        let count = (len as usize) / 2;
+        let mut buf = vec![0u16; count];
+        let r: WIN32_ERROR = unsafe {
+            RegGetValueW(
+                HKEY_CURRENT_USER,
+                w!("Control Panel\\Desktop"),
+                w!("WallPaper"),
+                RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ,
+                None,
+                Some(buf.as_mut_ptr() as *mut core::ffi::c_void),
+                Some(&mut len),
+            )
+        };
+        if r.0 != 0 {
+            return None;
+        }
+        let path = String::from_utf16_lossy(&buf);
+        let path = path.trim_end_matches('\0').to_string();
+        if path.is_empty() {
+            return None;
+        }
+
+        // Prefer the real image file with a known extension so the asset
+        // protocol serves a proper content type.
+        let p = std::path::Path::new(&path);
+        if p.is_file() {
+            let has_img_ext = p
+                .extension()
+                .map(|e| {
+                    ["jpg", "jpeg", "png", "bmp", "gif", "webp"]
+                        .contains(&e.to_string_lossy().to_lowercase().as_str())
+                })
+                .unwrap_or(false);
+            if has_img_ext {
+                return Some(path);
+            }
+            // Extensionless (e.g. old-style .bmp swaps) → mirror to a temp .jpg.
+            return copy_wallpaper_to_temp_jpg(p);
+        }
+
+        // Fallback: the transcoded copy Windows always keeps (a JPEG with no
+        // extension), mirrored to a temp .jpg so the asset protocol serves it.
+        if let Some(appdata) = std::env::var_os("APPDATA") {
+            let tp = std::path::Path::new(&appdata)
+                .join("Microsoft")
+                .join("Windows")
+                .join("Themes")
+                .join("TranscodedWallpaper");
+            if tp.is_file() {
+                return copy_wallpaper_to_temp_jpg(&tp);
+            }
+        }
+        None
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn copy_wallpaper_to_temp_jpg(src: &std::path::Path) -> Option<String> {
+    let dst = std::env::temp_dir().join("coffee-frost-wallpaper.jpg");
+    let _ = std::fs::copy(src, &dst);
+    dst.is_file().then(|| dst.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 async fn pick_folder(app: tauri::AppHandle) -> Result<String, String> {
     let folder = app
@@ -3765,6 +3867,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             window_maximize,
             window_close,
             show_main_window,
+            get_wallpaper_path,
             tier_terminal_start,
             tier_terminal_input,
             tier_terminal_raw_write,

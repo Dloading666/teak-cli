@@ -1517,8 +1517,10 @@ body.gambit-docked .multi-agent-grid-standalone {
 
 [data-shape="glass"] #root {
     background: var(--glass-tint);
-    backdrop-filter: blur(24px) saturate(160%);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    /* Strength comes from --glass-blur so the [data-frost=...] variants
+       can re-tune the frosted backdrop without touching this rule. */
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
 }
 
 /* Glass hierarchy — ONE unified glass surface for the whole app.
@@ -1542,6 +1544,54 @@ body.gambit-docked .multi-agent-grid-standalone {
        reads cleanly. Push higher (65-75%) for near-opaque, drop
        back toward 30-40% for "barely there" overlay. */
     --glass-tint: color-mix(in oklab, var(--bg-app) 55%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════
+   FROST SHAPE — glass chrome, blurred-wallpaper backdrop
+   Frost reuses the ENTIRE glass treatment (tabs, cards,
+   nuclear layer-strip, everything) because App.tsx + index.html
+   normalize it to data-shape="glass" + data-frost="frost".
+   The actual frosting is rendered IN-PAGE by FrostBackdrop.tsx:
+   a blurred copy of the desktop wallpaper + a tint overlay,
+   both z-index:-1 behind the app content. CSS backdrop-filter
+   can't sample the OS desktop through a transparent WebView2
+   window, and native Acrylic broke rounded corners + focus, so
+   the webview stays transparent here and the wallpaper layer
+   shows through. --frost-blur / --frost-tint tune it.
+   ═══════════════════════════════════════════════════════ */
+[data-frost="frost"] {
+    /* The Frost backdrop is the blurred desktop wallpaper rendered in-page
+       (FrostBackdrop.tsx) — the webview must stay transparent so it shows. */
+    --glass-tint: transparent;
+    --glass-blur: none;
+    /* Frost tunables — blur radius + tint strength (higher tint = more
+       frosted / less see-through). */
+    --frost-blur: 28px;
+    --frost-tint: color-mix(in oklab, var(--bg-app) 50%, transparent);
+}
+/* Frost backdrop layers — blurred wallpaper + tint, both behind the app
+   content (z-index -1) and clipped to #root's rounded corners. Pure webview
+   rendering: no DWM / native window manipulation, so rounded corners, focus,
+   and the borderless frame behave exactly like every other shape. */
+[data-frost="frost"] .frost-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-size: cover;
+    background-position: center;
+    filter: blur(var(--frost-blur)) saturate(150%) brightness(1.05);
+    transform: scale(1.15); /* hide blur edge bleed */
+}
+[data-frost="frost"] .frost-tint {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--frost-tint);
+}
+/* Frost — Apple Liquid-Glass: a 1px specular inset along the top edge
+   completes the Apple "top catches light" signature. */
+[data-frost="frost"] #root {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
 }
 
 /* Tier 1 deleted — body alone carries the tint. Titlebar / 3

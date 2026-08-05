@@ -27,6 +27,12 @@
         try { theme = localStorage.getItem('cc-theme') || 'obsidian'; } catch(e) {}
         try { shape = localStorage.getItem('cc-shape') || 'panel'; } catch(e) {}
         document.documentElement.setAttribute('data-theme', theme);
+        // Frost renders as glass chrome + a data-frost backdrop variant
+        // (mirrors App.tsx's shape effect) — pre-paint so no first-render flash.
+        if (shape === 'frost') {
+          document.documentElement.setAttribute('data-frost', shape);
+          shape = 'glass';
+        }
         document.documentElement.setAttribute('data-shape', shape);
       })();
     </script>

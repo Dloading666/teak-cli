@@ -6,7 +6,9 @@ import { retryInvoke } from './tauri';
 import { initNotifySound } from './lib/notify-sound';
 import { routeFileDrop } from './lib/file-drop';
 import { initHistoryAutoRefresh } from './lib/history-cache';
+import { isFrostShape } from './lib/personalization';
 import { TitleBar } from './components/common/TitleBar';
+import { FrostBackdrop } from './components/common/FrostBackdrop';
 import { ResizeEdges } from './components/common/ResizeEdges';
 import { SettingsModal } from './components/common/SettingsModal';
 import { Explorer } from './components/left/Explorer';
@@ -110,7 +112,17 @@ export function App() {
   }, [state.currentTheme]);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-shape', state.currentShape);
+    // Frost shapes reuse the whole glass chrome; normalize data-shape to
+    // "glass" and expose the variant via data-frost (see [data-frost=...]
+    // in global.css). Must mirror the inline script in index.html.
+    const el = document.documentElement;
+    if (isFrostShape(state.currentShape)) {
+      el.setAttribute('data-shape', 'glass');
+      el.setAttribute('data-frost', state.currentShape);
+    } else {
+      el.setAttribute('data-shape', state.currentShape);
+      el.removeAttribute('data-frost');
+    }
     try { localStorage.setItem('cc-shape', state.currentShape); } catch {}
   }, [state.currentShape]);
 
@@ -217,6 +229,11 @@ export function App() {
 
   return (
     <>
+      {/* Frost shape's blurred-wallpaper backdrop — first child so it stacks
+          behind the panels (z-index -1, see [data-frost] CSS). Renders nothing
+          unless the Frost shape is active. */}
+      <FrostBackdrop />
+
       {/* Custom titlebar — drag region + minimize / maximize / close */}
       <TitleBar />
 

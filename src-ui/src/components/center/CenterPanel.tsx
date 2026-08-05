@@ -9,6 +9,7 @@ import { ContributionHeatmap } from './ContributionHeatmap';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { DiffPanel } from '../right/DiffPanel';
 import { supportsNativeAgentStatus, useAppState, type ToolType } from '../../store/app-state';
+import { isFrostShape } from '../../lib/personalization';
 
 // Dropdown shown when a tool card's folder icon is clicked: the globally
 // recent project folders (any tool that used one) + "Open folder…" last.
@@ -1200,7 +1201,7 @@ export function CenterPanel() {
   // replaced by the shape texture in those [data-shape] overrides). Without
   // this, the xterm canvas renders its solid `bgOpaque` and covers the
   // backdrop exactly where it matters most — the largest surface.
-  const isBackdropShape = state.currentShape === 'glass' || state.currentShape === 'carbon' || state.currentShape === 'monogram';
+  const isBackdropShape = state.currentShape === 'glass' || isFrostShape(state.currentShape) || state.currentShape === 'carbon' || state.currentShape === 'monogram';
   const hasBg = (bgType !== 'none' && bgPath !== '') || isBackdropShape;
 
   // Convert wallpaper path to a displayable URL. User-picked local

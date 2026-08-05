@@ -31,15 +31,29 @@ export const THEME_COLORS: { code: ThemeColor; labelKey: string; swatch: string;
 ];
 
 // ─── Theme shapes (corner/surface treatment) ─────────────────────────────────
+// Frost shares Glass's full chrome; only the frosted backdrop differs (a
+// blurred copy of the desktop wallpaper rendered in-page — FrostBackdrop.tsx).
+// App.tsx normalizes it to data-shape="glass" + data-frost="frost" so every
+// [data-shape="glass"] rule applies unchanged.
 export const THEME_SHAPES: { code: ThemeShape; label: string }[] = [
   { code: 'soft',   label: 'Soft'   },
   { code: 'slab',   label: 'Slab'   },
   { code: 'sharp',  label: 'Sharp'  },
   { code: 'glass',  label: 'Glass'  },
+  { code: 'frost',  label: 'Frost'  },
   { code: 'panel',  label: 'Panel'  },
   { code: 'carbon', label: 'Carbon' },
   { code: 'monogram', label: 'Monogram' },
 ];
+
+// Frost reuses the entire glass chrome treatment; only the frosted backdrop
+// differs. App.tsx + the index.html pre-paint script normalize it to
+// data-shape="glass" + data-frost="frost", and CenterPanel treats it like glass
+// for the terminal-as-transparent rule.
+const FROST_SHAPES: ThemeShape[] = ['frost'];
+export function isFrostShape(shape: ThemeShape): boolean {
+  return FROST_SHAPES.includes(shape);
+}
 
 // ─── Task board form (to-do list vs sticky notes) ────────────────────────────
 // Two presentations of the same task data, chosen in the settings "Tasks"
