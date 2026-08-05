@@ -1,34 +1,39 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-- 🔕 **修复完成音重复播放**:Claude Code 完成任务后只会响一次完成音,不会在上下文压缩/回到空闲状态后隔几秒再响第二次。
+- ✨ **新增 Frost 毛玻璃形态**:桌面壁纸高斯模糊成隐约色彩,圆角与其他形态统一,聚焦/失焦都稳定。
+- 🎨 **Gambit 停靠面板无边框化**:Slab / Carbon / Monogram 形态下,Gambit 输入框停靠后不再显示高亮边框。
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-- 🔕 **修復完成音重複播放**:Claude Code 完成任務後只會響一次完成音,不會在上下文壓縮/回到閒置狀態後隔幾秒再響第二次。
+- ✨ **新增 Frost 毛玻璃形態**:桌面桌布高斯模糊成隱約色彩,圓角與其他形態統一,聚焦/失焦都穩定。
+- 🎨 **Gambit 停靠面板無邊框化**:Slab / Carbon / Monogram 形態下,Gambit 輸入框停靠後不再顯示高亮邊框。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-- 🔕 **Fixed duplicate done chimes**: Claude Code now plays the completion sound only once when a task finishes, instead of playing a second chime a few seconds later after context compaction returns the session to idle.
+- ✨ **New Frost frosted-glass shape**: The desktop wallpaper blurs into diffuse colour behind a unified rounded window, stable on focus/blur.
+- 🎨 **Borderless docked Gambit panel**: On Slab / Carbon / Monogram shapes, the docked Gambit input no longer shows a highlight border.
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-- 🔕 **完了音が重複して鳴る問題を修正**:Claude Code のタスク完了時に完了音が 1 回だけ鳴るようになりました。コンテキスト圧縮後にアイドルへ戻るタイミングで、数秒後に 2 回目の音が鳴ることはありません。
+- ✨ **Frost すりガラス形状を追加**:デスクトップの壁紙をガウシアンぼかしにして淡い色合いに。角丸は他の形状と統一され、フォーカス前後で安定。
+- 🎨 **Gambit ドッキングパネルの枠線を撤廃**:Slab / Carbon / Monogram 形状で、ドッキングした Gambit 入力欄のハイライト枠が表示されなくなります。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-- 🔕 **완료음이 중복 재생되던 문제 수정**:Claude Code 작업이 끝났을 때 완료음이 한 번만 재생됩니다. 컨텍스트 압축 후 유휴 상태로 돌아가면서 몇 초 뒤 두 번째 완료음이 울리지 않습니다.
+- ✨ **Frost 프로스트 글라스 형태 추가**:바탕화면 배경을 가우시안 블러로 흐리게 만들어 은은한 색감으로 표현. 모서리 라운드는 다른 형태와 통일되고 포커스 전후 모두 안정적.
+- 🎨 **Gambit 도킹 패널 테두리 제거**:Slab / Carbon / Monogram 형태에서 도킹된 Gambit 입력창의 하이라이트 테두리가 더 이상 표시되지 않습니다.
 
 </details>
