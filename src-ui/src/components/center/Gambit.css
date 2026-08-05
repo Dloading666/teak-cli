@@ -9,13 +9,17 @@
     box-shadow: 0 0 0 1px var(--border);
 }
 
-/* Soft + Sharp: same theme-uniform 1px ring as Panel. The default
-   multi-layer drop shadow read as a halo against busy desktops in
-   these two minimalist shapes. Slab keeps its 3D inset edges + glow
-   (deliberate physical-slab aesthetic), Glass has its own treatment
-   in global.css. */
+/* Soft + Sharp + Slab + Carbon + Monogram: same theme-uniform 1px
+   ring as Panel. The default multi-layer drop shadow reads as a halo,
+   and Slab's inset 3D edges read as a cheap glowing outline, against
+   these shapes' minimalist/matte/hex backgrounds — switch them all to
+   the single 1px var(--border) ring (effectively borderless against
+   the panel fill). Glass has its own treatment in global.css. */
 [data-shape="soft"] .gambit,
-[data-shape="sharp"] .gambit {
+[data-shape="sharp"] .gambit,
+[data-shape="slab"] .gambit,
+[data-shape="carbon"] .gambit,
+[data-shape="monogram"] .gambit {
     box-shadow: 0 0 0 1px var(--border);
 }
 
@@ -79,14 +83,6 @@
 }
 
 /* ─── Shape overlays (mirror .task-card / .panel-* styling) ─── */
-
-/* Slab: inset 3D light edges like a physical stone slab */
-[data-shape="slab"] .gambit {
-    box-shadow:
-        inset 1px 1px 0 0 var(--shape-edge-light-top),
-        inset -1px -1px 0 0 var(--shape-edge-light-bottom),
-        var(--gambit-shadow);
-}
 
 /* Sharp: identity is 0-radius corners. No extra trim — the natural
    4-layer falloff defined on .gambit already reads correctly here. */
