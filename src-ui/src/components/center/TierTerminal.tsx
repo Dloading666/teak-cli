@@ -863,11 +863,31 @@ function TierTerminalImpl({
 
     // Forward keyboard input to Rust PTY backend.
     //
+    // Strip right-button mouse press/release before the PTY ever sees them.
+    // Coffee CLI owns right-click itself (custom context menu: Copy / Paste /
+    // Select All), but xterm still forwards the button events to the PTY
+    // whenever the TUI has mouse reporting on. Claude Code ≥v2.1.143 acts on
+    // that right-click by pasting the clipboard ITSELF — so the user got one
+    // paste from the TUI plus a second from our menu item (upstream:
+    // anthropics/claude-code#61035). Other tools (Kimi/Codex/OpenCode) don't
+    // bind right-click, which is why only Claude Code duplicated. Dropping
+    // the events here leaves our menu as the single right-click paste path.
+    // SGR encoding only (`\x1b[<b;x;yM` press / `\x1b[<b;x;ym` release);
+    // motion (bit 5) and wheel (bit 6) events are left untouched.
+    const stripRightClickMouse = (data: string): string => {
+      if (!data.includes('\x1b[<')) return data;
+      return data.replace(/\x1b\[<(\d+);\d+;\d+[Mm]/g, (seq, b) => {
+        const btn = Number(b);
+        return (btn & 3) === 2 && !(btn & 96) ? '' : seq;
+      });
+    };
     // Single entry point for user-typed data on its way to the PTY. term.onData
     // covers xterm's own key handling; the macOS IME symbol-passthrough input
     // listener below calls the same function for IME-committed text that
     // xterm drops (issue #107, WKWebView commit-first ordering).
-    const forwardInput = (data: string) => {
+    const forwardInput = (rawData: string) => {
+      const data = stripRightClickMouse(rawData);
+      if (!data) return;
       if (data.includes('\r') || data.includes('\n')) {
         markNotifySoundPromptSubmitted(sessionId, tool);
       }
