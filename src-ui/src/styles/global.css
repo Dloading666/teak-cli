@@ -1754,6 +1754,17 @@ html.is-windows[data-frost="frost"] #root {
         inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
         0 12px 40px rgba(0, 0, 0, 0.40);
 }
+/* The directory-filter dropdown floats over the text-dense session list, so
+   the shared 6%-white wash above is too transparent — the card text behind
+   bleeds through and reads as "below text on top of the menu" (reported on
+   glass/frost; carbon/monogram were fine because they already swap in a
+   smoked theme fill). Give it the same smoked fill, kept on the glass tier
+   with its frosted blur. Frost normalizes to data-shape="glass", so this
+   covers frost too. */
+[data-shape="glass"] .history-tool-filter-menu {
+    background: color-mix(in oklab, var(--bg-app) 76%, transparent);
+    background-image: none;
+}
 
 /* Per-tool config modal (gear icon on each card in the full
    tools list) — same heavier wash as .remote-form-card: it's
