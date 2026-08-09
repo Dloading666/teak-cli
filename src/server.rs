@@ -67,14 +67,14 @@ fn show_main_window(app: tauri::AppHandle) {
 /// transparent so the Acrylic shows through; the app's rounded corners come
 /// from DWM instead of the CSS clip-path while Frost is active.
 #[tauri::command]
-fn set_frosted_backdrop(app: tauri::AppHandle, on: bool) {
+fn set_frosted_backdrop(app: tauri::AppHandle, on: bool, dark: bool) {
     #[cfg(target_os = "windows")]
     {
         use tauri::Manager;
         use windows::Win32::Foundation::{BOOL, FALSE, HWND, TRUE};
         use windows::Win32::Graphics::Dwm::{
             DWM_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW, DwmSetWindowAttribute,
-            DWMWA_COLOR_DEFAULT, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_WINDOW_CORNER_PREFERENCE,
+            DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_WINDOW_CORNER_PREFERENCE,
             DWMWCP_DONOTROUND, DWMWCP_ROUND, DWMWINDOWATTRIBUTE,
         };
         use windows::Win32::UI::WindowsAndMessaging::{
@@ -99,21 +99,17 @@ fn set_frosted_backdrop(app: tauri::AppHandle, on: bool) {
             if on {
                 // Native acrylic (DWMSBT_TRANSIENTWINDOW). window-vibrancy's
                 // apply_acrylic IGNORES its tint on Win11 22H2+ (only the legacy
-                // fallback uses it), leaving the default LIGHT acrylic → the
-                // "泛白" wash. Drive DWM directly instead:
-                //  - immersive dark mode (attr 20) pushes the acrylic to the
-                //    dark palette;
-                //  - DWMWA_COLOR (attr 35) pins an explicit dark backdrop
-                //    (#1a1917-ish);
-                //  - DWMWCP_ROUND keeps the corners rounded.
+                // fallback uses it). DWM therefore owns blur/noise only; the
+                // WebView overlays the user's selected --bg-app colour. Keep
+                // DWM's base palette in sync with that theme and let DWM own
+                // the rounded corners. Attribute 35 is DWMWA_CAPTION_COLOR,
+                // not a backdrop-tint API, so it must not be used here.
                 let backdrop = DWMSBT_TRANSIENTWINDOW;
-                let dark: BOOL = TRUE;
-                let colorref: u32 = 0x0017191A; // 0x00BBGGRR ≈ #1a1917
+                let dark_mode: BOOL = if dark { TRUE } else { FALSE };
                 let pref: i32 = DWMWCP_ROUND.0;
                 unsafe {
                     let _ = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop as *const _ as *const core::ffi::c_void, 4);
-                    let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(20), &dark as *const _ as *const core::ffi::c_void, 4);
-                    let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(35), &colorref as *const _ as *const core::ffi::c_void, 4);
+                    let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(20), &dark_mode as *const _ as *const core::ffi::c_void, 4);
                     let _ = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &pref as *const _ as *const core::ffi::c_void, 4);
                 }
             } else {
@@ -123,7 +119,6 @@ fn set_frosted_backdrop(app: tauri::AppHandle, on: bool) {
                 unsafe {
                     let _ = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop as *const _ as *const core::ffi::c_void, 4);
                     let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(20), &dark as *const _ as *const core::ffi::c_void, 4);
-                    let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(35), &DWMWA_COLOR_DEFAULT as *const _ as *const core::ffi::c_void, 4);
                     let _ = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &pref as *const _ as *const core::ffi::c_void, 4);
                 }
             }
@@ -137,12 +132,19 @@ fn set_frosted_backdrop(app: tauri::AppHandle, on: bool) {
         };
         if let Some(w) = app.get_webview_window("main") {
             if on {
-                // Dark system-level vibrancy (HUD material) — macOS frosted
-                // glass, like Finder/Control Center. Unlike Windows acrylic,
-                // the blur radius is macOS-controllable.
+                // Match vibrancy to the colour theme rather than the macOS
+                // system appearance. With the intentionally light 30% CSS
+                // tint, a mismatched native material would dominate the
+                // remaining 70% and destroy text contrast.
+                #[allow(deprecated)]
+                let material = if dark {
+                    NSVisualEffectMaterial::Dark
+                } else {
+                    NSVisualEffectMaterial::Light
+                };
                 let _ = apply_vibrancy(
                     &w,
-                    NSVisualEffectMaterial::HudWindow,
+                    material,
                     Some(NSVisualEffectState::FollowsWindowActiveState),
                     Some(20.0),
                 );
@@ -152,7 +154,7 @@ fn set_frosted_backdrop(app: tauri::AppHandle, on: bool) {
         }
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    let _ = on; // Linux: no native blur — transparent-glass fallback
+    let _ = (on, dark); // Linux: CSS backdrop-filter + selected-theme tint fallback
 }
 
 #[tauri::command]
