@@ -1,39 +1,44 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-- ✨ **Frost 原生毛玻璃升级**:Windows 上改为真实桌面模糊(Acrylic),深色磨砂质感,圆角统一;macOS 支持系统级 vibrancy 模糊。
-- 🎨 **透明形态控件半透明化**:亮色主题下,工作区目录框、会话记录搜索框、"按目录分类"下拉按钮不再纯白,统一为半透明玻璃质感。
+- 🔊 **通知音效升级**:完成提示音改用 Reasonix「Generation complete」上扬琶音,等待提示音改用「Awaiting response」下行五度,音色更清脆、更有层次。
+- 🖱️ **修复**:Claude Code 终端中右键粘贴不再触发重复粘贴。
+- 🎨 **修复**:glass / Frost 主题下,会话记录筛选下拉框背景不再发白,恢复半透明玻璃质感。
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-- ✨ **Frost 原生毛玻璃升級**:Windows 上改為真實桌面模糊(Acrylic),深色磨砂質感,圓角統一;macOS 支援系統級 vibrancy 模糊。
-- 🎨 **透明形態控制項半透明化**:亮色主題下,工作區目錄框、會話記錄搜尋框、「依目錄分類」下拉按鈕不再純白,統一為半透明玻璃質感。
+- 🔊 **通知音效升級**:完成提示音改用 Reasonix「Generation complete」上揚琶音,等待提示音改用「Awaiting response」下行五度,音色更清脆、更有層次。
+- 🖱️ **修復**:Claude Code 終端中右鍵貼上不再觸發重複貼上。
+- 🎨 **修復**:glass / Frost 主題下,會話記錄篩選下拉框背景不再發白,恢復半透明玻璃質感。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-- ✨ **Frost upgraded to native frosted glass**: Real desktop blur on Windows (Acrylic) with a dark frosted tint and unified rounded corners; macOS gains system-level vibrancy blur.
-- 🎨 **Translucent controls in transparent shapes**: In light themes, the workspace directory box, session-history search box, and the filter-by-directory dropdown no longer render pure white — unified semi-transparent glass.
+- 🔊 **Notification chimes upgraded**: Completion now uses Reasonix's "Generation complete" rising arpeggio; the awaiting prompt uses "Awaiting response" descending fifth — crisper, more layered tones.
+- 🖱️ **Fix**: Right-click paste in the Claude Code terminal no longer triggers duplicate paste.
+- 🎨 **Fix**: The session-history filter dropdown no longer shows a solid white background on glass / Frost themes — translucent glass restored.
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-- ✨ **Frost をネイティブのすりガラスに強化**:Windows では実際のデスクトップぼかし(Acrylic)で深い磨りガラス質感・角丸統一、macOS ではシステムレベルの vibrancy ぼかしに対応。
-- 🎨 **透明シェイプのコントロールを半透明化**:ライトテーマで、ワークスペースのディレクトリ欄・セッション履歴の検索欄・「ディレクトリ別」ドロップダウンが純白にならず、半透明ガラスで統一されます。
+- 🔊 **通知サウンドをアップグレード**:完了音を Reasonix「Generation complete」の上昇アルペジオに、待機音を「Awaiting response」の下降五度に変更。より澄んだ、レイヤーのある音色に。
+- 🖱️ **修正**:Claude Code ターミナルで右クリック貼り付けが重複して実行される問題を修正。
+- 🎨 **修正**:glass / Frost テーマでセッション履歴のフィルタードロップダウンの背景が真っ白にならず、半透明ガラスを復元。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-- ✨ **Frost 네이티브 프로스트 글라스로 업그레이드**:Windows에서 실제 데스크톱 블러(Acrylic)로 어두운 프로스트 질감 + 통일된 모서리 라운드, macOS에서 시스템 레벨 vibrancy 블러 지원.
-- 🎨 **투명 형태 컨트롤 반투명화**:라이트 테마에서 워크스페이스 디렉터리 박스, 세션 기록 검색창, "디렉터리별 분류" 드롭다운이 순백색으로 보이지 않고 반투명 글라스로 통일됩니다.
+- 🔊 **알림음 업그레이드**:완료음을 Reasonix "Generation complete" 상승 아르페지오로, 대기음을 "Awaiting response" 하행 5도로 변경. 더 맑고 입체적인 사운드.
+- 🖱️ **수정**:Claude Code 터미널에서 오른쪽 클릭 붙여넣기가 중복 실행되지 않도록 수정.
+- 🎨 **수정**:glass / Frost 테마에서 세션 기록 필터 드롭다운 배경이 순백색으로 표시되지 않고 반투명 글라스 복원.
 
 </details>
