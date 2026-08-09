@@ -1551,26 +1551,25 @@ body.gambit-docked .multi-agent-grid-standalone {
    Frost reuses the ENTIRE glass treatment (tabs, cards,
    nuclear layer-strip, everything) because App.tsx + index.html
    normalize it to data-shape="glass" + data-frost="frost".
-   The actual frosting is the native Windows Acrylic applied in
-   Rust (set_frosted_backdrop): real desktop blur via DWM, with
-   the window made opaque + DWMWCP_ROUND for rounded corners
-   (NOT SetWindowRgn — a region can't clip Acrylic and resets
-   the borderless frame on focus). The webview stays transparent
-   so the blur shows through; no in-page wallpaper layer.
+   The actual frosting is applied in Rust (set_frosted_backdrop):
+   DWM Acrylic on Windows, NSVisualEffectView on macOS, and KWin's
+   X11/Wayland blur-behind request on supported Linux desktops.
+   Windows makes the host window opaque + DWMWCP_ROUND for rounded
+   corners (NOT SetWindowRgn — a region can't clip Acrylic and
+   resets the borderless frame on focus). The webview content stays
+   transparent so compositor blur shows through; no wallpaper copy.
    ═══════════════════════════════════════════════════════ */
 [data-frost="frost"] {
     /* DWM supplies only the real desktop blur/noise. Colour belongs to the
        user's selected theme: --bg-app is the base swatch behind every colour
        option in Settings. Keep enough alpha for the blurred desktop to read
        through, but make the selected colour dominant instead of inheriting
-       Desktop Acrylic's built-in bright/white wash. Linux has no native
-       backdrop path, so it keeps a CSS blur fallback; Windows/macOS disable
-       that below because their OS compositor already supplies the blur. */
+       Desktop Acrylic's built-in bright/white wash. On Linux, KWin can supply
+       the same live compositor blur through its X11/Wayland blur request.
+       Other compositors retain honest translucency; CSS backdrop-filter
+       cannot sample desktop pixels outside WebKit and must not masquerade as
+       a native backdrop by blurring an in-app wallpaper. */
     --glass-tint: color-mix(in oklab, var(--bg-app) 30%, transparent);
-    --glass-blur: blur(24px) saturate(140%);
-}
-html.is-windows[data-frost="frost"],
-html.is-macos[data-frost="frost"] {
     --glass-blur: none;
 }
 /* Frost removes the CSS rounded clip — but ONLY on Windows, where the window

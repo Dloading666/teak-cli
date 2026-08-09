@@ -129,3 +129,17 @@ window-vibrancy = "0.6"
 # `libc::kill(pid, 0)` for process-liveness probe in cli::mcp_status.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+# Linux has no cross-desktop blur-behind API.  Request real compositor blur
+# where the compositor exposes KDE's established protocol/property:
+#   - KWin Wayland: org_kde_kwin_blur_manager
+#   - KWin/X11 (also understood by some other compositors):
+#     _KDE_NET_WM_BLUR_BEHIND_REGION
+# Other compositors keep the same genuinely transparent, theme-tinted window
+# without pretending that an in-page wallpaper is the desktop.
+[target.'cfg(target_os = "linux")'.dependencies]
+raw-window-handle = "0.6"
+wayland-backend = { version = "0.3", features = ["client_system", "dlopen"] }
+wayland-client = { version = "0.31", features = ["system", "dlopen"] }
+wayland-scanner = "0.31"
+x11-dl = "2.21"

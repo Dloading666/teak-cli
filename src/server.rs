@@ -53,16 +53,16 @@ fn show_main_window(app: tauri::AppHandle) {
     }
 }
 
-/// Windows: apply (on=true) or clear (off=false) the native Acrylic frosted
-/// backdrop so the desktop behind the window is genuinely Gaussian-blurred
-/// into diffuse colour — real transparency, not a blurred wallpaper image.
-/// CSS backdrop-filter cannot sample the OS desktop through a transparent
-/// WebView2 window, so the blur comes from the DWM composition layer.
+/// Apply (on=true) or clear (off=false) a native frosted backdrop so the
+/// desktop behind the window is genuinely blurred — real transparency, not a
+/// blurred wallpaper image. CSS backdrop-filter cannot sample pixels outside
+/// a webview, so Windows uses DWM Acrylic, macOS uses NSVisualEffectView, and
+/// Linux asks KWin through its X11/Wayland blur-behind interfaces.
 ///
-/// While Frost is on the window is made OPAQUE (WS_EX_LAYERED removed) and
-/// rounded via DWMWCP_ROUND — the standard Win11 Acrylic-window path (Windows
-/// Terminal, Files, etc.). Rounding via DWM, NOT SetWindowRgn: a window region
-/// can't clip the Acrylic layer (square corners) and resets the frameless
+/// On Windows, while Frost is on the window is made OPAQUE (WS_EX_LAYERED
+/// removed) and rounded via DWMWCP_ROUND — the standard Win11 Acrylic-window
+/// path (Windows Terminal, Files, etc.). Rounding via DWM, NOT SetWindowRgn:
+/// a window region can't clip the Acrylic layer (square corners) and resets the frameless
 /// borderless state on focus (default frame reappearing). The webview stays
 /// transparent so the Acrylic shows through; the app's rounded corners come
 /// from DWM instead of the CSS clip-path while Frost is active.
@@ -153,8 +153,20 @@ fn set_frosted_backdrop(app: tauri::AppHandle, on: bool, dark: bool) {
             }
         }
     }
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    let _ = (on, dark); // Linux: CSS backdrop-filter + selected-theme tint fallback
+    #[cfg(target_os = "linux")]
+    {
+        use tauri::Manager;
+        if let Some(w) = app.get_webview_window("main") {
+            // KWin performs real, live compositor blur on both X11 and
+            // Wayland. Other Linux compositors simply keep Tauri's genuine
+            // transparent surface plus the selected-theme tint; there is no
+            // cross-desktop blur API and no wallpaper/screenshot fakery.
+            let _ = crate::linux_blur::set_blur(&w, on);
+        }
+        let _ = dark;
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    let _ = (app, on, dark);
 }
 
 #[tauri::command]

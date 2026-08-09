@@ -125,9 +125,10 @@ export function App() {
     }
     try { localStorage.setItem('cc-shape', state.currentShape); } catch {}
 
-    // Frost = native Windows Acrylic (real desktop blur) under a CSS tint from
-    // the selected theme. DWM's light/dark base follows the theme as well;
-    // non-Tauri dev builds and non-Windows skip it inside Rust.
+    // Frost = OS/compositor blur under a CSS tint from the selected theme.
+    // Windows uses DWM Acrylic, macOS NSVisualEffectView, and Linux requests
+    // KWin's native X11/Wayland blur when available. Other Linux compositors
+    // keep genuine translucency without substituting an in-app wallpaper.
     const inv = retryInvoke();
     if (inv) {
       inv('set_frosted_backdrop', {

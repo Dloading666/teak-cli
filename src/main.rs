@@ -10,6 +10,8 @@ mod tool_config;
 mod tools;
 mod git;
 mod shell_probe;
+#[cfg(target_os = "linux")]
+mod linux_blur;
 #[cfg(target_os = "windows")]
 mod windows_path;
 
