@@ -11,9 +11,10 @@
 // a local user-submission marker solely to exclude its startup title cycle.
 //
 // Sounds are synthesized with WebAudio — no audio assets, no WebView2
-// permission prompts. Two distinct chimes:
-//   done — rising two-note (E5 → A5), "turn finished"
-//   wait — lower double-beep (A4 ×2), "needs your input"
+// permission prompts. The two chimes are ported from DeepSeek-Reasonix's
+// synthesized sound set (https://github.com/esengine/DeepSeek-Reasonix):
+//   done — "Generation complete": rising E6 → G6 → C7 triad
+//   wait — "Awaiting response": A6 → E6 descending fifth
 //
 // User controls (Settings ▸ Sound, localStorage `cc-*` keys, both default ON):
 //   cc-sound-done  — chime when a turn completes
@@ -64,17 +65,30 @@ function audioCtx(): AudioContext | null {
   }
 }
 
-function tone(ac: AudioContext, freq: number, start: number, dur: number, peak: number) {
+/** Synth a single Reasonix-style note: a sine tone plus a quiet 4× overtone
+ *  "shimmer" for sparkle (ported from DeepSeek-Reasonix's playSynthNote). */
+function note(ac: AudioContext, freq: number, start: number, dur: number, peak: number) {
   const osc = ac.createOscillator();
   const gain = ac.createGain();
   osc.type = 'sine';
   osc.frequency.value = freq;
   gain.gain.setValueAtTime(0, start);
-  gain.gain.linearRampToValueAtTime(peak, start + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  gain.gain.linearRampToValueAtTime(peak, start + 0.002);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
   osc.connect(gain).connect(ac.destination);
   osc.start(start);
-  osc.stop(start + dur + 0.05);
+  osc.stop(start + dur);
+
+  const shimmer = ac.createOscillator();
+  const sGain = ac.createGain();
+  shimmer.type = 'sine';
+  shimmer.frequency.value = freq * 4;
+  sGain.gain.setValueAtTime(0, start);
+  sGain.gain.linearRampToValueAtTime(peak * 0.12, start + 0.002);
+  sGain.gain.exponentialRampToValueAtTime(0.001, start + dur * 0.6);
+  shimmer.connect(sGain).connect(ac.destination);
+  shimmer.start(start);
+  shimmer.stop(start + dur);
 }
 
 /** Play one of the two notification chimes. Exported so Settings can offer
@@ -84,11 +98,14 @@ export function playNotifySound(kind: NotifyKind) {
   if (!ac) return;
   const t0 = ac.currentTime + 0.01;
   if (kind === 'done') {
-    tone(ac, 659.25, t0, 0.18, 0.08);       // E5
-    tone(ac, 880.0, t0 + 0.12, 0.30, 0.08); // A5 — rising resolve
+    // Reasonix "Generation complete": rising E6 → G6 → C7 triad
+    note(ac, 1318.5, t0, 0.20, 0.12);
+    note(ac, 1568.0, t0 + 0.07, 0.22, 0.10);
+    note(ac, 2093.0, t0 + 0.14, 0.30, 0.08);
   } else {
-    tone(ac, 440.0, t0, 0.12, 0.07);        // A4
-    tone(ac, 440.0, t0 + 0.18, 0.12, 0.07); // A4 — insistent double-beep
+    // Reasonix "Awaiting response": A6 → E6 descending fifth
+    note(ac, 1760.0, t0, 0.14, 0.10);
+    note(ac, 1318.5, t0 + 0.09, 0.22, 0.08);
   }
 }
 
