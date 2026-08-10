@@ -2211,6 +2211,22 @@ fn mimocode_db(home: &std::path::Path) -> Option<std::path::PathBuf> {
     candidates.into_iter().find(|p| p.is_file())
 }
 
+/// Resolve Kilo Code's SQLite db (an OpenCode fork — identical Drizzle
+/// schema). XDG data root is `~/.local/share/kilo/kilo.db` (`app = "kilo"` in
+/// the fork's packages/core/src/global.ts; the fork also honors a `KILO_DB`
+/// env override that Coffee CLI does not read). None when absent.
+fn kilo_db(home: &std::path::Path) -> Option<std::path::PathBuf> {
+    let primary_root = crate::tools::find("kilo")
+        .and_then(|tool| {
+            tool.history_shape
+                .as_ref()
+                .map(|shape| crate::tool_config::history_path_for(tool.id, shape.join_under(home)))
+        })
+        .unwrap_or_else(|| home.join(".local").join("share").join("kilo"));
+    let db = primary_root.join("kilo.db");
+    db.is_file().then_some(db)
+}
+
 /// Read one MiMo Code session transcript. Same schema as OpenCode, so this
 /// just points `read_opencode_sqlite_session` at `mimocode.db`.
 #[tauri::command]
@@ -3163,6 +3179,14 @@ fn load_native_history_blocking() -> Result<Vec<SavedSession>, String> {
         }
     }
 
+    // Kilo Code second pass — an OpenCode fork (`kilo` binary), identical
+    // Drizzle schema, so it reuses find_drizzle_sessions_sqlite like MiMo Code.
+    if let Some(home) = home.as_ref() {
+        if let Some(db) = kilo_db(home) {
+            find_drizzle_sessions_sqlite(&db, "kilo", "Kilo Code Session", &mut result);
+        }
+    }
+
     // Kimi Code second pass — index-based store (session_index.jsonl + state.json,
     // NOT a dir walk). find_kimi_sessions reads the index, stats state.json for
     // mtime to pre-select the newest 200, then reads each survivor's state.json
@@ -3434,6 +3458,17 @@ fn load_message_heatmap_blocking() -> Result<Vec<HeatmapEntry>, String> {
     // reuses collect_opencode_heatmap_entries with the mimocode.db path.
     if let Some(home) = home.as_ref() {
         if let Some(db) = mimocode_db(home) {
+            let cutoff_secs = cutoff
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            collect_opencode_heatmap_entries(&db, cutoff_secs, &mut out);
+        }
+    }
+
+    // Kilo Code heatmap second pass — same schema as OpenCode/MiMo Code.
+    if let Some(home) = home.as_ref() {
+        if let Some(db) = kilo_db(home) {
             let cutoff_secs = cutoff
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs() as i64)

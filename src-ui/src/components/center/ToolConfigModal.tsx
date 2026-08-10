@@ -72,7 +72,7 @@ const TOOL_DEFAULTS: Record<string, ToolConfigEntry> = {
 // no Qwen scanner has been written), the field is hidden — letting the
 // user fill a path that nothing ever scans would just be a footgun.
 const HISTORY_SCANNED_TOOLS = new Set([
-  'claude', 'codex', 'grok', 'antigravity', 'hermes', 'opencode', 'openclaw', 'mimocode', 'pi', 'kimicode',
+  'claude', 'codex', 'grok', 'antigravity', 'hermes', 'opencode', 'openclaw', 'mimocode', 'kilo', 'pi', 'kimicode',
 ]);
 
 const defaultsFor = (key: string): ToolConfigEntry => TOOL_DEFAULTS[key] ?? EMPTY;

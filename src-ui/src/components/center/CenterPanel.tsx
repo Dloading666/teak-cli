@@ -126,6 +126,7 @@ import PI_SVG from '../../icons-inline/pi.svg?raw';
 import COPILOT_SVG from '../../icons-inline/copilot.svg?raw';
 import GROK_SVG from '../../icons-inline/grok.svg?raw';
 import OPENCLAW_SVG from '../../icons-inline/openclaw.svg?raw';
+import KILO_SVG from '../../icons-inline/kilo.svg?raw';
 import AIDER_DATA_URL from '../../icons-inline/aider.png?inline';
 import KIMICODE_DATA_URL from '../../icons-inline/kimicode.png?inline';
 import CRUSH_DATA_URL from '../../icons-inline/crush.png?inline';
@@ -232,6 +233,9 @@ const SvgQwen      = () => inlineSvgIcon(QWEN_SVG);
 // SVG with rounded outer rect matches the brand visually within a pixel or two.
 const SvgOpenCode  = () => inlineSvgIcon(OPENCODE_SVG);
 const SvgMimo      = () => inlineSvgIcon(MIMOCODE_SVG, '1em', { borderRadius: 'var(--radius-xs)', overflow: 'hidden' });
+// Kilo Code (OpenCode fork, `kilo` binary) — official square favicon mark
+// from kilo.ai. Hard-square art gets the same rounded crop as MiMo's mark.
+const SvgKilo      = () => inlineSvgIcon(KILO_SVG, '1em', { borderRadius: 'var(--radius-xs)', overflow: 'hidden' });
 const SvgOpenClaw  = () => inlineSvgIcon(OPENCLAW_SVG);
 const SvgCodex       = () => inlineSvgIcon(CODEX_SVG);
 const SvgAntigravity = () => inlineSvgIcon(ANTIGRAVITY_SVG);
@@ -417,7 +421,7 @@ const SvgPlus = ({ active }: { active: boolean }) => (
 // still count. Update this set when adding or removing AGENT_CATALOG
 // entries below.
 const VALID_PIN_KEYS = new Set<string>([
-  'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen', 'hermes', 'terminal',
+  'claude', 'opencode', 'mimocode', 'kilo', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen', 'hermes', 'terminal',
   'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
   'installer', 'four-split', 'three-split', 'two-split',
 ]);
@@ -507,6 +511,7 @@ export function CenterPanel() {
     claude: <SvgClaude />,
     opencode: <SvgOpenCode />,
     mimocode: <SvgMimo />,
+    kilo: <SvgKilo />,
     openclaw: <SvgOpenClaw />,
     codex: <SvgCodex />,
     grok: <SvgGrok />,
@@ -525,7 +530,7 @@ export function CenterPanel() {
   // names are sourced from the Rust registry (see lib/tool-info.ts);
   // the order here is the launchpad's preferred presentation order.
   const BUILTIN_AI_CLI_FALLBACK: { key: ToolType; label: string }[] = [
-    'claude', 'opencode', 'mimocode', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen', 'hermes',
+    'claude', 'opencode', 'mimocode', 'kilo', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen', 'hermes',
     // Pi (T2) + Crush/Aider/Goose/Copilot (T3 launch-only). Kimi Code is T1.
     'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
   ].map((key) => ({ key: key as ToolType, label: getToolDisplayName(key) }));
@@ -1158,6 +1163,7 @@ export function CenterPanel() {
       case 'hermes': return { icon: <SvgHermes />, title: getToolDisplayName('hermes'), tooltip: undefined };
       case 'opencode': return { icon: <SvgOpenCode />, title: cwd ?? getToolDisplayName('opencode'), tooltip: pathTip };
       case 'mimocode': return { icon: <SvgMimo />, title: cwd ?? getToolDisplayName('mimocode'), tooltip: pathTip };
+      case 'kilo': return { icon: <SvgKilo />, title: cwd ?? getToolDisplayName('kilo'), tooltip: pathTip };
       case 'openclaw': return { icon: <SvgOpenClaw />, title: getToolDisplayName('openclaw'), tooltip: undefined };
       case 'codex': return { icon: <SvgCodex />, title: cwd ?? getToolDisplayName('codex'), tooltip: pathTip };
       case 'grok': return { icon: <SvgGrok />, title: cwd ?? getToolDisplayName('grok'), tooltip: pathTip };
@@ -1774,7 +1780,7 @@ export function CenterPanel() {
                           {AGENT_CATALOG.filter(item => item.type === 'ai-cli').map(item => {
                             const pinId = `agent:${item.key}`;
                             const isPinned = pinnedItems.includes(pinId);
-                            const hasGear = (['claude', 'codex', 'grok', 'antigravity', 'qwen', 'opencode', 'mimocode', 'openclaw', 'hermes', 'pi', 'kimicode'] as const).includes(item.key as any);
+                            const hasGear = (['claude', 'codex', 'grok', 'antigravity', 'qwen', 'opencode', 'mimocode', 'kilo', 'openclaw', 'hermes', 'pi', 'kimicode'] as const).includes(item.key as any);
                             return (
                               <div
                                 key={item.key}

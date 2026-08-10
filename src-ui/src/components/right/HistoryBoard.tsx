@@ -58,6 +58,7 @@ const TOOL_ICON_SRC: Record<string, string> = {
   opencode:    OPENCODE_DATA_URL,
   kimicode:    KIMICODE_DATA_URL,
   mimocode:    '/icons/tools/mimocode.svg',
+  kilo:        '/icons/tools/kilo.svg',
 };
 
 const getToolIcon = (tool: string) => {
@@ -92,7 +93,7 @@ const getToolIcon = (tool: string) => {
   }
   const src = TOOL_ICON_SRC[tool];
   if (!src) return <div style={{ width: 14, height: 14, borderRadius: 'var(--radius-xs)', background: '#555' }}/>;
-  const extra = (tool === 'hermes' || tool === 'opencode') ? { borderRadius: 'var(--radius-xs)', objectFit: 'cover' as const }
+  const extra = (tool === 'hermes' || tool === 'opencode' || tool === 'kilo') ? { borderRadius: 'var(--radius-xs)', objectFit: 'cover' as const }
     : tool === 'kimicode' ? { borderRadius: 'var(--radius-xs)', objectFit: 'contain' as const }
     : {};
   return <img src={src} alt="" style={{ width: '1em', height: '1em', flexShrink: 0, objectFit: 'contain', ...extra }}/>;

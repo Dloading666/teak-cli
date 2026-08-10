@@ -206,6 +206,7 @@ mod claude;
 mod codex;
 mod grok;
 pub mod hermes;
+mod kilo;
 mod mimocode;
 mod openclaw;
 mod opencode;
@@ -237,6 +238,10 @@ pub static TOOLS: &[&ToolDescriptor] = &[
     // Order here doesn't affect the launchpad (that list is hardcoded in the
     // frontend); it only needs to be in the registry for list_tools + scanning.
     &mimocode::DESCRIPTOR,
+    // Kilo Code (OpenCode fork, `kilo` binary) — fully wired like MiMo Code:
+    // history/heatmap second pass in server.rs, resume preset in terminal.rs,
+    // launchpad tile in CenterPanel's catalog.
+    &kilo::DESCRIPTOR,
     // Pi is T2 (history + heatmap + changes + resume; see its module doc).
     // Kimi Code keeps the same history/resume features as Pi. The other four —
     // Crush / Aider / Goose / Copilot — are T3 launch-only: display name +

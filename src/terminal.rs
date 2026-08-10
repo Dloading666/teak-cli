@@ -325,6 +325,18 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
         session_id_pattern: None,
         token_format: Some(r"^ses_[A-Za-z0-9]{20,40}$"),
     },
+    // Kilo Code — an OpenCode fork (`kilo` binary, github.com/Kilo-Org/kilocode).
+    // Same resume contract as OpenCode/MiMo Code (`<bin> --session ses_<...>`);
+    // binary_name + token shape are best-guess pending a real-install verify,
+    // mirroring MiMo Code's initial integration.
+    AgentPreset {
+        tool_name: "kilo",
+        resume_program: Some("kilo"),
+        resume_args_before: &["--session"],
+        resume_args_after: &[],
+        session_id_pattern: None,
+        token_format: Some(r"^ses_[A-Za-z0-9]{20,40}$"),
+    },
     // Codex CLI resume: `codex resume <id>` is a positional subcommand,
     // not a `--resume` flag. Token is the rollout filename stem (UUID).
     AgentPreset {

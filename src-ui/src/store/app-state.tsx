@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type ToolType = 'claude' | 'qwen' | 'installer' | 'hermes' | 'opencode' | 'mimocode' | 'openclaw' | 'codex' | 'grok' | 'antigravity' | 'pi' | 'crush' | 'aider' | 'kimicode' | 'goose' | 'copilot' | 'terminal' | 'remote' | 'two-split' | 'three-split' | 'four-split' | null;
+export type ToolType = 'claude' | 'qwen' | 'installer' | 'hermes' | 'opencode' | 'mimocode' | 'kilo' | 'openclaw' | 'codex' | 'grok' | 'antigravity' | 'pi' | 'crush' | 'aider' | 'kimicode' | 'goose' | 'copilot' | 'terminal' | 'remote' | 'two-split' | 'three-split' | 'four-split' | null;
 
 /**
  * Tab status shown as an animated 9-dot glyph. Three states only —

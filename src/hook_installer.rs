@@ -116,6 +116,12 @@ fn cleanup_tool(tool: &crate::tools::ToolDescriptor, home: &Path) {
                 ensure_opencode_tui_theme_default(home, "mimocode");
             }
         }
+        "kilo" => {
+            cleanup_opencode_plugin(home, "kilo");
+            if crate::server::binary_on_path(tool.binary_name) {
+                ensure_opencode_tui_theme_default(home, "kilo");
+            }
+        }
         "hermes" => cleanup_hermes_plugin(home),
         "kimicode" => cleanup_kimi_hooks(home),
         "grok" => cleanup_grok_hooks(home),
