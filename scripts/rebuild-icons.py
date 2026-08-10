@@ -185,6 +185,12 @@ def main():
         resize_to(win, size).save(ICONS / fname)
         print(f"  {fname} ({size}x{size})")
 
+    # README badge — the pre-rounded art (Windows source) reads better on the
+    # light GitHub docs than the full-bleed square Linux icon.
+    print("README rounded icon (from windows source)…")
+    resize_to(win, 512).save(ICONS / "icon-rounded.png")
+    print("  icon-rounded.png (512x512)")
+
     print("building .ico (Windows, from windows source)…")
     build_ico(win, ICONS / "icon.ico")
     print(f"  icon.ico {ICO_SIZES} ({len(ICO_SIZES)} frames embedded)")

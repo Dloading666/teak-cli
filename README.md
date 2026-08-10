@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icons/icon.png" width="96" alt="Coffee CLI" />
+  <img src="icons/icon-rounded.png" width="96" alt="Coffee CLI" />
 </p>
 
 <h1 align="center">Coffee CLI</h1>
