@@ -115,7 +115,7 @@
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .agent-session-search {
@@ -135,7 +135,8 @@
 }
 
 .agent-session-search::placeholder {
-  color: var(--text-3);
+  color: var(--text-2);
+  opacity: 1;
 }
 
 .agent-session-search:focus {

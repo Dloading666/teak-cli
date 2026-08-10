@@ -47,7 +47,8 @@
   padding: 6px 0;
   background: transparent;
   border: none;
-  color: var(--text-3);
+  /* Keep inactive navigation as readable as the "All" directory filter. */
+  color: var(--text-2);
   font-family: var(--font, system-ui);
   font-size: 14px;
   font-weight: 600;
@@ -61,7 +62,7 @@
 }
 
 .right-tab:hover:not(.active) {
-  color: color-mix(in srgb, var(--text-3) 75%, transparent);
+  color: var(--text-1);
 }
 
 .right-tab.active {
@@ -607,10 +608,10 @@
 .task-empty-guide {
   margin-top: 16px;
   padding: 7px 16px;
-  border: 1px solid color-mix(in srgb, var(--accent, #c4956a) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-2) 55%, transparent);
   border-radius: var(--radius-pill, 999px);
   background: transparent;
-  color: var(--accent, #c4956a);
+  color: var(--text-2);
   font-family: var(--font, system-ui);
   font-size: 12.5px;
   font-weight: 500;
@@ -619,8 +620,9 @@
 }
 
 .task-empty-guide:hover {
-  background: color-mix(in srgb, var(--accent, #c4956a) 12%, transparent);
-  border-color: var(--accent, #c4956a);
+  background: color-mix(in srgb, var(--text-2) 12%, transparent);
+  border-color: var(--text-1);
+  color: var(--text-1);
 }
 
 .task-empty-guide:active {

@@ -48,7 +48,8 @@
     padding: 6px 0;
     background: transparent;
     border: none;
-    color: var(--text-3);
+    /* Match the directory filter trigger's readable secondary text. */
+    color: var(--text-2);
     font-family: var(--font, system-ui);
     font-size: 14px;
     font-weight: 600;
@@ -115,7 +116,7 @@
 /* Custom styling removed for first child separator */
 
 .explorer-tab:hover:not(.active) {
-    color: color-mix(in srgb, var(--text-3) 75%, transparent);
+    color: var(--text-1);
 }
 
 .explorer-tab.active {

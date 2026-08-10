@@ -701,10 +701,11 @@
 }
 
 .launchpad-card-cwd {
-  font-size: 11px !important;
+  /* Keep the remembered workspace readable at a glance, matching the
+     secondary metadata used by the session list in the left rail. */
+  font-size: 12px !important;
   font-weight: 500 !important;
-  color: var(--text-3) !important;
-  opacity: 0.6;
+  color: var(--text-2) !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
