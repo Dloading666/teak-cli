@@ -127,6 +127,9 @@ import COPILOT_SVG from '../../icons-inline/copilot.svg?raw';
 import GROK_SVG from '../../icons-inline/grok.svg?raw';
 import OPENCLAW_SVG from '../../icons-inline/openclaw.svg?raw';
 import KILO_SVG from '../../icons-inline/kilo.svg?raw';
+import CURSOR_SVG from '../../icons-inline/cursor.svg?raw';
+import CLINE_SVG from '../../icons-inline/cline.svg?raw';
+import OMP_SVG from '../../icons-inline/omp.svg?raw';
 import AIDER_DATA_URL from '../../icons-inline/aider.png?inline';
 import KIMICODE_DATA_URL from '../../icons-inline/kimicode.png?inline';
 import CRUSH_DATA_URL from '../../icons-inline/crush.png?inline';
@@ -252,6 +255,11 @@ const SvgAider     = () => bgIcon(AIDER_DATA_URL, '1em', { borderRadius: 'var(--
 const SvgKimi      = () => bgIcon(KIMICODE_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
 const SvgCrush     = () => bgIcon(CRUSH_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
 const SvgGoose     = () => bgIcon(GOOSE_DATA_URL, '1em', { borderRadius: 'var(--radius-xs)' });
+// Cursor / Cline are monochrome currentColor marks (like Grok) so they follow
+// the theme text color via inline SVG; Oh-My-Pi keeps its full-color gradient.
+const SvgCursor    = () => inlineSvgIcon(CURSOR_SVG);
+const SvgCline     = () => inlineSvgIcon(CLINE_SVG);
+const SvgOmp       = () => inlineSvgIcon(OMP_SVG);
 
 // Coffee 101 card icon — animated coffee mark (same as the brand mark
 // now portaled into the titlebar from Explorer.tsx): steam wave loops 3s, cup
@@ -422,7 +430,7 @@ const SvgPlus = ({ active }: { active: boolean }) => (
 // entries below.
 const VALID_PIN_KEYS = new Set<string>([
   'claude', 'opencode', 'mimocode', 'kilo', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen', 'hermes', 'terminal',
-  'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
+  'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot', 'cursor', 'cline', 'omp',
   'installer', 'four-split', 'three-split', 'two-split',
 ]);
 
@@ -524,6 +532,9 @@ export function CenterPanel() {
     kimicode: <SvgKimi />,
     goose: <SvgGoose />,
     copilot: <SvgCopilot />,
+    cursor: <SvgCursor />,
+    cline: <SvgCline />,
+    omp: <SvgOmp />,
   };
 
   // Built-in AI CLI catalog. Fully local — no remote fetch. Display
@@ -531,8 +542,8 @@ export function CenterPanel() {
   // the order here is the launchpad's preferred presentation order.
   const BUILTIN_AI_CLI_FALLBACK: { key: ToolType; label: string }[] = [
     'claude', 'opencode', 'mimocode', 'kilo', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen', 'hermes',
-    // Pi (T2) + Crush/Aider/Goose/Copilot (T3 launch-only). Kimi Code is T1.
-    'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot',
+    // Pi (T2) + Crush/Aider/Goose/Copilot/Cursor/Cline/Oh-My-Pi (T3 launch-only). Kimi Code is T1.
+    'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot', 'cursor', 'cline', 'omp',
   ].map((key) => ({ key: key as ToolType, label: getToolDisplayName(key) }));
 
   // Unified agent catalog — fully local. The remote catalog fetch
@@ -1176,6 +1187,9 @@ export function CenterPanel() {
       case 'kimicode': return { icon: <SvgKimi />, title: cwd ?? getToolDisplayName('kimicode'), tooltip: pathTip };
       case 'goose': return { icon: <SvgGoose />, title: cwd ?? getToolDisplayName('goose'), tooltip: pathTip };
       case 'copilot': return { icon: <SvgCopilot />, title: cwd ?? getToolDisplayName('copilot'), tooltip: pathTip };
+      case 'cursor': return { icon: <SvgCursor />, title: cwd ?? getToolDisplayName('cursor'), tooltip: pathTip };
+      case 'cline': return { icon: <SvgCline />, title: cwd ?? getToolDisplayName('cline'), tooltip: pathTip };
+      case 'omp': return { icon: <SvgOmp />, title: cwd ?? getToolDisplayName('omp'), tooltip: pathTip };
       case 'remote': {
         let title = t('tool.remote') as string;
         if (session.toolData) {

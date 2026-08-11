@@ -212,13 +212,16 @@ mod openclaw;
 mod opencode;
 mod qwen;
 // Lower-tier tools — see each module's doc comment for its tier (Pi is T2
-// with history; Aider/Crush/Goose/Copilot are T3 launch-only, no
-// history/status integration).
+// with history; Aider/Crush/Goose/Copilot/Cursor/Cline/Oh-My-Pi are T3
+// launch-only, no history/status integration).
 mod aider;
+mod cline;
 mod copilot;
 mod crush;
+mod cursor;
 mod goose;
 mod kimicode;
+mod omp;
 mod pi;
 
 /// All supported AI CLIs. Order matches launchpad layout (claude
@@ -243,16 +246,19 @@ pub static TOOLS: &[&ToolDescriptor] = &[
     // launchpad tile in CenterPanel's catalog.
     &kilo::DESCRIPTOR,
     // Pi is T2 (history + heatmap + changes + resume; see its module doc).
-    // Kimi Code keeps the same history/resume features as Pi. The other four —
-    // Crush / Aider / Goose / Copilot — are T3 launch-only: display name +
-    // PATH probe + launch binary, history_shape: None and
-    // has_legacy_hook_artifacts: false.
+    // Kimi Code keeps the same history/resume features as Pi. The others —
+    // Crush / Aider / Goose / Copilot / Cursor / Cline / Oh-My-Pi — are T3
+    // launch-only: display name + PATH probe + launch binary, history_shape:
+    // None and has_legacy_hook_artifacts: false.
     &pi::DESCRIPTOR,
     &crush::DESCRIPTOR,
     &aider::DESCRIPTOR,
     &kimicode::DESCRIPTOR,
     &goose::DESCRIPTOR,
     &copilot::DESCRIPTOR,
+    &cursor::DESCRIPTOR,
+    &cline::DESCRIPTOR,
+    &omp::DESCRIPTOR,
 ];
 
 /// Lookup by id. `None` if the id isn't registered. Used by legacy cleanup

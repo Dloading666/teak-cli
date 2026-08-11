@@ -9,7 +9,7 @@ type PaneToolKey = NonNullable<ToolType>;
 // views themselves (a pane can't be a nested split).
 export const PANE_TOOL_KEYS: readonly PaneToolKey[] = [
   'claude', 'opencode', 'mimocode', 'kilo', 'openclaw', 'codex', 'grok', 'antigravity', 'qwen',
-  'hermes', 'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot', 'terminal',
+  'hermes', 'pi', 'crush', 'aider', 'kimicode', 'goose', 'copilot', 'cursor', 'cline', 'omp', 'terminal',
 ];
 const PANE_TOOL_SET = new Set<string>(PANE_TOOL_KEYS as readonly string[]);
 
