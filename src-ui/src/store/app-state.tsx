@@ -434,13 +434,8 @@ function reducer(state: AppState, action: Action): AppState {
       // the diff still renders in its chosen surface, just not focused.
       return { ...state, activeTerminalId: action.id, diffTabActive: false };
     case 'SET_TERMINAL_TOOL':
-      // Opening a model/tool also opens the compose panel (Gambit) by default —
-      // the natural next step is typing a prompt to send to it. Its footer
-      // label shows the target workspace, so the auto-open doubles as the guard
-      // against sending into the wrong folder.
       return {
         ...state,
-        gambitOpen: true,
         terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, toolTitle: undefined, agentStatus: undefined } : t)
       };
     case 'SET_TERMINAL_HIDDEN':
@@ -765,6 +760,10 @@ function getInitialState(): AppState {
   // Default 'overlay' (the gentle half-height panel) — existing users see no
   // change. Only flips to 'tab' if the user explicitly expanded-to-tab before.
   let diffMode: 'overlay' | 'tab' = 'overlay';
+  // Gambit (compose box) opens by default on launch; the user's open/close
+  // choice persists via cc-gambit-open. NOT force-opened when an agent starts
+  // (that was a v3.3.9 mistake, reverted).
+  let gambitOpen = true;
   try {
     leftPanelHidden = localStorage.getItem('cc-left-hidden') === '1';
     rightPanelHidden = localStorage.getItem('cc-right-hidden') === '1';
@@ -774,6 +773,7 @@ function getInitialState(): AppState {
     if (savedTaskView === 'list' || savedTaskView === 'note' || savedTaskView === 'prompt') taskViewMode = savedTaskView;
     const savedDiffMode = localStorage.getItem('cc-diff-mode');
     if (savedDiffMode === 'tab' || savedDiffMode === 'overlay') diffMode = savedDiffMode;
+    gambitOpen = localStorage.getItem('cc-gambit-open') !== '0';
   } catch {}
 
   return {
@@ -789,7 +789,7 @@ function getInitialState(): AppState {
     defaultShell,
     terminals: [{ id: defaultTerminalId, tool: null, folderPath }],
     activeTerminalId: defaultTerminalId,
-    gambitOpen: false,
+    gambitOpen,
     settingsOpen: false,
     gambitEnterToSend,
     hotkeyScheme,
