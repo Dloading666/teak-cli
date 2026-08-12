@@ -199,6 +199,37 @@
     opacity: 0.55;
 }
 
+/* ─── Workspace label (footer, far left) ───────────────────── */
+/* Shows the active tab's working-folder name, symmetric to the send button.
+   Read-only info — deliberately no hover tooltip (the app has no hover-tip
+   concept). Text-only: a folder icon was tried but every directory gets the
+   same glyph, so it's noise. Height exactly matches .gambit-send (30px) so
+   the footer stays level; the glyphs + fill are sized up so the chip reads
+   as a real element next to the send circle. Ellipsizes rather than wrapping,
+   so a deep path can't shove the thumbs or send button. */
+.gambit-workspace {
+    display: flex;
+    align-items: center;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 200px;
+    height: 30px; /* matches .gambit-send exactly */
+    padding: 0 10px;
+    border-radius: var(--shape-radius-pill, 999px);
+    color: var(--text-1, #e8e4de);
+    background: rgba(255, 255, 255, 0.06);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    user-select: none;
+}
+.gambit-workspace-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
 /* ─── Thumbnail strip (derived view of image paths in draft) ─ */
 /* Pure visual — no state of its own. Regex scans draft text for
    absolute image paths; each unique match gets a thumb. Clicking a

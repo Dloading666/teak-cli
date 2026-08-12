@@ -114,6 +114,66 @@ textarea,
     -ms-overflow-style: none !important; /* legacy Edge / IE11 */
 }
 
+/* ─── Custom floating scrollbar (no native arrows) ────────────
+   WebView2's native scrollbar re-surfaces its up/down arrow buttons no matter
+   what CSS you apply — both `::-webkit-scrollbar-button` and the modern
+   `scrollbar-width`/`scrollbar-color` paths fail on textareas. The reliable
+   fix, proven in the Coffee-Note sibling project, is to hide the native bar
+   entirely (.auto-hide-scrollbar) and draw a floating DOM slider
+   (lib/auto-hide-scrollbar.ts). Mirrors the terminal's accent-slider look:
+   theme-bound, auto-fading, draggable. */
+
+.auto-hide-scrollbar {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+.auto-hide-scrollbar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.cc-scrollbar {
+    position: fixed;
+    z-index: 110;
+    width: 10px;
+    background: transparent;
+    pointer-events: none;
+}
+.cc-scrollbar-slider {
+    position: absolute;
+    top: 0;
+    left: 2px;
+    width: 6px;
+    min-height: 28px;
+    border-radius: 3px;
+    /* !important so the glass/carbon nuclear transparency rule can't erase it */
+    background: var(--accent, #c4956a) !important;
+    opacity: 0;
+    transition: opacity 220ms ease;
+    will-change: opacity;
+}
+/* Only interactive while visible + non-empty; otherwise clicks pass through. */
+.cc-scrollbar.is-visible:not(.is-empty) {
+    pointer-events: auto;
+}
+.cc-scrollbar.is-visible:not(.is-empty) .cc-scrollbar-slider {
+    opacity: 0.28;
+}
+.cc-scrollbar.is-visible:hover .cc-scrollbar-slider,
+.cc-scrollbar.is-dragging .cc-scrollbar-slider {
+    opacity: 0.56;
+}
+.cc-scrollbar-slim {
+    width: 7px;
+}
+.cc-scrollbar-slim .cc-scrollbar-slider {
+    left: 1.5px;
+    width: 4px;
+    min-height: 20px;
+    border-radius: 2px;
+}
+
 :root {
     /* Local Inter font for English, premium system fallbacks for CJK */
     /* Per-glyph cascade covering the 11 UI languages (de/en/es/fr/pt/vi/ru

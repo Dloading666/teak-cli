@@ -20,6 +20,7 @@ import { useT } from '../../i18n/useT';
 import { TaskEmptyState } from './TaskEmptyState';
 import { STATUS_ORDER, type TaskItem, type TaskStatus } from './task-types';
 import { useTextContextMenu } from '../../lib/use-text-context-menu';
+import { bindAutoHideScrollbar } from '../../lib/auto-hide-scrollbar';
 import './TaskNoteView.css';
 
 // Traffic-light dots, top-to-bottom priority. Colors are deliberately the
@@ -330,9 +331,11 @@ export function TaskNoteView({
               onChange={next => onUpdateTitle(task.id, next)}
             />
 
-            {/* Bottom-edge resize handle — drag to grow/shrink the note. */}
+            {/* Bottom-edge resize handle — drag to grow/shrink the note. The
+                `resizing` class drives the CSS deepen+lengthen effect while
+                the pointer drags (Coffee-Note pane-resizer style). */}
             <div
-              className="task-note-resize"
+              className={`task-note-resize${resizing?.id === task.id ? ' resizing' : ''}`}
               onPointerDown={e => handleResizeDown(e, task.id)}
             />
           </div>
@@ -365,9 +368,10 @@ function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyP
     if (!el) return;
     // The resized height is a FLOOR, not a fixed size: the note is at least the
     // height you dragged (or a roomy default), and still grows to fit longer
-    // content. So text is never clipped behind a scrollbar (which is globally
-    // hidden anyway) — drag bigger for room, drag smaller and it stops at the
-    // text.
+    // content when left un-resized. A manually-shrunk note scrolls instead of
+    // clipping — the size you chose wins, and overflow-y:auto (styled with the
+    // same accent slider as the terminal, see TaskNoteView.css) keeps the
+    // overflow reachable by wheel or drag.
     //
     // scrollHeight depends on the textarea's WIDTH (narrower ⇒ more wrapping ⇒
     // taller). The right panel mounts COLLAPSED (width 0) and animates open
@@ -380,9 +384,9 @@ function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyP
     const fit = () => {
       if (el.offsetWidth === 0) return; // collapsed / not laid out — wait for width
       if (height != null) {
-        // Manually resized: a FIXED height, not a floor. Text clips (overflow
-        // hidden) when the user dragged smaller than the content - the size
-        // they chose wins over auto-fit.
+        // Manually resized: a FIXED height, not a floor. Longer content scrolls
+        // inside the note (overflow-y:auto) — the size the user chose wins, but
+        // the tail stays reachable via the wheel or the accent slider.
         el.style.height = `${Math.max(NOTE_MIN_HEIGHT, height)}px`;
       } else {
         el.style.height = 'auto';
@@ -406,6 +410,18 @@ function NoteBody({ value, height, autoFocus, placeholder, onChange }: NoteBodyP
       ref.current.select();
     }
   }, [autoFocus]);
+
+  // Custom floating scrollbar for the note body. WebView2's native textarea
+  // scrollbar keeps re-surfacing its up/down arrow buttons no matter the CSS
+  // (see lib/auto-hide-scrollbar.ts for the full story) — so we hide it and
+  // draw a DOM slider instead, the proven Coffee-Note approach. slim = the
+  // 7px variant; insetBottom 11 clears the bottom-edge resize handle so the
+  // slider can't collide with it.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return bindAutoHideScrollbar(el, { slim: true, insetBottom: 11 });
+  }, []);
 
   return (
     <>

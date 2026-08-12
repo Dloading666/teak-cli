@@ -39,6 +39,10 @@ interface GambitProps {
    *  to know which sides are absent to compute the inset offsets. */
   leftPanelHidden: boolean;
   rightPanelHidden: boolean;
+  /** The active tab's working-folder name (basename). Rendered in the footer,
+   *  opposite the send button, so the user always sees which workspace Send
+   *  would hit; switching tabs updates it. '' hides the label (no folder). */
+  workspaceName: string;
 }
 
 // Matches any absolute image path inside the compose draft — both our
@@ -89,6 +93,7 @@ function GambitImpl({
   onSend,
   leftPanelHidden,
   rightPanelHidden,
+  workspaceName,
 }: GambitProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -681,6 +686,18 @@ function GambitImpl({
       </div>
 
       <div className="gambit-footer">
+
+        {/* Workspace label — leftmost footer item, symmetric to the send
+            button. Shows the active tab's working-folder name so a prompt
+            can't be sent into the wrong workspace; updates as tabs switch.
+            Deliberately no hover tooltip — the visible name is the info.
+            No folder icon: every directory would get the same glyph, so it's
+            pure noise (and read as a different brightness than the text). */}
+        {workspaceName && (
+          <span className="gambit-workspace">
+            <span className="gambit-workspace-name">{workspaceName}</span>
+          </span>
+        )}
 
         {/* Thumbnail strip lives in the footer, left-aligned, so it shares
             the same row as the send button. Empty when no image paths are

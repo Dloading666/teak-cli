@@ -22,6 +22,15 @@ import { getTabActions } from '../../lib/tab-actions';
 import { getFocusedPane } from '../../lib/pane-focus';
 import { Gambit } from './Gambit';
 
+// Last path segment of a folder, Windows ("\") and POSIX ("/") safe. Local copy
+// (CenterPanel has the same helper) — tiny, not worth a shared util yet.
+function basename(p: string): string {
+  const trimmed = p.replace(/[\\/]+$/, '');
+  if (!trimmed) return '/';
+  const parts = trimmed.split(/[\\/]/);
+  return parts[parts.length - 1] || trimmed;
+}
+
 export function ActiveGambit() {
   const { state, dispatch } = useAppState();
   const activeId = state.activeTerminalId;
@@ -31,6 +40,11 @@ export function ActiveGambit() {
 
   const gambitOpen = state.gambitOpen;
   const gambitDraft = activeSession?.gambitDraft ?? '';
+  // Active tab's working-folder name — the footer label telling the user which
+  // workspace Send would land in. Recomputes on tab switch (activeSession
+  // changes), so a long-lived open Gambit can't misdirect a prompt. '' when the
+  // tab has no folder (blank terminal) → the label hides.
+  const workspaceName = activeSession?.folderPath ? basename(activeSession.folderPath) : '';
 
   const handleDraftChange = useCallback((draft: string) => {
     if (!activeId) return;
@@ -117,6 +131,7 @@ export function ActiveGambit() {
     <Gambit
       sessionId={activeId}
       draft={gambitDraft}
+      workspaceName={workspaceName}
       onDraftChange={handleDraftChange}
       onClose={handleClose}
       onSend={handleSend}

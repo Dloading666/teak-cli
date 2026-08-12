@@ -434,8 +434,13 @@ function reducer(state: AppState, action: Action): AppState {
       // the diff still renders in its chosen surface, just not focused.
       return { ...state, activeTerminalId: action.id, diffTabActive: false };
     case 'SET_TERMINAL_TOOL':
+      // Opening a model/tool also opens the compose panel (Gambit) by default —
+      // the natural next step is typing a prompt to send to it. Its footer
+      // label shows the target workspace, so the auto-open doubles as the guard
+      // against sending into the wrong folder.
       return {
         ...state,
+        gambitOpen: true,
         terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, toolTitle: undefined, agentStatus: undefined } : t)
       };
     case 'SET_TERMINAL_HIDDEN':
