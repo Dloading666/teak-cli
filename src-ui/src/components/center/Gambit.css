@@ -121,16 +121,17 @@
    own physical row at the top of the dock — the textarea genuinely
    starts below, no spatial overlap, cursor switches reliably.
 
-   Hit area (10px) is decoupled from the visible affordance (a 2px
-   hairline at the very top edge that only lights up on hover/active),
-   matching native window-pane splitter UX. */
+   Hit area (6px) is decoupled from the visible affordance — a short
+   rounded grip bar centred under the top edge that surfaces on hover and
+   lengthens+deepens while dragging (the note panel's bottom-edge handle
+   style). Bar width scales with the dock (clamp on a % of width) since
+   Gambit spans the whole centre panel. */
 .gambit-dock-resize {
     flex-shrink: 0;
     /* 6px hit zone — kept compact so the dock's top breathing stays
        SHORTER than the 14px side breathing (typical chat-input rhythm).
-       The cursor !important rule below + visible affordance via the
-       ::after hairline still let users find the grab area without it
-       eating noticeable vertical real estate. */
+       The cursor !important rule below + the ::after grip still let users
+       find the grab area without it eating noticeable vertical space. */
     height: 6px;
     /* !important is required: global.css line ~87 sets a universal
        `* { cursor: default !important }` reset (so the app feels like
@@ -140,28 +141,37 @@
     position: relative;  /* pseudo positioning context */
     background: transparent;
 }
+/* Grip bar — a short centred pill, hidden at rest. On hover it surfaces in
+   a light accent; while dragging (`resizing`, added by Gambit.tsx) it
+   lengthens ~1.8×, thickens, and deepens to the solid accent — all on a fast
+   90ms ease-out so grow/shrink reads as one smooth gesture. */
 .gambit-dock-resize::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
+    left: 50%;
+    top: 50%;
+    width: clamp(64px, 24%, 220px);
+    height: 3px;
+    border-radius: 999px;
     background: transparent;
-    transition: background-color 0.12s;
-    /* Pseudo MUST be transparent to pointer events. Otherwise it
-       intercepts the top 2px and — having no cursor rule of its own —
-       falls back to the global `* { cursor: default !important }` reset,
-       so hovering on the visible line shows the wrong cursor while
-       hovering 1px below (parent's exposed hit area) shows ns-resize.
-       With pointer-events:none the parent stays the hit target
-       everywhere; :hover still fires on the parent (CSS evaluates :hover
-       by visual containment, not just hit-target), so the line still
-       lights up correctly. */
+    opacity: 0;
+    /* pointer-events:none so the parent's ns-resize cursor shows across the
+       whole strip — global `* { cursor: default !important }` would otherwise
+       win on the bar. */
     pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: opacity 90ms ease-out, width 90ms ease-out, height 90ms ease-out,
+        background-color 90ms ease-out;
 }
-.gambit-dock-resize:hover::after,
-.gambit-dock-resize:active::after {
+.gambit-dock-resize:hover::after {
+    opacity: 1;
+    background: color-mix(in srgb, var(--accent, #C4956A) 58%, transparent);
+}
+/* `resizing` sits after `:hover` at equal specificity so it wins while the
+   pointer drags (the handle is still hovered) — the longer, solid bar. */
+.gambit-dock-resize.resizing::after {
+    width: clamp(140px, 44%, 420px);
+    height: 4px;
     background: var(--accent, #C4956A);
 }
 

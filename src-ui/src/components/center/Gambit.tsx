@@ -21,6 +21,7 @@ import { commands } from '../../tauri';
 import { useT } from '../../i18n/useT';
 import { useAppState } from '../../store/app-state';
 import { registerFileDropTarget, formatPathsForInsert } from '../../lib/file-drop';
+import { bindAutoHideScrollbar } from '../../lib/auto-hide-scrollbar';
 import './Gambit.css';
 
 interface GambitProps {
@@ -143,10 +144,24 @@ function GambitImpl({
   // Caches the latest height written to the DOM during a resize drag, so
   // onUp commits it back to React state once without thrashing intermediate
   // renders. Null when no resize is in progress.
-  const dockResizeRef = useRef<{ startY: number; origH: number; lastH?: number } | null>(null);
+  const dockResizeRef = useRef<{ startY: number; origH: number; lastH?: number; handle?: HTMLElement } | null>(null);
 
   useEffect(() => {
     textareaRef.current?.focus();
+  }, []);
+
+  // Floating scrollbar for the input box. A long draft's scroll owner is
+  // .gambit-input (the textarea auto-grows and stays overflow:hidden), and
+  // native scrollbars are hidden globally (global.css) — WebView2 can't drop
+  // its up/down arrow buttons via CSS (same fix as the note panel). Bind the
+  // same floating DOM slider here so the overflow scrolls with a visible,
+  // auto-fading, draggable accent bar and no arrows. slim matches the note
+  // body's slider; no inset needed — the input box already sits between the
+  // top resize strip and the footer, so its rect excludes both.
+  useEffect(() => {
+    const scroller = inputRef.current;
+    if (!scroller) return;
+    return bindAutoHideScrollbar(scroller, { slim: true });
   }, []);
 
   // ─── Docked layout side effect ───────────────────────────────
@@ -171,9 +186,16 @@ function GambitImpl({
 
   // Top-edge vertical drag to resize dock height (constrained to the Y axis).
   const onDockResizeStart = (e: React.MouseEvent) => {
+    const handle = e.currentTarget as HTMLElement;
+    // Toggle a `resizing` class directly on the DOM node (NOT React state):
+    // the drag writes `el.style.height` live on every mousemove, and a React
+    // re-render would reset it from the stale `dockedH` prop mid-drag. The
+    // class only drives the grip bar's grow/deepen animation.
+    handle.classList.add('resizing');
     dockResizeRef.current = {
       startY: e.clientY,
       origH: dockedH,
+      handle,
     };
     e.preventDefault();
     e.stopPropagation();
@@ -196,6 +218,7 @@ function GambitImpl({
       if (dockResizeRef.current?.lastH !== undefined) {
         setDockedH(dockResizeRef.current.lastH);
       }
+      dockResizeRef.current?.handle?.classList.remove('resizing');
       dockResizeRef.current = null;
     };
     window.addEventListener('mousemove', onMove);

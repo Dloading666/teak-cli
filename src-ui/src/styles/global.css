@@ -135,7 +135,11 @@ textarea,
 
 .cc-scrollbar {
     position: fixed;
-    z-index: 110;
+    /* Above the Gambit dock (z-index:200) so the slider stays visible over
+       its panel, but below true overlays (preview 300, modals 2000, ctx menu
+       9999). The note panel is low-z so the original 110 already worked there;
+       Gambit forced this bump. */
+    z-index: 250;
     width: 10px;
     background: transparent;
     pointer-events: none;
