@@ -142,16 +142,16 @@
     background: transparent;
 }
 /* Grip bar — a short centred pill, hidden at rest. On hover it surfaces in
-   a light accent; while dragging (`resizing`, added by Gambit.tsx) it
-   lengthens ~1.8×, thickens, and deepens to the solid accent — all on a fast
-   90ms ease-out so grow/shrink reads as one smooth gesture. */
+   the solid accent; dragging (`resizing`) only LENGTHENS it (~1.8×) — colour
+   and thickness stay identical to hover, so the grow reads as one smooth
+   gesture with no extra emphasis (no deepen, no thicken). */
 .gambit-dock-resize::after {
     content: '';
     position: absolute;
     left: 50%;
     top: 50%;
     width: clamp(64px, 24%, 220px);
-    height: 3px;
+    height: 4px;
     border-radius: 999px;
     background: transparent;
     opacity: 0;
@@ -160,19 +160,20 @@
        win on the bar. */
     pointer-events: none;
     transform: translate(-50%, -50%);
-    transition: opacity 90ms ease-out, width 90ms ease-out, height 90ms ease-out,
-        background-color 90ms ease-out;
+    /* Colour + thickness are fixed; only opacity (fade) and width (grow)
+       animate. */
+    transition: opacity 90ms ease-out, width 90ms ease-out;
 }
-.gambit-dock-resize:hover::after {
+/* Shared reveal: hover or mid-drag both show the solid accent bar at the
+   same thickness. `resizing` also sets width so the drag never depends on
+   :hover staying true (the pointer can drift off the 6px strip mid-drag). */
+.gambit-dock-resize:hover::after,
+.gambit-dock-resize.resizing::after {
     opacity: 1;
-    background: color-mix(in srgb, var(--accent, #C4956A) 58%, transparent);
+    background: var(--accent, #C4956A);
 }
-/* `resizing` sits after `:hover` at equal specificity so it wins while the
-   pointer drags (the handle is still hovered) — the longer, solid bar. */
 .gambit-dock-resize.resizing::after {
     width: clamp(140px, 44%, 420px);
-    height: 4px;
-    background: var(--accent, #C4956A);
 }
 
 /* Input box (textarea, auto-grows to content). */
