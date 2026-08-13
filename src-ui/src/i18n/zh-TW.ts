@@ -136,7 +136,7 @@ export const zhTW = {
   'task.view.note': '便籤式',
   'task.view.list.sub': '緊湊清單，逐條勾選',
   'task.view.note.sub': '大便籤，隨手寫、整段發給 AI',
-  'task.view.prompt': '提示詞式',
+  'task.view.prompt': '分類式',
   'task.view.prompt.sub': '按分類攢 AI 提示詞，一鍵發送',
   'task.prompt.new_category': '新分類',
   'task.prompt.category_placeholder': '分類名（選已有或輸入新的）',

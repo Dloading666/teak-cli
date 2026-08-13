@@ -239,31 +239,45 @@ export function TaskPromptView({
     dropTargetRef.current = null;
 
     const THRESHOLD = 6;
+    const LONG_PRESS_MS = 400;
+
+    // Body is now click-to-edit, so a drag must be told apart from a click:
+    // start only on an actual move past THRESHOLD, or on a held press (long
+    // press). Ghost creation is extracted so both paths share it.
+    const startDrag = (cx: number, cy: number) => {
+      if (dragStartedRef.current) return;
+      dragStartedRef.current = true;
+      setDragId(id);
+      const ghost = cardEl.cloneNode(true) as HTMLDivElement;
+      ghost.className = 'task-prompt-card-ghost';
+      // cloneNode copies attributes but not the live textarea `.value`
+      // (React drives it as a property), so the clone's body would be
+      // blank. Copy it across so the drag preview keeps the user's text.
+      const srcBody = cardEl.querySelector('textarea');
+      const ghostBody = ghost.querySelector('textarea');
+      if (srcBody && ghostBody) ghostBody.value = srcBody.value;
+      // Cap the ghost's body to ~2 lines so a long prompt's drag preview
+      // stays compact (the full text isn't needed while dragging).
+      if (ghostBody) {
+        ghostBody.style.height = '42px';
+        ghostBody.style.maxHeight = '42px';
+        ghostBody.style.overflow = 'hidden';
+      }
+      ghost.style.width = `${rect.width}px`;
+      ghost.style.left = `${cx - offsetX}px`;
+      ghost.style.top = `${cy - offsetY}px`;
+      document.body.appendChild(ghost);
+      ghostRef.current = ghost;
+    };
+
+    // Held still for LONG_PRESS_MS -> drag (long-press), so a quick click
+    // never moves the card. Cleared on pointerup.
+    const longPressTimer = window.setTimeout(() => startDrag(startX, startY), LONG_PRESS_MS);
+
     const onMove = (me: PointerEvent) => {
       if (!dragStartedRef.current) {
         if (Math.abs(me.clientX - startX) < THRESHOLD && Math.abs(me.clientY - startY) < THRESHOLD) return;
-        dragStartedRef.current = true;
-        setDragId(id);
-        const ghost = cardEl.cloneNode(true) as HTMLDivElement;
-        ghost.className = 'task-prompt-card-ghost';
-        // cloneNode copies attributes but not the live textarea `.value`
-        // (React drives it as a property), so the clone's body would be
-        // blank. Copy it across so the drag preview keeps the user's text.
-        const srcBody = cardEl.querySelector('textarea');
-        const ghostBody = ghost.querySelector('textarea');
-        if (srcBody && ghostBody) ghostBody.value = srcBody.value;
-        // Cap the ghost's body to ~2 lines so a long prompt's drag preview
-        // stays compact (the full text isn't needed while dragging).
-        if (ghostBody) {
-          ghostBody.style.height = '42px';
-          ghostBody.style.maxHeight = '42px';
-          ghostBody.style.overflow = 'hidden';
-        }
-        ghost.style.width = `${rect.width}px`;
-        ghost.style.left = `${me.clientX - offsetX}px`;
-        ghost.style.top = `${me.clientY - offsetY}px`;
-        document.body.appendChild(ghost);
-        ghostRef.current = ghost;
+        startDrag(me.clientX, me.clientY);
       }
       if (ghostRef.current) {
         ghostRef.current.style.left = `${me.clientX - offsetX}px`;
@@ -291,6 +305,7 @@ export function TaskPromptView({
     };
 
     const onUp = () => {
+      window.clearTimeout(longPressTimer);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       if (ghostRef.current) { ghostRef.current.remove(); ghostRef.current = null; }
@@ -313,6 +328,10 @@ export function TaskPromptView({
           without.splice(insertAt, 0, moved);
           return without;
         });
+      } else if (!dragStartedRef.current) {
+        // Quick click (no move, no long-press) -> edit the body directly,
+        // replacing the old pencil affordance.
+        setEditingBody(id);
       }
       setDragId(null);
       setDropLine(null);
@@ -488,38 +507,17 @@ export function TaskPromptView({
                     onDone={() => setEditingBody(null)}
                   />
                   <div className="task-prompt-actions">
-                    {isEditingBody ? (
-                      <button
-                        className="task-prompt-tick"
-                        onMouseDown={e => { e.preventDefault(); setEditingBody(null); }}
-                        aria-label="confirm"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      </button>
-                    ) : (
-                      <button
-                        className="task-prompt-pencil"
-                        onClick={e => { e.stopPropagation(); setEditingBody(item.id); }}
-                        aria-label="edit prompt"
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                        </svg>
-                      </button>
-                    )}
+                    <button className="task-prompt-btn task-prompt-send" onClick={e => { e.stopPropagation(); onSend(item); }} disabled={!canSend || !hasBody} aria-label="send">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 21 12 5 21" /></svg>
+                    </button>
                     <button className="task-prompt-btn task-prompt-delete" onClick={e => { e.stopPropagation(); onRemove(item.id); }} aria-label="delete">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="3 6 5 6 21 6" /><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
                       </svg>
                     </button>
-                    <button className="task-prompt-btn task-prompt-send" onClick={e => { e.stopPropagation(); onSend(item); }} disabled={!canSend || !hasBody} aria-label="send">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 21 12 5 21" /></svg>
-                    </button>
                   </div>
                   <div
-                    className="task-prompt-resize"
+                    className={`task-prompt-resize${resizing?.id === item.id ? ' resizing' : ''}`}
                     onPointerDown={e => handleResizeDown(e, item.id)}
                   />
                 </div>

@@ -330,12 +330,14 @@
   filter: brightness(1.25);
   background: rgba(255, 255, 255, 0.05);
 }
-.task-prompt-send:disabled { opacity: 0.3; cursor: not-allowed; }
+.task-prompt-send:disabled { opacity: 0; cursor: not-allowed; }
 
 /* ─── Bottom-edge resize handle ─────────────────────────────────────────────── */
-/* Drag to set a fixed body height (text clips when shrunk). Faint edge on
-   card hover so it's discoverable; gold highlight when actually hovering the
-   handle (like Gambit's top-border hover highlight). */
+/* Drag to set a fixed body height (text clips when shrunk). The grip is a
+   short centred bar (the sticky-note view's resize style): hidden at rest,
+   a light accent bar surfaces on hover, and while dragging (`resizing`) it
+   deepens to the solid accent and lengthens - all on a fast 90ms ease-out.
+   Mirrors .task-note-resize. */
 .task-prompt-resize {
   position: absolute;
   left: 0;
@@ -343,37 +345,43 @@
   bottom: 0;
   height: 11px;
   /* Match the card's bottom corners and clip the ::after bar to the rounded
-     shape - mirroring Gambit's dock-resize (overflow:hidden container), so
-     the highlight follows the card's radius instead of poking past it. */
+     shape (like Gambit's dock-resize) so the highlight follows the radius. */
   border-radius: 0 0 var(--radius-md, 12px) var(--radius-md, 12px);
   overflow: hidden;
   /* !important: global.css sets `* { cursor: default !important }`. The
      ::after has pointer-events:none so the parent stays the hit target and
-     this cursor shows across the whole handle (same pattern as Gambit's
-     dock-resize). */
+     this cursor shows across the whole handle (same pattern as Gambit). */
   cursor: ns-resize !important;
   touch-action: none;
   z-index: 2;
 }
+/* The grip bar - centred in the strip, short + translucent until hover. */
 .task-prompt-resize::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
+  left: 50%;
+  top: 50%;
+  width: 96px;
+  height: 4px;
+  border-radius: 999px;
   background: transparent;
-  transition: background 0.15s;
-  /* Transparent to pointer events so the parent stays the hit target;
-     otherwise the bar intercepts hover and falls back to the global
-     default cursor (and the :hover highlight misfires). */
+  opacity: 0;
   pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: opacity 90ms ease-out, width 90ms ease-out, height 90ms ease-out,
+    background-color 90ms ease-out;
 }
-.task-prompt-card:hover .task-prompt-resize::after {
-  background: rgba(255, 255, 255, 0.14);
-}
+/* Hover surfaces the bar in a light accent (58% mix). */
+.task-prompt-card:hover .task-prompt-resize::after,
 .task-prompt-resize:hover::after {
-  background: var(--accent, #c4956a) !important;
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent, #c4956a) 58%, transparent);
+}
+/* While dragging: deepen to the solid accent and lengthen the bar. */
+.task-prompt-resize.resizing::after {
+  width: 144px;
+  height: 5px;
+  background: var(--accent, #c4956a);
 }
 
 /* ─── Floating ghost (drag clone) ───────────────────────────────────────────── */

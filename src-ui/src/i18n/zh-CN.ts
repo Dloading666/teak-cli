@@ -136,7 +136,7 @@ export const zhCN = {
   'task.view.note': '便签式',
   'task.view.list.sub': '紧凑清单，逐条勾选',
   'task.view.note.sub': '大便签，随手写、整段发给 AI',
-  'task.view.prompt': '提示词式',
+  'task.view.prompt': '分类式',
   'task.view.prompt.sub': '按分类攒 AI 提示词，一键发送',
   'task.prompt.new_category': '新分类',
   'task.prompt.category_placeholder': '分类名（选已有或输入新的）',
