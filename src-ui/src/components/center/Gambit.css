@@ -221,11 +221,15 @@
 .gambit-workspace {
     display: flex;
     align-items: center;
+    gap: 6px;
     flex: 0 1 auto;
     min-width: 0;
     max-width: 200px;
     height: 30px; /* matches .gambit-send exactly */
-    padding: 0 10px;
+    /* 6px = (30 − 18)/2: the icon's left margin equals its top/bottom margin,
+       and the folder text's right margin matches the icon's left margin — the
+       pill is fully symmetric around the icon+name row. */
+    padding: 0 6px;
     border-radius: var(--shape-radius-pill, 999px);
     color: var(--text-1, #e8e4de);
     background: rgba(255, 255, 255, 0.06);
@@ -239,6 +243,24 @@
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+    /* Slightly larger than the pill's default 13px, and its line box equals
+       the icon's 18px height — so the name and the glyph occupy the same
+       centred band inside the pill and read level with each other. */
+    font-size: 14px;
+    line-height: 18px;
+}
+/* Tool glyph — the active tab's icon (SvgClaude / SvgCodex / …), repeated in
+   the chip so it reads as "tool + directory" (mirrors the chrome-tab layout).
+   Icon components size at 1em, so font-size drives the glyph; explicit 18×18
+   box with the chip's 6px padding gives it uniform margins on all four sides. */
+.gambit-workspace-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
 }
 
 /* ─── Thumbnail strip (derived view of image paths in draft) ─ */

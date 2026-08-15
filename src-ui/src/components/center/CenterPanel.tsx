@@ -420,6 +420,44 @@ const SvgPlus = ({ active }: { active: boolean }) => (
   </svg>
 );
 
+// Tool → glyph map, shared by the chrome-tab AND the Gambit workspace chip
+// (ActiveGambit repeats the active tab's icon in the compose footer so the
+// chip reads as "tool + directory", the same icon+name pairing as the tab).
+// renderTabContent keeps title/tooltip logic and falls back to SvgPlus for
+// the placeholder new-tab; this owns ONLY the icon so there's one source of
+// truth for which glyph a tool renders. Returns undefined for unknown tools
+// (Gambit hides the icon rather than showing a wrong one).
+const getToolIcon = (tool: ToolType): React.ReactNode => {
+  switch (tool) {
+    case 'claude': return <SvgClaude />;
+    case 'qwen': return <SvgQwen />;
+    case 'hermes': return <SvgHermes />;
+    case 'opencode': return <SvgOpenCode />;
+    case 'mimocode': return <SvgMimo />;
+    case 'kilo': return <SvgKilo />;
+    case 'openclaw': return <SvgOpenClaw />;
+    case 'codex': return <SvgCodex />;
+    case 'grok': return <SvgGrok />;
+    case 'antigravity': return <SvgAntigravity />;
+    case 'pi': return <SvgPi />;
+    case 'crush': return <SvgCrush />;
+    case 'aider': return <SvgAider />;
+    case 'kimicode': return <SvgKimi />;
+    case 'goose': return <SvgGoose />;
+    case 'copilot': return <SvgCopilot />;
+    case 'cursor': return <SvgCursor />;
+    case 'cline': return <SvgCline />;
+    case 'omp': return <SvgOmp />;
+    case 'remote':
+    case 'terminal': return <TerminalIcon />;
+    case 'two-split': return <SvgTwoSplit />;
+    case 'three-split': return <SvgThreeSplit />;
+    case 'four-split': return <SvgFourSplit />;
+    default: return undefined;
+  }
+};
+export { getToolIcon };
+
 // Pin sanitizer: must mirror AGENT_CATALOG keys below. Used at init to
 // drop obsolete IDs from `coffee_pinned_items` (e.g. `agent:vibeid`
 // from back when /vibeid was a launcher tool, before it became a
@@ -1166,30 +1204,34 @@ export function CenterPanel() {
   const renderTabContent = (session: typeof terminals[0], isActive: boolean) => {
     const cwd = cwdBasename(session.folderPath);
     const pathTip = session.folderPath ?? undefined;
+    // Icon comes from the shared tool→glyph map (also used by the Gambit
+    // workspace chip) so the tab and the compose footer can't drift apart.
+    // The placeholder new-tab (tool === null) falls back to the plus glyph.
+    const icon = getToolIcon(session.tool) ?? <SvgPlus active={isActive} />;
     switch (session.tool) {
-      case 'claude': return { icon: <SvgClaude />, title: cwd ?? getToolDisplayName('claude'), tooltip: pathTip };
-      case 'qwen': return { icon: <SvgQwen />, title: cwd ?? getToolDisplayName('qwen'), tooltip: pathTip };
+      case 'claude': return { icon, title: cwd ?? getToolDisplayName('claude'), tooltip: pathTip };
+      case 'qwen': return { icon, title: cwd ?? getToolDisplayName('qwen'), tooltip: pathTip };
       // OpenClaw / Hermes are directory-agnostic tools — their tab title
       // stays as the tool name regardless of any inherited folderPath.
-      case 'hermes': return { icon: <SvgHermes />, title: getToolDisplayName('hermes'), tooltip: undefined };
-      case 'opencode': return { icon: <SvgOpenCode />, title: cwd ?? getToolDisplayName('opencode'), tooltip: pathTip };
-      case 'mimocode': return { icon: <SvgMimo />, title: cwd ?? getToolDisplayName('mimocode'), tooltip: pathTip };
-      case 'kilo': return { icon: <SvgKilo />, title: cwd ?? getToolDisplayName('kilo'), tooltip: pathTip };
-      case 'openclaw': return { icon: <SvgOpenClaw />, title: getToolDisplayName('openclaw'), tooltip: undefined };
-      case 'codex': return { icon: <SvgCodex />, title: cwd ?? getToolDisplayName('codex'), tooltip: pathTip };
-      case 'grok': return { icon: <SvgGrok />, title: cwd ?? getToolDisplayName('grok'), tooltip: pathTip };
-      case 'antigravity': return { icon: <SvgAntigravity />, title: cwd ?? getToolDisplayName('antigravity'), tooltip: pathTip };
+      case 'hermes': return { icon, title: getToolDisplayName('hermes'), tooltip: undefined };
+      case 'opencode': return { icon, title: cwd ?? getToolDisplayName('opencode'), tooltip: pathTip };
+      case 'mimocode': return { icon, title: cwd ?? getToolDisplayName('mimocode'), tooltip: pathTip };
+      case 'kilo': return { icon, title: cwd ?? getToolDisplayName('kilo'), tooltip: pathTip };
+      case 'openclaw': return { icon, title: getToolDisplayName('openclaw'), tooltip: undefined };
+      case 'codex': return { icon, title: cwd ?? getToolDisplayName('codex'), tooltip: pathTip };
+      case 'grok': return { icon, title: cwd ?? getToolDisplayName('grok'), tooltip: pathTip };
+      case 'antigravity': return { icon, title: cwd ?? getToolDisplayName('antigravity'), tooltip: pathTip };
       // Directory-aware tabs use their icon plus cwd basename. They do not
       // expose an authoritative native title status, so no island is shown.
-      case 'pi': return { icon: <SvgPi />, title: cwd ?? getToolDisplayName('pi'), tooltip: pathTip };
-      case 'crush': return { icon: <SvgCrush />, title: cwd ?? getToolDisplayName('crush'), tooltip: pathTip };
-      case 'aider': return { icon: <SvgAider />, title: cwd ?? getToolDisplayName('aider'), tooltip: pathTip };
-      case 'kimicode': return { icon: <SvgKimi />, title: cwd ?? getToolDisplayName('kimicode'), tooltip: pathTip };
-      case 'goose': return { icon: <SvgGoose />, title: cwd ?? getToolDisplayName('goose'), tooltip: pathTip };
-      case 'copilot': return { icon: <SvgCopilot />, title: cwd ?? getToolDisplayName('copilot'), tooltip: pathTip };
-      case 'cursor': return { icon: <SvgCursor />, title: cwd ?? getToolDisplayName('cursor'), tooltip: pathTip };
-      case 'cline': return { icon: <SvgCline />, title: cwd ?? getToolDisplayName('cline'), tooltip: pathTip };
-      case 'omp': return { icon: <SvgOmp />, title: cwd ?? getToolDisplayName('omp'), tooltip: pathTip };
+      case 'pi': return { icon, title: cwd ?? getToolDisplayName('pi'), tooltip: pathTip };
+      case 'crush': return { icon, title: cwd ?? getToolDisplayName('crush'), tooltip: pathTip };
+      case 'aider': return { icon, title: cwd ?? getToolDisplayName('aider'), tooltip: pathTip };
+      case 'kimicode': return { icon, title: cwd ?? getToolDisplayName('kimicode'), tooltip: pathTip };
+      case 'goose': return { icon, title: cwd ?? getToolDisplayName('goose'), tooltip: pathTip };
+      case 'copilot': return { icon, title: cwd ?? getToolDisplayName('copilot'), tooltip: pathTip };
+      case 'cursor': return { icon, title: cwd ?? getToolDisplayName('cursor'), tooltip: pathTip };
+      case 'cline': return { icon, title: cwd ?? getToolDisplayName('cline'), tooltip: pathTip };
+      case 'omp': return { icon, title: cwd ?? getToolDisplayName('omp'), tooltip: pathTip };
       case 'remote': {
         let title = t('tool.remote') as string;
         if (session.toolData) {
@@ -1202,12 +1244,12 @@ export function CenterPanel() {
             }
           } catch (e) {}
         }
-        return { icon: <TerminalIcon />, title, tooltip: undefined };
+        return { icon, title, tooltip: undefined };
       }
-      case 'terminal': return { icon: <TerminalIcon />, title: cwd ?? t('tool.terminal'), tooltip: pathTip };
-      case 'two-split': return { icon: <SvgTwoSplit />, title: cwd ?? t('tool.two_split' as any), tooltip: pathTip };
-      case 'three-split': return { icon: <SvgThreeSplit />, title: cwd ?? t('tool.three_split' as any), tooltip: pathTip };
-      case 'four-split': return { icon: <SvgFourSplit />, title: cwd ?? t('tool.four_split' as any), tooltip: pathTip };
+      case 'terminal': return { icon, title: cwd ?? t('tool.terminal'), tooltip: pathTip };
+      case 'two-split': return { icon, title: cwd ?? t('tool.two_split' as any), tooltip: pathTip };
+      case 'three-split': return { icon, title: cwd ?? t('tool.three_split' as any), tooltip: pathTip };
+      case 'four-split': return { icon, title: cwd ?? t('tool.four_split' as any), tooltip: pathTip };
       default: return { icon: <SvgPlus active={isActive} />, title: t('tab.new'), tooltip: undefined };
     }
   };

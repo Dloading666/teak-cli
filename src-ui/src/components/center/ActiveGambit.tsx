@@ -20,6 +20,7 @@ import { useCallback, useEffect } from 'react';
 import { useAppState, isSplitTool, paneSessionId, matchHotkeyScheme } from '../../store/app-state';
 import { getTabActions } from '../../lib/tab-actions';
 import { getFocusedPane } from '../../lib/pane-focus';
+import { getToolIcon } from './CenterPanel';
 import { Gambit } from './Gambit';
 
 // Last path segment of a folder, Windows ("\") and POSIX ("/") safe. Local copy
@@ -44,7 +45,14 @@ export function ActiveGambit() {
   // workspace Send would land in. Recomputes on tab switch (activeSession
   // changes), so a long-lived open Gambit can't misdirect a prompt. '' when the
   // tab has no folder (blank terminal) → the label hides.
-  const workspaceName = activeSession?.folderPath ? basename(activeSession.folderPath) : '';
+  const workspaceName =
+    activeSession?.folderPath && activeSession.tool
+      ? basename(activeSession.folderPath)
+      : '';
+  // The active tab's tool glyph — the same icon its chrome-tab shows, so the
+  // Gambit workspace chip reads as "tool + directory" (mirrors the tab's
+  // icon+name pairing). null session → undefined → Gambit hides the icon.
+  const toolIcon = activeSession ? getToolIcon(activeSession.tool) : undefined;
 
   const handleDraftChange = useCallback((draft: string) => {
     if (!activeId) return;
@@ -139,6 +147,7 @@ export function ActiveGambit() {
       sessionId={activeId}
       draft={gambitDraft}
       workspaceName={workspaceName}
+      toolIcon={toolIcon}
       onDraftChange={handleDraftChange}
       onClose={handleClose}
       onSend={handleSend}

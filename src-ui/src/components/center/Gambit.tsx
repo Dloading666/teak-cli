@@ -44,6 +44,10 @@ interface GambitProps {
    *  opposite the send button, so the user always sees which workspace Send
    *  would hit; switching tabs updates it. '' hides the label (no folder). */
   workspaceName: string;
+  /** The active tab's tool glyph — same icon its chrome-tab shows. Rendered
+   *  left of the workspace name so the chip reads as "tool + directory",
+   *  mirroring the tab's icon+name pairing. undefined hides the icon. */
+  toolIcon?: React.ReactNode;
 }
 
 // Matches any absolute image path inside the compose draft — both our
@@ -95,6 +99,7 @@ function GambitImpl({
   leftPanelHidden,
   rightPanelHidden,
   workspaceName,
+  toolIcon,
 }: GambitProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -718,6 +723,7 @@ function GambitImpl({
             pure noise (and read as a different brightness than the text). */}
         {workspaceName && (
           <span className="gambit-workspace">
+            {toolIcon != null && <span className="gambit-workspace-icon">{toolIcon}</span>}
             <span className="gambit-workspace-name">{workspaceName}</span>
           </span>
         )}
