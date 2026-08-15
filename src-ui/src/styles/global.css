@@ -1455,7 +1455,10 @@ body.gambit-docked .multi-agent-grid-standalone {
     font-size: 13px;
     color: var(--text-2);
     cursor: pointer;
-    border-radius: 6px;
+    /* Follow the active shape form (Panel/Sharp = 0, Soft/Glass = radius-sm).
+       Keep in sync with the Explorer.css rules for these same classes — both
+       must use the var or the later-loaded sheet wins the cascade. */
+    border-radius: var(--radius-sm);
     transition: background var(--transition);
 }
 .tree-dir-header:hover, .tree-file:hover { background: var(--bg-hover); color: var(--text-1); }
