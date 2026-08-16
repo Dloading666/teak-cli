@@ -9,7 +9,6 @@
 // etc.) don't cascade into this component.
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
@@ -31,6 +30,7 @@ import { commands } from '../../tauri';
 import { supportsNativeAgentStatus, useAppDispatch, useAppState, type AgentStatus, type ToolType, type ThemeColor } from '../../store/app-state';
 import { useT } from '../../i18n/useT';
 import { getToolDisplayName } from '../../lib/tool-info';
+import { TermContextMenu, type TermContextMenuState } from './TermContextMenu';
 import '@xterm/xterm/css/xterm.css';
 import './TierTerminal.css';
 
@@ -211,69 +211,6 @@ function buildXtermTheme(themeName: string, hasBg: boolean | undefined, schemeId
 // Sessions being detached to a new window — skip kill on unmount
 export const detachedSessions = new Set<string>();
 
-// ─── Terminal Context Menu ────────────────────────────────────────────────────
-
-interface CtxMenu { x: number; y: number; hasSelection: boolean; }
-
-function TermContextMenu({ menu, onClose, onCopy, onPaste, onSelectAll }: {
-  menu: CtxMenu;
-  onClose: () => void;
-  onCopy: () => void;
-  onPaste: () => void;
-  onSelectAll: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const isMac = navigator.platform.toUpperCase().includes('MAC');
-  const t = useT();
-  const mod = isMac ? '⌘' : 'Ctrl';
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    const closeKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    // Delay so the triggering mousedown doesn't immediately close the menu
-    const t = setTimeout(() => {
-      document.addEventListener('mousedown', close);
-      document.addEventListener('keydown', closeKey);
-    }, 0);
-    return () => {
-      clearTimeout(t);
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', closeKey);
-    };
-  }, [onClose]);
-
-  // Clamp to viewport so menu never overflows off-screen
-  const left = Math.min(menu.x, window.innerWidth  - 164);
-  const top  = Math.min(menu.y, window.innerHeight - 116);
-
-  return createPortal(
-    <div ref={ref} className="term-ctx-menu" style={{ left, top }}>
-      <button
-        className={`term-ctx-item${menu.hasSelection ? '' : ' disabled'}`}
-        onMouseDown={(e) => { e.preventDefault(); if (menu.hasSelection) onCopy(); }}
-      >
-        <span>{t('menu.copy')}</span><kbd>{mod}+C</kbd>
-      </button>
-      <button
-        className="term-ctx-item"
-        onMouseDown={(e) => { e.preventDefault(); onPaste(); }}
-      >
-        <span>{t('menu.paste')}</span><kbd>{mod}+V</kbd>
-      </button>
-      <div className="term-ctx-sep" />
-      <button
-        className="term-ctx-item"
-        onMouseDown={(e) => { e.preventDefault(); onSelectAll(); }}
-      >
-        <span>{t('menu.select_all')}</span><kbd>{mod}+A</kbd>
-      </button>
-    </div>,
-    document.body,
-  );
-}
-
 // ── Shared WebGL renderer budget ─────────────────────────────────────────────
 // Chromium/WebView2 caps *active* WebGL contexts at ~16 per renderer process.
 // With one terminal per tab/pane, a long session blows past that and the
@@ -413,6 +350,8 @@ interface TierTerminalProps {
   theme: ThemeColor;
   lang: string;
   isActive: boolean;
+  /** The same PTY is projected through ConversationView while xterm is hidden. */
+  conversationActive?: boolean;
   toolData?: string;
   folderPath?: string | null;
   /** Resume token for "Continue this session" — when set, the mount
@@ -436,7 +375,8 @@ interface TierTerminalProps {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 function TierTerminalImpl({
-  sessionId, tool, toolName, theme, lang, isActive, toolData, folderPath, resumeToken, hasBg, bgUrl, bgType, termColorScheme, termFont,
+  sessionId, tool, toolName, theme, lang, isActive, conversationActive = false,
+  toolData, folderPath, resumeToken, hasBg, bgUrl, bgType, termColorScheme, termFont,
 }: TierTerminalProps) {
   // Raw shells (local terminal / remote SSH) have no TUI painting its own
   // caret — the xterm cursor is the only input-position indicator, so these
@@ -452,6 +392,15 @@ function TierTerminalImpl({
   const { state: _appState } = useAppState();
   const appStateRef = useRef(_appState);
   useEffect(() => { appStateRef.current = _appState; }, [_appState]);
+  const projectionActiveRef = useRef(isActive || conversationActive);
+  projectionActiveRef.current = isActive || conversationActive;
+
+  // TierTerminal is the single owner of backend activity cadence. In chat
+  // mode xterm is intentionally non-intersecting, but its PTY is still the
+  // visible conversation's event source and must remain at foreground speed.
+  useEffect(() => {
+    commands.setSessionActive(sessionId, isActive || conversationActive).catch(() => {});
+  }, [sessionId, isActive, conversationActive]);
 
   const termRef  = useRef<HTMLDivElement>(null);
   // Frozen helper-textarea position held for the lifetime of an IME
@@ -508,7 +457,7 @@ function TierTerminalImpl({
   const [canvasHidden, setCanvasHidden] = useState(false);
 
   // ── Terminal context menu ────────────────────────────────────────────────
-  const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<TermContextMenuState | null>(null);
   const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
 
   const t = useT();
@@ -1102,6 +1051,20 @@ function TierTerminalImpl({
     term.onRender(() => rig.outputRenderEnd());
     const usesNativeStatus = supportsNativeAgentStatus(tool);
 
+    let lastNativeAction = { fingerprint: '', switchedAt: 0 };
+    const requestTerminalForNativeAction = (fingerprint: string) => {
+      const session = appStateRef.current.terminals.find(item => item.id === sessionId);
+      if (session?.viewMode !== 'chat') return;
+      const now = Date.now();
+      // Native Action Required titles blink repeatedly. Also let a user
+      // deliberately switch back to chat without an immediate bounce.
+      if (lastNativeAction.fingerprint === fingerprint && now - lastNativeAction.switchedAt < 30_000) {
+        return;
+      }
+      lastNativeAction = { fingerprint, switchedAt: now };
+      dispatch({ type: 'SET_SESSION_VIEW', id: sessionId, viewMode: 'terminal' });
+    };
+
     // Tool sets its own tab title via OSC 0/2 (e.g. Claude Code's conversation
     // summary) → xterm fires onTitleChange → mirror it to the tab title.
     // Claude, Codex, and Grok also carry their authoritative activity state in the
@@ -1131,6 +1094,9 @@ function TierTerminalImpl({
         const parsed = parseCodexTerminalTitle(title);
         displayTitle = parsed.displayTitle;
         dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: parsed.status });
+        if (parsed.status === 'wait_input') {
+          requestTerminalForNativeAction('native:codex:action-required');
+        }
       } else if (tool === 'grok') {
         const parsed = parseGrokTerminalTitle(title);
         displayTitle = parsed.displayTitle;
@@ -1148,6 +1114,9 @@ function TierTerminalImpl({
         } else {
           clearGrokPermissionRelease();
           setGrokStatus(parsed.status);
+          if (parsed.status === 'wait_input') {
+            requestTerminalForNativeAction('native:grok:action-required');
+          }
         }
       }
       if (displayTitle !== lastTabTitle) {
@@ -1366,7 +1335,8 @@ function TierTerminalImpl({
             // the WebGL observer's discipline keeps this from firing at all.
             if (!mounted) return;
             const visible = entries.some((e) => e.isIntersecting);
-            commands.setSessionActive(sessionId, visible).catch(() => {});
+            const backendActive = visible || projectionActiveRef.current;
+            commands.setSessionActive(sessionId, backendActive).catch(() => {});
             outputScheduler.setActive(sessionId, visible);
             // WebGL lifecycle (Orca suspendRendering pattern): release this
             // tab's GL context when hidden so it doesn't hold one of the ~16

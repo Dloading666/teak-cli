@@ -377,8 +377,8 @@ export function HistoryBoard() {
   };
 
   const handleViewHistory = (saved: SavedSession) => {
-    // Click = resume directly. The old flow opened a ChatReader tab (read-
-    // only bubble view) and made the user click "Continue this session"
+    // Click = resume directly. The old flow opened an intermediate read-only
+    // preview and made the user click "Continue this session"
     // inside it; that intermediate step was slower than just resuming —
     // claude --resume loads its own TUI history faster than the bubble
     // view renders, and the extra tab was one more concept to navigate.

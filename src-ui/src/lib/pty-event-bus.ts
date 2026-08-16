@@ -6,8 +6,9 @@
 // an ID check and early-returned.
 //
 // This module registers exactly ONE listener per event type at the process
-// level, keeps a Map<sessionId, handler>, and routes incoming events to the
-// right handler by ID. N-tab fan-out collapses to O(1) map lookup per event.
+// level, keeps a Map<sessionId, Set<handler>>, and routes incoming events to
+// subscribers for that session. N-tab fan-out collapses to O(1) map lookup;
+// the Set also lets lightweight observers coexist with the xterm renderer.
 //
 // Usage:
 //   const unsub = await subscribeTerminalEvents(sessionId, {
@@ -41,10 +42,10 @@ interface TerminalEventHandlers {
   onExit?: ExitHandler;
 }
 
-const outputHandlers = new Map<string, OutputHandler>();
-const statusHandlers = new Map<string, StatusHandler>();
-const cwdHandlers = new Map<string, CwdHandler>();
-const exitHandlers = new Map<string, ExitHandler>();
+const outputHandlers = new Map<string, Set<OutputHandler>>();
+const statusHandlers = new Map<string, Set<StatusHandler>>();
+const cwdHandlers = new Map<string, Set<CwdHandler>>();
+const exitHandlers = new Map<string, Set<ExitHandler>>();
 
 let globalUnlisteners: UnlistenFn[] | null = null;
 let initPromise: Promise<void> | null = null;
@@ -54,26 +55,35 @@ async function ensureInit(): Promise<void> {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    const unOutput = await listen<OutputEventPayload>('tier-terminal-output', (event) => {
-      const handler = outputHandlers.get(event.payload.id);
-      if (handler) handler(event.payload.data);
-    });
-    const unStatus = await listen<StatusEventPayload>('tier-terminal-status', (event) => {
-      const handler = statusHandlers.get(event.payload.id);
-      if (handler) handler(event.payload.running, event.payload.exit_code);
-    });
-    const unCwd = await listen<CwdEventPayload>('tier-terminal-cwd', (event) => {
-      const handler = cwdHandlers.get(event.payload.id);
-      if (handler) handler(event.payload.cwd);
-    });
-    const unExit = await listen<ExitEventPayload>('tier-terminal-exit', (event) => {
-      const handler = exitHandlers.get(event.payload.id);
-      if (handler) handler(event.payload.exit_code);
-    });
-    globalUnlisteners = [unOutput, unStatus, unCwd, unExit];
+    const registered: UnlistenFn[] = [];
+    try {
+      registered.push(await listen<OutputEventPayload>('tier-terminal-output', (event) => {
+        outputHandlers.get(event.payload.id)?.forEach(handler => handler(event.payload.data));
+      }));
+      registered.push(await listen<StatusEventPayload>('tier-terminal-status', (event) => {
+        statusHandlers.get(event.payload.id)?.forEach(handler => handler(event.payload.running, event.payload.exit_code));
+      }));
+      registered.push(await listen<CwdEventPayload>('tier-terminal-cwd', (event) => {
+        cwdHandlers.get(event.payload.id)?.forEach(handler => handler(event.payload.cwd));
+      }));
+      registered.push(await listen<ExitEventPayload>('tier-terminal-exit', (event) => {
+        exitHandlers.get(event.payload.id)?.forEach(handler => handler(event.payload.exit_code));
+      }));
+      globalUnlisteners = registered;
+    } catch (error) {
+      // A partial Tauri-listener setup must not leak process-wide listeners or
+      // poison every later subscription with the same rejected promise.
+      registered.forEach(unlisten => unlisten());
+      throw error;
+    }
   })();
 
-  return initPromise;
+  try {
+    await initPromise;
+  } catch (error) {
+    initPromise = null;
+    throw error;
+  }
 }
 
 /**
@@ -81,8 +91,9 @@ async function ensureInit(): Promise<void> {
  * Returns an unsubscribe function. Safe to call before or after the global
  * Tauri listeners are initialized — initialization is lazy and shared.
  *
- * Only one handler per (session, event type) is supported. Calling subscribe
- * again for the same session overwrites previous handlers for that session.
+ * Multiple subscribers per (session, event type) are supported. This keeps
+ * the hot Tauri listener singular while allowing independent UI projections
+ * of the same PTY session.
  */
 export async function subscribeTerminalEvents(
   sessionId: string,
@@ -90,26 +101,38 @@ export async function subscribeTerminalEvents(
 ): Promise<() => void> {
   await ensureInit();
 
-  // Capture references to the handlers we just registered.
-  // The unsub function must only remove OUR handlers, not a newer mount's.
+  // Capture references to the handlers we just registered. Cleanup removes
+  // only these exact functions, so Strict Mode remounts remain safe.
   const myOutput = handlers.onOutput;
   const myStatus = handlers.onStatus;
   const myCwd = handlers.onCwd;
   const myExit = handlers.onExit;
 
-  if (myOutput) outputHandlers.set(sessionId, myOutput);
-  if (myStatus) statusHandlers.set(sessionId, myStatus);
-  if (myCwd) cwdHandlers.set(sessionId, myCwd);
-  if (myExit) exitHandlers.set(sessionId, myExit);
+  const add = <T,>(map: Map<string, Set<T>>, handler: T | undefined) => {
+    if (!handler) return;
+    let registered = map.get(sessionId);
+    if (!registered) {
+      registered = new Set<T>();
+      map.set(sessionId, registered);
+    }
+    registered.add(handler);
+  };
+  add(outputHandlers, myOutput);
+  add(statusHandlers, myStatus);
+  add(cwdHandlers, myCwd);
+  add(exitHandlers, myExit);
 
   return () => {
-    // Only delete if the registered handler is still ours.
-    // React Strict Mode double-mounts with the same sessionId: the second
-    // mount overwrites the Map entry, so the first mount's stale unsub must
-    // NOT blow away the second mount's live handler.
-    if (myOutput && outputHandlers.get(sessionId) === myOutput) outputHandlers.delete(sessionId);
-    if (myStatus && statusHandlers.get(sessionId) === myStatus) statusHandlers.delete(sessionId);
-    if (myCwd && cwdHandlers.get(sessionId) === myCwd) cwdHandlers.delete(sessionId);
-    if (myExit && exitHandlers.get(sessionId) === myExit) exitHandlers.delete(sessionId);
+    const remove = <T,>(map: Map<string, Set<T>>, handler: T | undefined) => {
+      if (!handler) return;
+      const registered = map.get(sessionId);
+      if (!registered) return;
+      registered.delete(handler);
+      if (registered.size === 0) map.delete(sessionId);
+    };
+    remove(outputHandlers, myOutput);
+    remove(statusHandlers, myStatus);
+    remove(cwdHandlers, myCwd);
+    remove(exitHandlers, myExit);
   };
 }

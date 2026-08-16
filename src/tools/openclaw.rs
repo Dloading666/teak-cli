@@ -18,8 +18,8 @@ pub static DESCRIPTOR: ToolDescriptor = ToolDescriptor {
     // upstream `openclaw --help` (2026.7.1-2): there is no
     // `openclaw resume <id>`, no `--resume`/`--session` flag — OpenClaw
     // resumes its own last session internally on launch, not via argv.
-    // HistoryBoard's only card action is click-to-resume (the old read-
-    // only ChatReader bubble view was removed), and the Rust resume path
+    // HistoryBoard's only card action is click-to-resume (the old read-only
+    // history preview was removed), and the Rust resume path
     // (terminal.rs AGENT_PRESETS) has `resume_program: None` for openclaw,
     // so server.rs returns "Tool 'openclaw' does not support resume" and
     // the card is a dead-end error. OpenClaw DOES persist multi-session

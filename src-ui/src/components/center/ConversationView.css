@@ -1,0 +1,401 @@
+.conversation-view {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  container-type: inline-size;
+  overflow: hidden;
+  color: var(--text-1);
+  background: var(--bg-terminal);
+}
+
+.conversation-view--has-bg {
+  background: transparent;
+}
+
+.conversation-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.conversation-background img,
+.conversation-background video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: var(--wallpaper-opacity, 0.35);
+}
+
+.conversation-scroll {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.conversation-thread {
+  width: min(860px, calc(100% - 40px));
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 34px 0 46px;
+}
+
+.conversation-view--has-navigation .conversation-thread {
+  width: min(860px, calc(100% - 96px));
+}
+
+.conversation-navigation {
+  position: absolute;
+  top: 50%;
+  left: max(8px, calc(50% - 500px));
+  z-index: 3;
+  display: flex;
+  width: 32px;
+  height: min(58%, 420px);
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: visible;
+  transform: translateY(-50%);
+}
+
+.conversation-navigation-scroll {
+  display: flex;
+  width: 32px;
+  max-height: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 8px 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.conversation-navigation-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.conversation-navigation-item {
+  display: flex;
+  width: 32px;
+  min-height: 12px;
+  flex: 0 0 12px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.conversation-navigation-item > span {
+  display: block;
+  width: 7px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.36;
+  transition: width 140ms ease, opacity 140ms ease, color 140ms ease;
+}
+
+.conversation-navigation-item[data-active="true"] > span {
+  width: 12px;
+  color: var(--accent);
+  opacity: 0.82;
+}
+
+.conversation-navigation-item[data-hover-distance="2"] > span {
+  width: 10px;
+  opacity: 0.5;
+}
+
+.conversation-navigation-item[data-hover-distance="1"] > span {
+  width: 16px;
+  opacity: 0.68;
+}
+
+.conversation-navigation-item[data-hover-distance="0"] > span {
+  width: 26px;
+  height: 2px;
+  color: var(--text-1);
+  opacity: 1;
+}
+
+.conversation-navigation-item:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Same themed tooltip recipe as ContributionHeatmap: panel surface, app
+   border, compact type and the two-layer shadow instead of a native title. */
+.conversation-navigation-tooltip {
+  position: absolute;
+  left: calc(100% + 9px);
+  width: max-content;
+  max-width: min(360px, calc(100cqw - 58px));
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20), 0 6px 20px rgba(0, 0, 0, 0.22);
+  color: var(--text-1);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.conversation-navigation-tooltip > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-navigation-tooltip::before {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-right: 4px solid var(--border);
+  border-bottom: 4px solid transparent;
+  content: '';
+  transform: translateY(-50%);
+}
+
+.conversation-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0 0 22px;
+}
+
+.conversation-message--user {
+  align-items: flex-end;
+}
+
+.conversation-bubble {
+  min-width: 0;
+  max-width: min(76%, 680px);
+  line-height: 1.65;
+  user-select: text;
+}
+
+.conversation-message--user .conversation-bubble {
+  padding: 11px 15px;
+  border: 0;
+  border-radius: var(--shape-radius-panel, 8px);
+  background: var(--accent-bg);
+}
+
+/* Panel is the only shape whose visual language uses drawn dividers. */
+[data-shape="panel"] .conversation-message--user .conversation-bubble {
+  border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--border));
+}
+
+/* Material/backdrop shapes already provide the surface. Keep the message
+   grouping through alignment and spacing without painting another tile. Frost
+   is normalized to data-shape="glass" by App.tsx, so it is covered here too. */
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"])
+  .conversation-message--user .conversation-bubble {
+  background: transparent;
+}
+
+.conversation-message--assistant .conversation-bubble {
+  width: 100%;
+  max-width: 100%;
+}
+
+.conversation-message--optimistic {
+  opacity: 0.82;
+}
+
+.conversation-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--shape-radius-btn, 6px);
+  background: transparent;
+  color: var(--text-2);
+  opacity: 0.62;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.conversation-copy:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+  opacity: 1;
+}
+
+.conversation-copy--copied,
+.conversation-copy--copied:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+  opacity: 1;
+}
+
+.conversation-copy:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.conversation-bubble .md-body > :first-child,
+.conversation-reasoning .md-body > :first-child { margin-top: 0; }
+.conversation-bubble .md-body > :last-child,
+.conversation-reasoning .md-body > :last-child { margin-bottom: 0; }
+.conversation-bubble .md-body p { margin: 0 0 10px; }
+.conversation-bubble .md-body ul,
+.conversation-bubble .md-body ol { padding-left: 22px; }
+.conversation-bubble .md-body a { color: var(--accent); }
+.conversation-bubble .md-inline-code {
+  padding: 1px 5px;
+  border-radius: var(--shape-radius-btn, 4px);
+  background: var(--bg-hover);
+  font-family: var(--term-font, monospace);
+}
+.conversation-bubble .md-code {
+  overflow-x: auto;
+  margin: 12px 0;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--shape-radius-panel, 8px);
+  background: var(--bg-panel);
+  font-family: var(--term-font, monospace);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.md-code-line { min-height: 1.55em; }
+
+.conversation-tool,
+.conversation-reasoning {
+  margin: -5px 0 18px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.conversation-tool summary,
+.conversation-reasoning summary {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  gap: 7px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.conversation-tool summary::-webkit-details-marker,
+.conversation-reasoning summary::-webkit-details-marker { display: none; }
+.conversation-tool summary svg { transition: transform 140ms ease; }
+.conversation-tool[open] summary svg { transform: rotate(90deg); }
+
+.conversation-tool-status {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-2);
+}
+.conversation-tool-status--running { background: var(--accent); animation: conversation-pulse 1.15s ease-in-out infinite; }
+.conversation-tool-status--done { background: var(--success, #62b883); }
+.conversation-tool-status--failed { background: var(--danger, #df6b6b); }
+.conversation-tool pre {
+  overflow-x: auto;
+  margin: 9px 0 0 14px;
+  padding: 10px 12px;
+  border-left: 1px solid var(--border);
+  white-space: pre-wrap;
+  font-family: var(--term-font, monospace);
+  user-select: text;
+}
+.conversation-reasoning-glyph { color: var(--accent); }
+.conversation-reasoning .md-body {
+  margin: 9px 0 0 14px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+  user-select: text;
+}
+
+.conversation-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 2px 2px;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.conversation-thinking-braille {
+  display: inline-block;
+  width: 1ch;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace;
+  line-height: inherit;
+  transform: translateY(0.06em);
+}
+
+.conversation-thinking-braille::after {
+  display: inline-block;
+  content: '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
+  animation: conversation-thinking-braille 0.9s steps(10, end) infinite;
+}
+
+.conversation-thinking-text {
+  background: linear-gradient(
+    90deg,
+    var(--text-2) 0%,
+    var(--text-2) 40%,
+    color-mix(in srgb, var(--text-2) 38%, transparent) 50%,
+    var(--text-2) 60%,
+    var(--text-2) 100%
+  );
+  background-position: 100% 0;
+  background-size: 225% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: conversation-thinking-shimmer 2.7s linear infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes conversation-pulse { 50% { opacity: 0.35; } }
+@keyframes conversation-thinking-braille { to { transform: translateX(-10ch); } }
+@keyframes conversation-thinking-shimmer { to { background-position: 0 0; } }
+
+@media (max-width: 720px) {
+  .conversation-thread { width: calc(100% - 24px); padding-top: 22px; }
+  .conversation-bubble { max-width: 88%; }
+}
+
+@container (max-width: 760px) {
+  .conversation-navigation { display: none; }
+  .conversation-view--has-navigation .conversation-thread {
+    width: calc(100% - 24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-thinking-text,
+  .conversation-thinking-braille::after,
+  .conversation-tool-status--running { animation: none; }
+
+  .conversation-navigation-item > span { transition: none; }
+
+  .conversation-thinking-braille { opacity: 0.5; }
+}

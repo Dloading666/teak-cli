@@ -392,8 +392,8 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
     // "Tool 'openclaw' does not support resume" Err instead of
     // spawning a `openclaw resume <token>` invocation that OpenClaw
     // itself would reject as an unknown command. Frontend UX (hiding
-    // the resume button entirely for openclaw history rows) is a
-    // separate ChatReader change.
+    // the resume action entirely for OpenClaw history rows) is handled
+    // separately by HistoryBoard.
     AgentPreset {
         tool_name: "openclaw",
         resume_program: None,

@@ -92,8 +92,19 @@ export interface SavedSession {
   cwd: string;
   session_token: string | null;
   saved_at: string;
+  /** Stable creation timestamp used to distinguish concurrent live terminals.
+   * Unlike saved_at, this value must not advance on every assistant write. */
+  created_at?: string;
   file_path?: string;
   turn_count?: number;
+}
+
+export interface ChatSessionRead {
+  data: string;
+  cursor: number | null;
+  revision: string;
+  append: boolean;
+  unchanged: boolean;
 }
 
 export interface DirEntryInfo {
@@ -146,25 +157,18 @@ export const commands = {
    *  widen its coalesce window while nobody is looking at that tab. */
   setSessionActive: (sessionId: string, active: boolean) =>
     invoke<void>('set_session_active', { sessionId, active }),
+  getTerminalSessionToken: (sessionId: string) =>
+    invoke<string | null>('get_terminal_session_token', { sessionId }),
 
   // Session Resume
-  getNativeHistory: () => invoke<SavedSession[]>('get_native_history'),
+  getNativeHistory: (force = false) => invoke<SavedSession[]>('get_native_history', { force }),
   /** Per-session activity for the contribution heatmap.
    *  One entry per session file: { ts: epoch seconds, count: msg lines }.
    *  Frontend buckets ts into local-day boxes for the grid. */
   getMessageHeatmap: () =>
     invoke<{ ts: number; count: number }[]>('get_message_heatmap'),
-  readNativeSession: (filePath: string) => invoke<string>('read_native_session', { filePath }),
-  readOpencodeSession: (sessionId: string) =>
-    invoke<string>('read_opencode_session', { sessionId }),
-  // Hermes Agent sessions from the newer SQLite state.db (no per-session
-  // file). Returns the same newline-delimited {message:{role,content}} shape
-  // as readNativeSession so ChatReader's parser handles it unchanged.
-  readHermesSession: (sessionToken: string) =>
-    invoke<string>('read_hermes_session', { sessionToken }),
-  // MiMo Code (OpenCode fork) — same SQLite schema, read from mimocode.db.
-  readMimocodeSession: (sessionToken: string) =>
-    invoke<string>('read_mimocode_session', { sessionToken }),
+  readChatSession: (session: SavedSession, cursor?: number | null, revision?: string) =>
+    invoke<ChatSessionRead>('read_chat_session', { session, cursor, revision }),
   checkNetworkPort: (host: string, port: number) => invoke<boolean>('check_network_port', { host, port }),
 
   // Tool availability detection

@@ -263,6 +263,83 @@
     font-size: 18px;
 }
 
+.gambit-view-toggle {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: 64px;
+    height: 30px;
+    gap: 0;
+    padding: 2px;
+    border: 0;
+    overflow: hidden;
+    border-radius: var(--shape-radius-pill, 999px);
+    background: var(--bg-hover);
+}
+
+/* One continuous two-segment selector: the shared track supplies the single
+   silhouette while this 30px thumb glides between icon positions. Both radii
+   use shape tokens, so Soft/Glass become a pill, Slab stays gently squared,
+   and Panel/Sharp become a clean rectangle. */
+.gambit-view-toggle::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    z-index: 0;
+    width: 30px;
+    height: 26px;
+    border-radius: var(--shape-radius-pill, 999px);
+    background: color-mix(in srgb, var(--accent) 20%, var(--bg-panel));
+    transform: translateX(0);
+    transition: transform 180ms cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+.gambit-view-toggle[data-view-mode="terminal"]::before {
+    transform: translateX(30px);
+}
+
+.gambit-view-toggle-btn {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    color: var(--text-2);
+    background: transparent;
+    cursor: pointer;
+    transition: color 140ms ease;
+}
+
+.gambit-view-toggle-btn:hover {
+    color: var(--text-1);
+}
+
+.gambit-view-toggle-btn[aria-pressed="true"] {
+    color: var(--accent);
+}
+
+.gambit-view-toggle-btn svg {
+    transition: transform 120ms ease;
+}
+
+.gambit-view-toggle-btn:active svg {
+    transform: scale(0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gambit-view-toggle::before,
+    .gambit-view-toggle-btn {
+        transition: none;
+    }
+}
+
 /* ─── Thumbnail strip (derived view of image paths in draft) ─ */
 /* Pure visual — no state of its own. Regex scans draft text for
    absolute image paths; each unique match gets a thumb. Clicking a

@@ -20,6 +20,7 @@ import { useCallback, useEffect } from 'react';
 import { useAppState, isSplitTool, paneSessionId, matchHotkeyScheme } from '../../store/app-state';
 import { getTabActions } from '../../lib/tab-actions';
 import { getFocusedPane } from '../../lib/pane-focus';
+import { supportsConversationTool } from '../../lib/chat-tools';
 import { getToolIcon } from './CenterPanel';
 import { Gambit } from './Gambit';
 
@@ -53,6 +54,8 @@ export function ActiveGambit() {
   // Gambit workspace chip reads as "tool + directory" (mirrors the tab's
   // icon+name pairing). null session → undefined → Gambit hides the icon.
   const toolIcon = activeSession ? getToolIcon(activeSession.tool) : undefined;
+  const canUseChat = supportsConversationTool(activeSession?.tool);
+  const viewMode = canUseChat ? (activeSession?.viewMode ?? 'terminal') : 'terminal';
 
   const handleDraftChange = useCallback((draft: string) => {
     if (!activeId) return;
@@ -93,8 +96,17 @@ export function ActiveGambit() {
     }
     const actions = getTabActions(targetId);
     if (!actions) return false;
-    return actions.paste(text);
-  }, [activeId, activeSession?.tool]);
+    const sent = actions.paste(text);
+    if (sent && !isSplitTool(tool) && canUseChat) {
+      dispatch({ type: 'SET_CHAT_PENDING', id: activeId, pending: { text, sentAt: Date.now() } });
+    }
+    return sent;
+  }, [activeId, activeSession?.tool, canUseChat, dispatch]);
+
+  const handleViewModeChange = useCallback((next: 'terminal' | 'chat') => {
+    if (!activeId || (next === 'chat' && !canUseChat)) return;
+    dispatch({ type: 'SET_SESSION_VIEW', id: activeId, viewMode: next });
+  }, [activeId, canUseChat, dispatch]);
 
   // Global open/close hotkey (settings → 妙手). Registered in the CAPTURE
   // phase on document so it fires BEFORE the focused xterm's own keydown —
@@ -137,7 +149,7 @@ export function ActiveGambit() {
   // first launch (see app-state initializer) but the user's toggle sticks —
   // cc-gambit-open is the single source that initializer reads back.
   useEffect(() => {
-    try { localStorage.setItem('cc-gambit-open', state.gambitOpen ? '1' : '0'); } catch {}
+    try { localStorage.setItem('cc-gambit-open', state.gambitOpen ? '1' : '0'); } catch { /* optional preference */ }
   }, [state.gambitOpen]);
 
   if (!gambitOpen || !activeId) return null;
@@ -148,6 +160,9 @@ export function ActiveGambit() {
       draft={gambitDraft}
       workspaceName={workspaceName}
       toolIcon={toolIcon}
+      canUseChat={canUseChat}
+      viewMode={viewMode}
+      onViewModeChange={handleViewModeChange}
       onDraftChange={handleDraftChange}
       onClose={handleClose}
       onSend={handleSend}

@@ -48,6 +48,9 @@ interface GambitProps {
    *  left of the workspace name so the chip reads as "tool + directory",
    *  mirroring the tab's icon+name pairing. undefined hides the icon. */
   toolIcon?: React.ReactNode;
+  canUseChat: boolean;
+  viewMode: 'terminal' | 'chat';
+  onViewModeChange: (mode: 'terminal' | 'chat') => void;
 }
 
 // Matches any absolute image path inside the compose draft — both our
@@ -100,6 +103,9 @@ function GambitImpl({
   rightPanelHidden,
   workspaceName,
   toolIcon,
+  canUseChat,
+  viewMode,
+  onViewModeChange,
 }: GambitProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -143,7 +149,7 @@ function GambitImpl({
       const raw = localStorage.getItem(LS_DOCK_H);
       const n = raw ? parseInt(raw, 10) : NaN;
       if (Number.isFinite(n) && n >= DOCK_MIN_HEIGHT) return n;
-    } catch {}
+    } catch { /* optional preference */ }
     return DOCK_DEFAULT_HEIGHT;
   });
   // Caches the latest height written to the DOM during a resize drag, so
@@ -186,7 +192,7 @@ function GambitImpl({
 
   // Persist dock height. Cheap to write — runs only on settle.
   useEffect(() => {
-    try { localStorage.setItem(LS_DOCK_H, String(dockedH)); } catch {}
+    try { localStorage.setItem(LS_DOCK_H, String(dockedH)); } catch { /* optional preference */ }
   }, [dockedH]);
 
   // Top-edge vertical drag to resize dock height (constrained to the Y axis).
@@ -411,7 +417,7 @@ function GambitImpl({
     return () => {
       document.removeEventListener('mousedown', onDocMouseDown, true);
       document.removeEventListener('keydown', onKey, true);
-      document.removeEventListener('wheel', onWheel, { capture: true } as any);
+      document.removeEventListener('wheel', onWheel, true);
       window.removeEventListener('blur', close);
       window.removeEventListener('resize', close);
     };
@@ -763,6 +769,36 @@ function GambitImpl({
           <span className="gambit-send-hint gambit-send-hint--empty" role="status">
             {t('gambit.send_empty_hint')}
           </span>
+        )}
+        {canUseChat && (
+          <div
+            className="gambit-view-toggle"
+            data-view-mode={viewMode}
+            role="group"
+            aria-label="View mode"
+          >
+            <button
+              className="gambit-view-toggle-btn"
+              aria-label="Conversation view"
+              aria-pressed={viewMode === 'chat'}
+              onClick={() => onViewModeChange('chat')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3 1.7-5.1A7 7 0 0 1 3 12V8a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+              </svg>
+            </button>
+            <button
+              className="gambit-view-toggle-btn"
+              aria-label="Terminal view"
+              aria-pressed={viewMode === 'terminal'}
+              onClick={() => onViewModeChange('terminal')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="4 7 9 12 4 17" />
+                <line x1="12" y1="17" x2="20" y2="17" />
+              </svg>
+            </button>
+          </div>
         )}
         <button
           className={`gambit-send${sendFailed ? ' gambit-send--failed' : ''}${!draft.trim() ? ' gambit-send--empty' : ''}`}

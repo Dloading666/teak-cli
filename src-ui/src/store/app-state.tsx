@@ -159,6 +159,14 @@ export interface TerminalSession {
   isHidden?: boolean;
   agentStatus?: AgentStatus;
   gambitDraft?: string;    // Unsent textarea content, preserved across tab switches
+  /** Per-tab center surface. The PTY stays mounted while chat is visible so
+   *  switching views never interrupts the running CLI or loses output. */
+  viewMode?: 'terminal' | 'chat';
+  /** Optimistic prompt shown before the CLI has flushed it to native history. */
+  chatPending?: { text: string; sentAt: number };
+  /** Local launch timestamp used to reject older history files when binding
+   *  a live conversation to this terminal tab. */
+  startedAt?: number;
   /// When present, this Tab renders as a 2×2+ pane grid instead of a
   /// single terminal. See docs/MULTI-AGENT-ARCHITECTURE.md §5.7 and §7.
   multiAgent?: MultiAgentState;
@@ -339,6 +347,9 @@ type Action =
   | { type: 'SET_HOTKEY_SCHEME'; value: HotkeyScheme }
   | { type: 'SET_TITLEBAR_TOGGLE_DISPLAY'; value: TitlebarToggleDisplay }
   | { type: 'SET_GAMBIT_DRAFT'; id: string; draft: string }
+  | { type: 'APPEND_GAMBIT_DRAFT'; id: string; text: string }
+  | { type: 'SET_SESSION_VIEW'; id: string; viewMode: 'terminal' | 'chat' }
+  | { type: 'SET_CHAT_PENDING'; id: string; pending?: { text: string; sentAt: number } }
   | { type: 'SET_PANE_TOOL'; tabId: string; paneIdx: number; tool: ToolType; toolData?: string; folderPath?: string | null }
   | { type: 'SET_PANE_SENTINEL'; tabId: string; paneIdx: number; enabled: boolean }
   | { type: 'SET_PANE_COMPLETION'; tabId: string; paneIdx: number; ts: number }
@@ -386,12 +397,16 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, iconTheme: action.theme };
     case 'SET_LANG':
       return { ...state, currentLang: action.lang };
-    case 'ADD_TERMINAL':
+    case 'ADD_TERMINAL': {
+      const session = action.session.tool && !action.session.startedAt
+        ? { ...action.session, startedAt: Date.now() }
+        : action.session;
       return { 
         ...state, 
-        terminals: [...state.terminals, action.session],
-        activeTerminalId: action.session.id 
+        terminals: [...state.terminals, session],
+        activeTerminalId: session.id
       };
+    }
     case 'REMOVE_TERMINAL': {
       let newTerminals = state.terminals.filter(t => t.id !== action.id);
       let newActiveId = state.activeTerminalId;
@@ -436,7 +451,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_TERMINAL_TOOL':
       return {
         ...state,
-        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, toolTitle: undefined, agentStatus: undefined } : t)
+        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, toolTitle: undefined, agentStatus: undefined, viewMode: 'terminal', chatPending: undefined, startedAt: Date.now() } : t)
       };
     case 'SET_TERMINAL_HIDDEN':
       return {
@@ -447,7 +462,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         terminals: state.terminals.map(t =>
-          t.id === action.id ? { ...t, id: action.newId, toolTitle: undefined, agentStatus: undefined } : t
+          t.id === action.id ? { ...t, id: action.newId, toolTitle: undefined, agentStatus: undefined, chatPending: undefined, startedAt: Date.now() } : t
         ),
         activeTerminalId: state.activeTerminalId === action.id ? action.newId : state.activeTerminalId
       };
@@ -488,6 +503,23 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         terminals: state.terminals.map(t => t.id === action.id ? { ...t, gambitDraft: action.draft } : t)
+      };
+    case 'APPEND_GAMBIT_DRAFT':
+      return {
+        ...state,
+        terminals: state.terminals.map(t => t.id === action.id
+          ? { ...t, gambitDraft: `${t.gambitDraft ?? ''}${action.text}` }
+          : t),
+      };
+    case 'SET_SESSION_VIEW':
+      return {
+        ...state,
+        terminals: state.terminals.map(t => t.id === action.id ? { ...t, viewMode: action.viewMode } : t),
+      };
+    case 'SET_CHAT_PENDING':
+      return {
+        ...state,
+        terminals: state.terminals.map(t => t.id === action.id ? { ...t, chatPending: action.pending } : t),
       };
     case 'SET_PANE_TOOL': {
       // Seed a MultiAgentState lazily on the first pane selection so

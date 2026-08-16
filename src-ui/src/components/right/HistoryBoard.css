@@ -1,5 +1,5 @@
 /* ── History Card (Recent Sessions) ──
-   All visible colors come from theme variables — same fix as ChatReader
+   All visible colors come from theme variables — same rule as conversation surfaces
    (issue #21). Earlier the cards/search/skeleton used hard-coded white
    half-transparent layers (rgba(255,255,255,0.03) etc.) which collapsed
    to "almost invisible" on the light theme since white-on-white has no

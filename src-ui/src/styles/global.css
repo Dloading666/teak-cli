@@ -1339,7 +1339,7 @@ html.is-macos .titlebar-left-slot.is-collapsed {
    Gambit.tsx (initial value + during top-edge drag-resize). */
 /* Reserve room at the bottom for the docked Gambit card PLUS its 8px
    top/bottom breathing gap (16px total). We apply this to .tier-terminal
-   AND .launchpad-container — NOT to .panel-center — so that each
+   and .launchpad-container — NOT to .panel-center — so that each
    container's own `position: absolute; inset: 0` background layer
    (.tier-terminal-bg / .launchpad-bg) naturally extends through the
    padding region. Result: the gap above the dock shows the terminal's
@@ -1351,6 +1351,14 @@ body.gambit-docked .tier-terminal,
 body.gambit-docked .launchpad-container,
 body.gambit-docked .multi-agent-grid-standalone {
     padding-bottom: calc(var(--gambit-dock-h, 200px) + 16px);
+}
+
+/* Keep ConversationView full-height so its wallpaper continues through the
+   breathing gap and behind Gambit exactly like TierTerminal. Only shrink the
+   inner scroll owner: messages, clipping edge, and scrollbar stop above the
+   dock while the background layer remains visually continuous. */
+body.gambit-docked .conversation-scroll {
+    height: calc(100% - var(--gambit-dock-h, 200px) - 16px);
 }
 
 .tab-actions {
@@ -1679,9 +1687,9 @@ html.is-windows[data-frost="frost"] #root {
    Buttons / inputs / textareas / anchors aren't matched by the
    element list at all, so their own hover/focus bgs are
    untouched. */
-:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-left :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-toggle, .library-toggle-knob, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
-:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-right :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-toggle, .library-toggle-knob, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line),
-:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-center :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-toggle, .library-toggle-knob, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .diff-line) {
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-left :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-toggle, .library-toggle-knob, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .conversation-navigation-tooltip, .diff-line),
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-right :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-toggle, .library-toggle-knob, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .conversation-navigation-tooltip, .diff-line),
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-center :is(div, section, aside, nav, header, footer, main):not(.launchpad-card, .launchpad-card-group, .task-card, .task-note-card, .task-prompt-card, .task-prompt-category-menu, .task-note-head, .task-droppable-area, .guide-card, .remote-form-card, .remote-form-overlay, .remote-protocol-toggle, .remote-pill, .chat-input-container, .library-item, .library-toggle, .library-toggle-knob, .ctx-menu, .gambit, .tool-config-modal, .tab-status-dot, .heatmap-cell, .conversation-navigation-tooltip, .diff-line) {
     background: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;
@@ -1945,6 +1953,20 @@ html.is-windows[data-frost="frost"] #root {
     box-shadow:
         inset 0 1px 0 0 rgba(255, 255, 255, 0.24),
         0 12px 40px rgba(0, 0, 0, 0.40);
+}
+
+/* Gambit's active view segment must remain glass as well. The base thumb
+   mixes accent into opaque --bg-panel, which is appropriate for solid
+   shapes but reads as a painted disk inside Glass/Frost. Frost normalizes to
+   data-shape="glass", so this one translucent accent wash covers both. */
+[data-shape="glass"] .gambit-view-toggle::before {
+    background: color-mix(in srgb, var(--accent) 28%, transparent);
+    backdrop-filter: blur(8px) saturate(150%);
+    -webkit-backdrop-filter: blur(8px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.20);
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.08);
 }
 
 /* Primary action dots (Gambit send ↑ + TaskBoard add +).

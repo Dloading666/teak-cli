@@ -253,6 +253,20 @@
   flex-direction: column;
 }
 
+.terminal-mode-surface {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.conversation-mode-surface {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
 /* ─── Launchpad Grid Overlay ─── */
 .launchpad-container {
   flex: 1;

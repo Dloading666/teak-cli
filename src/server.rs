@@ -2,7 +2,7 @@ use crate::terminal;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use tauri::{State, Manager, Emitter};
 use tauri_plugin_dialog::DialogExt;
 
@@ -1087,8 +1087,52 @@ struct SavedSession {
     cwd: String,
     session_token: Option<String>,
     saved_at: String,
+    #[serde(default)]
+    created_at: Option<String>,
     file_path: Option<String>,
     turn_count: Option<u32>,
+}
+
+#[tauri::command]
+fn get_terminal_session_token(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let map = state.terminal_session.lock().map_err(|e| e.to_string())?;
+    let Some(session) = map.get(&session_id) else {
+        return Ok(None);
+    };
+    let token = session.session_token.lock()
+        .map(|token| token.clone())
+        .map_err(|e| e.to_string())?;
+    Ok(token)
+}
+
+fn file_created_epoch_ms(path: &std::path::Path) -> Option<String> {
+    let metadata = std::fs::metadata(path).ok()?;
+    // `modified()` is deliberately not a fallback here: session transcripts
+    // are append-only, so mtime advances on every turn and is not a stable
+    // identity signal. On filesystems without birth time support, callers
+    // should prefer the creation timestamp embedded in the CLI transcript.
+    let timestamp = metadata.created().ok()?;
+    let duration = timestamp.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()?;
+    Some(duration.as_millis().to_string())
+}
+
+fn json_timestamp_string(value: &serde_json::Value) -> Option<String> {
+    if let Some(value) = value.as_str().filter(|value| !value.is_empty()) {
+        return Some(value.to_string());
+    }
+    if let Some(value) = value.as_i64() {
+        return Some(value.to_string());
+    }
+    if let Some(value) = value.as_u64() {
+        return Some(value.to_string());
+    }
+    value
+        .as_f64()
+        .filter(|value| value.is_finite())
+        .map(|value| value.to_string())
 }
 
 /// XML-style tags injected into the user message stream by Claude /
@@ -1254,6 +1298,7 @@ fn parse_agent_jsonl(
     let mut session_id = file_path.file_stem()?.to_string_lossy().to_string();
     let mut cwd = String::new();
     let mut updated_at = String::new();
+    let mut created_at = None;
     let mut title = String::new();
     let mut total_messages = 0;
     // Count of REAL user messages — ones that are not IDE/system injections
@@ -1266,6 +1311,9 @@ fn parse_agent_jsonl(
 
     for line in reader.lines().map_while(Result::ok) {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) {
+            if created_at.is_none() {
+                created_at = value.get("timestamp").and_then(json_timestamp_string);
+            }
             if let Some(s) = value.get("sessionId").and_then(|v| v.as_str()) {
                 if !s.is_empty() { session_id = s.to_string(); }
             }
@@ -1403,6 +1451,7 @@ fn parse_agent_jsonl(
         cwd,
         session_token: Some(session_id),
         saved_at: updated_at,
+        created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
     })
@@ -1430,6 +1479,7 @@ fn parse_pi_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession> {
     let mut cwd = String::new();
     let mut title = String::new();
     let mut total_messages = 0;
+    let mut created_at = None;
 
     for line in reader.lines().map_while(Result::ok) {
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
@@ -1437,6 +1487,10 @@ fn parse_pi_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession> {
 
         // Header: pull id (resume token) + cwd straight off line 1.
         if row_type == "session" {
+            created_at = value
+                .get("timestamp")
+                .and_then(json_timestamp_string)
+                .or(created_at);
             if let Some(id) = value.get("id").and_then(|v| v.as_str()) {
                 if !id.is_empty() { session_id = id.to_string(); }
             }
@@ -1492,6 +1546,7 @@ fn parse_pi_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession> {
         cwd,
         session_token: Some(session_id),
         saved_at: updated_at,
+        created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
     })
@@ -1554,6 +1609,7 @@ fn parse_codex_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession
     let mut updated_at = String::new();
     let mut title = String::new();
     let mut total_messages = 0;
+    let mut created_at = None;
 
     for line in reader.lines().map_while(Result::ok) {
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) else {
@@ -1567,6 +1623,11 @@ fn parse_codex_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession
 
         // Session meta: pull id + cwd off the first row.
         if row_type == "session_meta" {
+            created_at = payload
+                .get("timestamp")
+                .or_else(|| value.get("timestamp"))
+                .and_then(json_timestamp_string)
+                .or(created_at);
             // Codex (incl. Codex Desktop) writes a separate rollout JSONL for
             // every sub-agent it spawns, alongside the user's main session.
             // Sub-agent rollouts inherit the parent's first user message, so
@@ -1654,6 +1715,7 @@ fn parse_codex_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession
         cwd,
         session_token: Some(session_id),
         saved_at: updated_at,
+        created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
     })
@@ -1731,6 +1793,7 @@ fn parse_gemini_session_jsonl(
     let mut updated_at = String::new();
     let mut title = String::new();
     let mut total_messages = 0;
+    let mut created_at = None;
 
     if let Some(short) = file_path
         .parent()
@@ -1753,6 +1816,9 @@ fn parse_gemini_session_jsonl(
             if !s.is_empty() {
                 session_id = s.to_string();
             }
+        }
+        if created_at.is_none() {
+            created_at = value.get("startTime").and_then(json_timestamp_string);
         }
         let row_type = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
         if row_type == "user" || row_type == "gemini" {
@@ -1798,6 +1864,7 @@ fn parse_gemini_session_jsonl(
         cwd,
         session_token: Some(session_id),
         saved_at: updated_at,
+        created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
     })
@@ -1843,6 +1910,7 @@ fn parse_qwen_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession>
     let mut updated_at = String::new();
     let mut title = String::new();
     let mut total_messages = 0;
+    let mut created_at = None;
 
     for line in reader.lines().map_while(Result::ok) {
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) else {
@@ -1852,6 +1920,9 @@ fn parse_qwen_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession>
             if !s.is_empty() {
                 session_id = s.to_string();
             }
+        }
+        if created_at.is_none() {
+            created_at = value.get("timestamp").and_then(json_timestamp_string);
         }
         if cwd.is_empty() {
             if let Some(c) = value.get("cwd").and_then(|v| v.as_str()) {
@@ -1907,13 +1978,13 @@ fn parse_qwen_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession>
         cwd,
         session_token: Some(session_id),
         saved_at: updated_at,
+        created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
     })
 }
 
-#[tauri::command]
-fn read_native_session(file_path: String) -> Result<String, String> {
+fn validated_native_session_path(file_path: &str) -> Result<std::path::PathBuf, String> {
     let path = std::path::Path::new(&file_path);
 
     // Only allow .jsonl / .json files
@@ -1967,8 +2038,8 @@ fn read_native_session(file_path: String) -> Result<String, String> {
         home.join(".gemini").join("antigravity-cli"),
         // Antigravity / legacy Gemini session dir — both CLIs write
         // session JSONL under `~/.gemini/tmp/<project>/chats/`. Sessions
-        // surface in the history list tagged as Antigravity; ChatReader
-        // walks file_path through this gate to load them.
+        // surface in the history list tagged as Antigravity;
+        // ConversationView walks file_path through this gate to load them.
         home.join(".gemini").join("tmp"),
     ];
     if hermes_legacy != hermes_root {
@@ -1980,11 +2051,31 @@ fn read_native_session(file_path: String) -> Result<String, String> {
             allowed.push(crate::tool_config::expand_path(&cfg));
         }
     }
+    // Registry-backed tools added after the original allowlist (Pi, Kimi,
+    // Grok, MiMo, Kilo, etc.) use the exact same resolved history root as the
+    // scanner. This also covers per-tool history-path overrides.
+    for tool in crate::tools::TOOLS {
+        if let Some(shape) = tool.history_shape.as_ref() {
+            allowed.push(crate::tool_config::history_path_for(
+                tool.id,
+                shape.join_under(&home),
+            ));
+        }
+    }
+    if let Ok(kimi_home) = std::env::var("KIMI_CODE_HOME") {
+        if !kimi_home.is_empty() {
+            allowed.push(std::path::PathBuf::from(kimi_home));
+        }
+    }
+    if let Ok(grok_home) = std::env::var("GROK_HOME") {
+        if !grok_home.is_empty() {
+            allowed.push(std::path::PathBuf::from(grok_home).join("sessions"));
+        }
+    }
     if !allowed.iter().any(|prefix| canonical.starts_with(prefix)) {
         return Err("Access denied: path is outside allowed agent data directories".to_string());
     }
-
-    std::fs::read_to_string(&canonical).map_err(|e| e.to_string())
+    Ok(canonical)
 }
 
 // ─── OpenCode Session Reader ─────────────────────────────────────────────────
@@ -1996,8 +2087,8 @@ fn read_native_session(file_path: String) -> Result<String, String> {
 //   • JSON  (legacy):    `~/.local/share/opencode/storage/message/<sid>/*.json`
 //                         one file per message, content blocks inline.
 //
-// Both are normalized to the same JSONL shape that ChatReader.tsx already
-// understands (Claude Code shape with `{message:{role, content[]}}`):
+// Both are normalized to the same JSONL shape ConversationView understands
+// (Claude Code shape with `{message:{role, content[]}}`):
 //
 //   {"message": {"role": "user", "content": [{"type":"text","text":"..."}]}}
 //   {"message": {"role": "assistant", "content": [{"type":"text","text":"..."}]}}
@@ -2147,7 +2238,6 @@ fn read_opencode_json_dir(message_dir: &std::path::Path) -> Result<String, Strin
     Ok(out)
 }
 
-#[tauri::command]
 fn read_opencode_session(session_id: String) -> Result<String, String> {
     let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
 
@@ -2229,11 +2319,237 @@ fn kilo_db(home: &std::path::Path) -> Option<std::path::PathBuf> {
 
 /// Read one MiMo Code session transcript. Same schema as OpenCode, so this
 /// just points `read_opencode_sqlite_session` at `mimocode.db`.
-#[tauri::command]
 fn read_mimocode_session(session_token: String) -> Result<String, String> {
     let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
     let db = mimocode_db(&home).ok_or("MiMo Code session storage not found")?;
     read_opencode_sqlite_session(&db, &session_token)
+}
+
+#[derive(Serialize)]
+struct ChatSessionRead {
+    data: String,
+    cursor: Option<u64>,
+    revision: String,
+    append: bool,
+    unchanged: bool,
+}
+
+/// Read one session through the storage adapter for its tool. Append-only
+/// JSONL sources return only bytes written after `cursor`; database and JSON
+/// sources return a full snapshot only when their revision changed.
+#[tauri::command]
+async fn read_chat_session(
+    session: SavedSession,
+    cursor: Option<u64>,
+    revision: Option<String>,
+) -> Result<ChatSessionRead, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        read_chat_session_blocking(session, cursor, revision.as_deref())
+    })
+    .await
+    .map_err(|e| format!("Chat session task join failed: {e}"))?
+}
+
+fn chat_session_file_path(session: &SavedSession) -> Result<Option<std::path::PathBuf>, String> {
+    let path = match session.tool.as_str() {
+        "opencode" | "mimocode" | "kilo" => return Ok(None),
+        "hermes" if session.file_path.is_none() => return Ok(None),
+        "kimicode" => std::path::Path::new(
+            session.file_path.as_deref().ok_or("Kimi Code session path is missing")?,
+        )
+        .join("agents")
+        .join("main")
+        .join("wire.jsonl"),
+        "grok" => std::path::Path::new(
+            session.file_path.as_deref().ok_or("Grok session path is missing")?,
+        )
+        .join("chat_history.jsonl"),
+        _ => std::path::PathBuf::from(
+            session.file_path.as_deref().ok_or("Session transcript path is missing")?,
+        ),
+    };
+    Ok(Some(validated_native_session_path(&path.to_string_lossy())?))
+}
+
+fn content_revision(content: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    content.hash(&mut hasher);
+    format!("content:{:016x}", hasher.finish())
+}
+
+fn drizzle_session_revision(
+    db_path: &std::path::Path,
+    session_token: &str,
+) -> Result<String, String> {
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| error.to_string())?;
+    let (message_count, message_updated, part_count, part_updated): (i64, i64, i64, i64) = conn
+        .query_row(
+            "SELECT \
+                (SELECT COUNT(*) FROM message WHERE session_id = ?1), \
+                COALESCE((SELECT MAX(time_updated) FROM message WHERE session_id = ?1), 0), \
+                (SELECT COUNT(*) FROM part WHERE session_id = ?1), \
+                COALESCE((SELECT MAX(time_updated) FROM part WHERE session_id = ?1), 0)",
+            [session_token],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .map_err(|error| error.to_string())?;
+    Ok(format!(
+        "drizzle:{message_count}:{message_updated}:{part_count}:{part_updated}"
+    ))
+}
+
+fn hermes_session_revision(
+    db_path: &std::path::Path,
+    session_token: &str,
+) -> Result<String, String> {
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| error.to_string())?;
+    if let Ok((message_count, last_activity, tool_call_count)) = conn.query_row(
+        "SELECT message_count, COALESCE(last_activity_at, 0), tool_call_count \
+         FROM sessions WHERE id = ?1",
+        [session_token],
+        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, f64>(1)?, row.get::<_, i64>(2)?)),
+    ) {
+        return Ok(format!(
+            "hermes:{message_count}:{last_activity}:{tool_call_count}"
+        ));
+    }
+
+    // Older Hermes databases may not have last_activity_at/tool_call_count.
+    // Their messages table is still narrow-indexable by session_id, so retain
+    // a compatibility fallback without reading or decoding content bodies.
+    let (message_count, max_id, max_timestamp): (i64, i64, f64) = conn.query_row(
+        "SELECT COUNT(*), COALESCE(MAX(id), 0), COALESCE(MAX(timestamp), 0) \
+         FROM messages WHERE session_id = ?1",
+        [session_token],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(format!("hermes-legacy:{message_count}:{max_id}:{max_timestamp}"))
+}
+
+/// Return a cheap database revision without materializing message bodies.
+/// Older/variant schemas fall back to the content hash path so compatibility
+/// is preserved even if a fork lacks one of the timestamp columns.
+fn database_chat_revision(tool: &str, session_token: &str) -> Option<String> {
+    let home = dirs::home_dir()?;
+    match tool {
+        "opencode" => {
+            let root = crate::tool_config::history_path_for(
+                "opencode",
+                home.join(".local").join("share").join("opencode"),
+            );
+            let db = root.join("opencode.db");
+            db.is_file().then(|| drizzle_session_revision(&db, session_token).ok()).flatten()
+        }
+        "mimocode" => mimocode_db(&home)
+            .and_then(|db| drizzle_session_revision(&db, session_token).ok()),
+        "kilo" => kilo_db(&home)
+            .and_then(|db| drizzle_session_revision(&db, session_token).ok()),
+        "hermes" => hermes_state_db(&home)
+            .and_then(|db| hermes_session_revision(&db, session_token).ok()),
+        _ => None,
+    }
+}
+
+fn read_chat_session_blocking(
+    session: SavedSession,
+    cursor: Option<u64>,
+    known_revision: Option<&str>,
+) -> Result<ChatSessionRead, String> {
+    if let Some(path) = chat_session_file_path(&session)? {
+        use std::io::{Read, Seek, SeekFrom};
+        let metadata = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+        let len = metadata.len();
+        let modified = metadata
+            .modified()
+            .ok()
+            .and_then(|value| value.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+            .map(|value| value.as_nanos())
+            .unwrap_or(0);
+        let next_revision = format!("file:{len}:{modified}");
+        if known_revision == Some(next_revision.as_str()) && cursor == Some(len) {
+            return Ok(ChatSessionRead {
+                data: String::new(), cursor: Some(len), revision: next_revision,
+                append: true, unchanged: true,
+            });
+        }
+
+        let is_jsonl = path.extension().and_then(|value| value.to_str()) == Some("jsonl");
+        let can_append = is_jsonl && cursor.is_some_and(|offset| offset < len);
+        let offset = if can_append { cursor.unwrap_or(0) } else { 0 };
+        let mut file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
+        if offset > 0 {
+            file.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
+        }
+        let mut bytes = Vec::with_capacity((len.saturating_sub(offset)).min(1_048_576) as usize);
+        file.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+        let (data, consumed) = match String::from_utf8(bytes) {
+            Ok(data) => {
+                let consumed = data.len() as u64;
+                (data, consumed)
+            }
+            Err(error) => {
+                // A poll can land between bytes of one UTF-8 codepoint. Stop
+                // at the last valid boundary and retry the remainder from the
+                // returned cursor instead of inserting U+FFFD permanently.
+                let valid = error.utf8_error().valid_up_to();
+                let bytes = error.into_bytes();
+                (String::from_utf8_lossy(&bytes[..valid]).into_owned(), valid as u64)
+            }
+        };
+        return Ok(ChatSessionRead {
+            data,
+            cursor: Some(offset + consumed),
+            revision: next_revision,
+            append: can_append,
+            unchanged: false,
+        });
+    }
+
+    let token = session.session_token.clone().unwrap_or_default();
+    let cheap_revision = (!token.is_empty())
+        .then(|| database_chat_revision(&session.tool, &token))
+        .flatten();
+    if let Some(next_revision) = cheap_revision.as_ref() {
+        if known_revision == Some(next_revision.as_str()) {
+            return Ok(ChatSessionRead {
+                data: String::new(),
+                cursor: None,
+                revision: next_revision.clone(),
+                append: false,
+                unchanged: true,
+            });
+        }
+    }
+    let data = match session.tool.as_str() {
+        "opencode" if !token.is_empty() => read_opencode_session(token),
+        "mimocode" if !token.is_empty() => read_mimocode_session(token),
+        "kilo" if !token.is_empty() => {
+            let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
+            let db = kilo_db(&home).ok_or("Kilo Code session storage not found")?;
+            read_opencode_sqlite_session(&db, &token)
+        }
+        "hermes" if !token.is_empty() => read_hermes_session(token),
+        _ => Err("Session storage adapter is unavailable".to_string()),
+    }?;
+    let next_revision = cheap_revision.unwrap_or_else(|| content_revision(&data));
+    let unchanged = known_revision == Some(next_revision.as_str());
+    Ok(ChatSessionRead {
+        data: if unchanged { String::new() } else { data },
+        cursor: None,
+        revision: next_revision,
+        append: false,
+        unchanged,
+    })
 }
 
 // ── Kimi Code (Moonshot `kimi`) — index-based second pass ──────────────
@@ -2295,7 +2611,7 @@ fn find_kimi_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
     const KIMI_HISTORY_LIMIT: usize = 200;
     candidates.truncate(KIMI_HISTORY_LIMIT);
 
-    for (_, session_dir, session_id, work_dir) in &candidates {
+    for (mtime, session_dir, session_id, work_dir) in &candidates {
         let Ok(state_bytes) = std::fs::read_to_string(session_dir.join("state.json")) else { continue };
         let Ok(state) = serde_json::from_str::<serde_json::Value>(&state_bytes) else { continue };
 
@@ -2311,19 +2627,17 @@ fn find_kimi_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
             })
             .unwrap_or_else(|| "Kimi Code Session".to_string());
 
-        // state.json.updatedAt is ISO 8601 (e.g. "2026-07-05T17:56:30.904Z").
-        // Store the raw string — the frontend's Date.parse handles ISO, same
-        // as it already does for the epoch-ms/epoch-s numbers other tools emit.
-        // Fall back to createdAt, then state.json mtime, then empty.
-        let saved_at = state.get("updatedAt").or_else(|| state.get("createdAt"))
-            .and_then(|x| x.as_str()).map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                std::fs::metadata(session_dir.join("state.json"))
-                    .and_then(|m| m.modified()).ok()
-                    .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-                    .map(|d| d.as_millis().to_string())
-                    .unwrap_or_default()
-            });
+        // Keep every SavedSession timestamp in the same epoch-ms format. The
+        // metadata file is rewritten whenever state changes and its mtime was
+        // already collected for pre-selection, so no second stat is needed.
+        let saved_at = mtime
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_millis().to_string())
+            .unwrap_or_default();
+        let created_at = state.get("createdAt")
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string())
+            .or_else(|| file_created_epoch_ms(&session_dir.join("state.json")));
 
         result.push(SavedSession {
             id: format!("kimicode_native_{}", session_id),
@@ -2332,6 +2646,7 @@ fn find_kimi_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
             cwd: work_dir.clone(),
             session_token: Some(session_id.clone()),
             saved_at,
+            created_at,
             // sessionDir exposes the session's on-disk location (holds
             // state.json + wire.jsonl). Mirrors OpenCode's file_path surface.
             file_path: Some(session_dir.to_string_lossy().into_owned()),
@@ -2457,7 +2772,7 @@ fn find_grok_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
     const GROK_HISTORY_LIMIT: usize = 200;
     candidates.truncate(GROK_HISTORY_LIMIT);
 
-    for (_, session_dir) in &candidates {
+    for (mtime, session_dir) in &candidates {
         let Ok(summary_bytes) = std::fs::read_to_string(session_dir.join("summary.json")) else { continue };
         let Ok(s) = serde_json::from_str::<serde_json::Value>(&summary_bytes) else { continue };
 
@@ -2483,18 +2798,16 @@ fn find_grok_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
             })
             .unwrap_or_else(|| "Grok Build Session".to_string());
 
-        // summary.json timestamps are ISO 8601 (e.g. "2026-07-09T23:20:36Z").
-        // Store the raw string - the frontend's Date.parse handles ISO, same
-        // as Kimi. Fall back to created_at, then summary.json mtime, then empty.
-        let saved_at = s.get("updated_at").or_else(|| s.get("created_at"))
-            .and_then(|x| x.as_str()).map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                std::fs::metadata(session_dir.join("summary.json"))
-                    .and_then(|m| m.modified()).ok()
-                    .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-                    .map(|d| d.as_millis().to_string())
-                    .unwrap_or_default()
-            });
+        // Normalize to epoch milliseconds, matching every other scanner. The
+        // summary mtime is also the pre-selection key and advances per turn.
+        let saved_at = mtime
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_millis().to_string())
+            .unwrap_or_default();
+        let created_at = s.get("created_at")
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string())
+            .or_else(|| file_created_epoch_ms(&session_dir.join("summary.json")));
 
         result.push(SavedSession {
             id: format!("grok_native_{}", session_id),
@@ -2503,6 +2816,7 @@ fn find_grok_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
             cwd: work_dir,
             session_token: if session_id.is_empty() { None } else { Some(session_id.clone()) },
             saved_at,
+            created_at,
             // session_dir exposes the on-disk location (holds summary.json +
             // chat_history.jsonl). Mirrors OpenCode/Kimi's file_path surface.
             file_path: Some(session_dir.to_string_lossy().into_owned()),
@@ -2615,6 +2929,11 @@ fn collect_jsonl_paths_with_mtime(
 fn parse_hermes_json(file_path: &std::path::Path) -> Option<SavedSession> {
     let content = std::fs::read_to_string(file_path).ok()?;
     let value: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let created_at = value
+        .get("started_at")
+        .or_else(|| value.get("created_at"))
+        .or_else(|| value.get("start_time"))
+        .and_then(json_timestamp_string);
 
     // Hermes session naming: legacy files were `session_<id>.json`, the
     // `.jsonl` rewrite drops the prefix. If the JSON carries a `session_id`
@@ -2675,6 +2994,7 @@ fn parse_hermes_json(file_path: &std::path::Path) -> Option<SavedSession> {
         cwd: String::new(),
         session_token: Some(session_id),
         saved_at,
+        created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
     })
@@ -2696,6 +3016,11 @@ fn parse_opencode_session(file_path: &std::path::Path, message_dir: &std::path::
         .and_then(|v| v.as_u64())
         .map(|ms| ms.to_string())
         .unwrap_or_default();
+    let created_at = value.get("time")
+        .and_then(|t| t.get("created"))
+        .and_then(|v| v.as_u64())
+        .map(|ms| ms.to_string())
+        .or_else(|| file_created_epoch_ms(file_path));
 
     // Count message files to estimate turn count
     let msg_dir = message_dir.join(&id);
@@ -2715,6 +3040,7 @@ fn parse_opencode_session(file_path: &std::path::Path, message_dir: &std::path::
         cwd,
         session_token: Some(id),
         saved_at,
+        created_at,
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
     })
@@ -2776,7 +3102,7 @@ fn find_drizzle_sessions_sqlite(
     // on-demand from the parent's timeline. Surfacing them here flat-clutters
     // the Sessions board with un-resumable child conversations. MiMo Code
     // shares this Drizzle schema/scanner, so the same filter applies.
-    let query = "SELECT s.id, s.title, s.directory, s.time_updated, \
+    let query = "SELECT s.id, s.title, s.directory, s.time_created, s.time_updated, \
                  COUNT(m.id) as msg_count \
                  FROM session s \
                  LEFT JOIN message m ON m.session_id = s.id \
@@ -2800,8 +3126,9 @@ fn find_drizzle_sessions_sqlite(
         let directory: String = row.get::<_, Option<String>>(2)
             .unwrap_or(None)
             .unwrap_or_default();
-        let time_updated: i64 = row.get(3).unwrap_or(0);
-        let msg_count: i64 = row.get(4).unwrap_or(0);
+        let time_created: i64 = row.get(3).unwrap_or(0);
+        let time_updated: i64 = row.get(4).unwrap_or(0);
+        let msg_count: i64 = row.get(5).unwrap_or(0);
         let turn_count = std::cmp::max(1, msg_count / 2) as u32;
 
         Ok(SavedSession {
@@ -2811,16 +3138,17 @@ fn find_drizzle_sessions_sqlite(
             cwd: directory,
             session_token: Some(id),
             saved_at: time_updated.to_string(),
-            // Surface the shared SQLite DB path so the ChatReader copy-path
-            // button has a target for OpenCode sessions too. Granularity
+            created_at: Some(time_created.to_string()),
+            // Surface the shared SQLite DB path so SessionContextMenu's
+            // file action has a target for OpenCode sessions too. Granularity
             // mismatch is OpenCode's own design choice — they bundle every
             // session into ONE opencode.db (vs Claude/Codex/Qwen/Hermes
             // jsonl-per-session) — so we expose the path that exists rather
             // than hide the button. Users who paste it into a file manager
             // land on the actual artifact that holds this conversation,
             // even if it also holds the others. Doesn't affect the read
-            // path (ChatReader gates on tool==opencode + session_token,
-            // not on file_path, so readOpencodeSession still owns parsing).
+            // path (the chat adapter gates on tool + session_token, not on
+            // file_path, so read_opencode_session still owns parsing).
             file_path: Some(db_path.to_string_lossy().into_owned()),
             turn_count: Some(turn_count),
         })
@@ -2907,14 +3235,14 @@ fn hermes_started_at_secs(raw: f64) -> f64 {
 /// stores everything here (sessions + messages + FTS5 search); the
 /// `session_*.json` files our legacy path reads may be absent.
 ///
-/// Schema (sessions table): `id`, `title`, `cwd`, `started_at` (epoch
-/// SECONDS, REAL), `message_count`, `archived`. Best-effort: any error
+/// Schema (sessions table): `id`, `title`, `cwd`, `started_at` /
+/// `last_activity_at` (epoch SECONDS, REAL), `message_count`, `archived`. Best-effort: any error
 /// (missing table, renamed column, locked db) yields zero rows and the
 /// caller falls back to the JSON scan — no regression for older Hermes.
 ///
 /// `file_path` is intentionally None: these sessions live in the shared db,
-/// not a per-session file, so ChatReader routes them through
-/// `read_hermes_session` instead of `read_native_session`.
+/// not a per-session file, so the chat adapter routes them through
+/// `read_hermes_session` instead of the JSONL file path.
 fn find_hermes_sessions_sqlite(db_path: &std::path::Path, result: &mut Vec<SavedSession>) {
     let conn = match rusqlite::Connection::open_with_flags(
         db_path,
@@ -2923,11 +3251,22 @@ fn find_hermes_sessions_sqlite(db_path: &std::path::Path, result: &mut Vec<Saved
         Ok(c) => c,
         Err(_) => return,
     };
-    let query = "SELECT id, title, cwd, started_at, message_count \
-                 FROM sessions \
-                 WHERE archived = 0 \
-                 ORDER BY started_at DESC \
-                 LIMIT 200";
+    // `last_activity_at` was added after the first SQLite schema. Keep older
+    // databases discoverable; their revision reader already has an equivalent
+    // fallback and history scanning should not silently return zero sessions.
+    let has_last_activity = conn
+        .prepare("SELECT last_activity_at FROM sessions LIMIT 0")
+        .is_ok();
+    let query = if has_last_activity {
+        "SELECT id, title, cwd, started_at, \
+         COALESCE(last_activity_at, started_at), message_count \
+         FROM sessions WHERE archived = 0 \
+         ORDER BY started_at DESC LIMIT 200"
+    } else {
+        "SELECT id, title, cwd, started_at, started_at, message_count \
+         FROM sessions WHERE archived = 0 \
+         ORDER BY started_at DESC LIMIT 200"
+    };
     let mut stmt = match conn.prepare(query) {
         Ok(s) => s,
         Err(_) => return,
@@ -2944,7 +3283,8 @@ fn find_hermes_sessions_sqlite(db_path: &std::path::Path, result: &mut Vec<Saved
         // started_at → epoch ms for the saved_at string the frontend sorts on.
         // hermes_started_at_secs normalizes a seconds-or-ms value to seconds.
         let started_at: f64 = row.get(3).unwrap_or(0.0);
-        let msg_count: i64 = row.get(4).unwrap_or(0);
+        let last_activity_at: f64 = row.get(4).unwrap_or(started_at);
+        let msg_count: i64 = row.get(5).unwrap_or(0);
         // Title fallback: explicit title → cwd basename → placeholder.
         let name = title
             .map(|s| s.trim().to_string())
@@ -2964,7 +3304,8 @@ fn find_hermes_sessions_sqlite(db_path: &std::path::Path, result: &mut Vec<Saved
             tool: "hermes".to_string(),
             cwd,
             session_token: Some(id),
-            saved_at: ((hermes_started_at_secs(started_at) * 1000.0) as i64).to_string(),
+            saved_at: ((hermes_started_at_secs(last_activity_at) * 1000.0) as i64).to_string(),
+            created_at: Some(((hermes_started_at_secs(started_at) * 1000.0) as i64).to_string()),
             file_path: None,
             turn_count: Some(turn_count),
         })
@@ -3049,14 +3390,12 @@ fn hermes_extract_text(v: &serde_json::Value) -> String {
     }
 }
 
-/// Read one Hermes session's transcript from `state.db` for the ChatReader
-/// preview. Emits the same newline-delimited `{"message":{role,content}}`
-/// shape `read_native_session` returns for JSONL tools, so the existing
-/// frontend parser handles it unchanged.
+/// Read one Hermes session's transcript from `state.db` for ConversationView.
+/// Emits the same newline-delimited `{"message":{role,content}}` shape as
+/// JSONL tools, so the frontend parser handles it unchanged.
 ///
 /// Schema (messages table): `session_id`, `role`, `content`, ordered by
 /// rowid (insertion order). Best-effort.
-#[tauri::command]
 fn read_hermes_session(session_token: String) -> Result<String, String> {
     let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
     let db = hermes_state_db(&home).ok_or_else(|| "hermes not in registry".to_string())?;
@@ -3089,14 +3428,56 @@ fn read_hermes_session(session_token: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn get_native_history() -> Result<Vec<SavedSession>, String> {
+async fn get_native_history(force: Option<bool>) -> Result<Vec<SavedSession>, String> {
     // Async command + spawn_blocking so the file I/O runs on a dedicated
     // blocking thread pool and never blocks the Tauri command dispatcher.
     // Other IPC calls (resize, theme switches, etc.) stay responsive while
     // history is being scanned on app startup.
-    tauri::async_runtime::spawn_blocking(load_native_history_blocking)
+    tauri::async_runtime::spawn_blocking(move || load_native_history_cached(force.unwrap_or(false)))
         .await
         .map_err(|e| format!("History task join failed: {e}"))?
+}
+
+struct NativeHistoryCache {
+    fetched_at: std::time::Instant,
+    sessions: Vec<SavedSession>,
+}
+
+static NATIVE_HISTORY_CACHE: OnceLock<Mutex<Option<NativeHistoryCache>>> = OnceLock::new();
+
+/// Coalesce native-history requests from the History board and conversation
+/// tabs. Holding this mutex through the scan intentionally gives concurrent
+/// callers one producer; waiters then clone the same fresh result instead of
+/// walking every CLI history directory again.
+fn load_native_history_cached(force: bool) -> Result<Vec<SavedSession>, String> {
+    const CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(5);
+    let cache = NATIVE_HISTORY_CACHE.get_or_init(|| Mutex::new(None));
+    let mut guard = cache
+        .lock()
+        .map_err(|_| "Native history cache lock poisoned".to_string())?;
+    if !force {
+        if let Some(cached) = guard.as_ref() {
+            if cached.fetched_at.elapsed() < CACHE_TTL {
+                return Ok(cached.sessions.clone());
+            }
+        }
+    }
+
+    let sessions = load_native_history_blocking()?;
+    *guard = Some(NativeHistoryCache {
+        fetched_at: std::time::Instant::now(),
+        sessions: sessions.clone(),
+    });
+    Ok(sessions)
+}
+
+fn saved_session_epoch_ms(value: &str) -> u64 {
+    let parsed = value.parse::<u64>().unwrap_or(0);
+    if parsed > 0 && parsed < 100_000_000_000 {
+        parsed.saturating_mul(1_000)
+    } else {
+        parsed
+    }
 }
 
 fn load_native_history_blocking() -> Result<Vec<SavedSession>, String> {
@@ -3216,7 +3597,11 @@ fn load_native_history_blocking() -> Result<Vec<SavedSession>, String> {
         }
     }
 
-    result.sort_by(|a, b| b.saved_at.cmp(&a.saved_at));
+    // Numeric sorting is required: lexicographic comparison misorders values
+    // when a legacy source emits epoch seconds rather than milliseconds.
+    result.sort_by(|a, b| {
+        saved_session_epoch_ms(&b.saved_at).cmp(&saved_session_epoch_ms(&a.saved_at))
+    });
     result.truncate(HISTORY_LIMIT);
     Ok(result)
 }
@@ -3926,10 +4311,8 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             set_session_active,
             get_native_history,
             get_message_heatmap,
-            read_native_session,
-            read_opencode_session,
-            read_hermes_session,
-            read_mimocode_session,
+            read_chat_session,
+            get_terminal_session_token,
             check_network_port,
             check_tools_installed,
             detect_shells,
@@ -4297,36 +4680,51 @@ mod tests {
     /// `find_drizzle_sessions_sqlite` reads), seeded with one parent session,
     /// two sub-agent children (parent_id set), and one archived session. Only
     /// the columns the scanner touches are created.
-    fn seed_drizzle_db() -> std::path::PathBuf {
+    fn seed_drizzle_db(test_name: &str) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(format!(
-            "coffee-cli-drizzle-test-{}.db",
-            std::process::id()
+            "coffee-cli-drizzle-test-{}-{}.db",
+            std::process::id(),
+            test_name,
         ));
         let _ = std::fs::remove_file(&path);
         let conn = rusqlite::Connection::open(&path).expect("open temp db");
         conn.execute_batch(
-            "CREATE TABLE session (
+             r#"CREATE TABLE session (
                 id            TEXT PRIMARY KEY,
                 title         TEXT,
                 directory     TEXT,
+                time_created  INTEGER,
                 time_updated  INTEGER,
                 time_archived INTEGER,
                 parent_id     TEXT
              );
              CREATE TABLE message (
-                id         TEXT PRIMARY KEY,
-                session_id TEXT
+                id           TEXT PRIMARY KEY,
+                session_id   TEXT,
+                time_created INTEGER,
+                time_updated INTEGER,
+                data         TEXT
              );
-             INSERT INTO session (id, title, directory, time_updated, time_archived, parent_id) VALUES
-                ('ses_parent',   'Main task',                      '/proj', 3000, NULL, NULL),
-                ('ses_child_a',  'Find files (@explore subagent)', '/proj', 3010, NULL, 'ses_parent'),
-                ('ses_child_b',  'Refactor (@general subagent)',   '/proj', 3020, NULL, 'ses_parent'),
-                ('ses_archived', 'Old session',                    '/proj', 1000, 999,  NULL);
-             INSERT INTO message (id, session_id) VALUES
-                ('m1', 'ses_parent'),
-                ('m2', 'ses_parent'),
-                ('m3', 'ses_child_a'),
-                ('m4', 'ses_archived');",
+             CREATE TABLE part (
+                id           TEXT PRIMARY KEY,
+                message_id   TEXT,
+                session_id   TEXT,
+                time_created INTEGER,
+                time_updated INTEGER,
+                data         TEXT
+             );
+             INSERT INTO session (id, title, directory, time_created, time_updated, time_archived, parent_id) VALUES
+                ('ses_parent',   'Main task',                      '/proj', 2000, 3000, NULL, NULL),
+                ('ses_child_a',  'Find files (@explore subagent)', '/proj', 2010, 3010, NULL, 'ses_parent'),
+                ('ses_child_b',  'Refactor (@general subagent)',   '/proj', 2020, 3020, NULL, 'ses_parent'),
+                ('ses_archived', 'Old session',                    '/proj',  900, 1000, 999,  NULL);
+             INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES
+                ('m1', 'ses_parent',   2001, 2001, '{"role":"user"}'),
+                ('m2', 'ses_parent',   2002, 2002, '{"role":"assistant"}'),
+                ('m3', 'ses_child_a',  2011, 2011, '{"role":"user"}'),
+                ('m4', 'ses_archived',  901,  901, '{"role":"user"}');
+             INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES
+                ('p1', 'm1', 'ses_parent', 2001, 2001, '{"type":"text","text":"hello"}');"#,
         )
         .expect("seed db");
         drop(conn);
@@ -4340,7 +4738,7 @@ mod tests {
     /// clutters the Sessions board as a top-level card.
     #[test]
     fn drizzle_scanner_excludes_subagent_and_archived_sessions() {
-        let db = seed_drizzle_db();
+        let db = seed_drizzle_db("scanner");
         let mut result: Vec<SavedSession> = Vec::new();
         find_drizzle_sessions_sqlite(&db, "opencode", "OpenCode Session", &mut result);
         let _ = std::fs::remove_file(&db);
@@ -4355,6 +4753,54 @@ mod tests {
             "expected only the root parent session, got {ids:?}"
         );
         assert_eq!(result[0].session_token.as_deref(), Some("ses_parent"));
+        assert_eq!(result[0].created_at.as_deref(), Some("2000"));
+    }
+
+    #[test]
+    fn drizzle_revision_changes_without_reading_message_bodies() {
+        let db = seed_drizzle_db("revision");
+        let before = drizzle_session_revision(&db, "ses_parent").expect("initial revision");
+        let conn = rusqlite::Connection::open(&db).expect("reopen temp db");
+        conn.execute(
+            "UPDATE part SET data = ?1, time_updated = 2100 WHERE id = 'p1'",
+            [r#"{"type":"text","text":"hello again"}"#],
+        )
+        .expect("update part");
+        drop(conn);
+        let after = drizzle_session_revision(&db, "ses_parent").expect("updated revision");
+        let _ = std::fs::remove_file(&db);
+        assert_ne!(before, after);
+    }
+
+    #[test]
+    fn hermes_revision_changes_when_a_message_is_appended() {
+        let db = std::env::temp_dir().join(format!(
+            "coffee-cli-hermes-revision-test-{}.db",
+            std::process::id(),
+        ));
+        let _ = std::fs::remove_file(&db);
+        let conn = rusqlite::Connection::open(&db).expect("open Hermes test db");
+        conn.execute_batch(
+            "CREATE TABLE messages (
+                id INTEGER PRIMARY KEY,
+                session_id TEXT,
+                timestamp REAL,
+                content TEXT
+             );
+             INSERT INTO messages (id, session_id, timestamp, content)
+             VALUES (1, 'session-a', 1.0, 'hello');",
+        )
+        .expect("seed Hermes test db");
+        let before = hermes_session_revision(&db, "session-a").expect("initial revision");
+        conn.execute(
+            "INSERT INTO messages (id, session_id, timestamp, content) VALUES (2, ?1, 2.0, 'world')",
+            ["session-a"],
+        )
+        .expect("append Hermes message");
+        drop(conn);
+        let after = hermes_session_revision(&db, "session-a").expect("updated revision");
+        let _ = std::fs::remove_file(&db);
+        assert_ne!(before, after);
     }
 
     /// Write a Codex-style rollout JSONL with the given `session_meta` payload
@@ -4418,6 +4864,7 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         assert_eq!(session.tool, "codex");
         assert_eq!(session.name, "refactor the auth module");
+        assert_eq!(session.created_at.as_deref(), Some("2026-07-12T10:48:37.000Z"));
     }
 
     /// `thread_source == "subagent"` rollouts are dropped entirely.

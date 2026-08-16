@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { focusTerminal } from '../../lib/focus-registry';
 import { onWindowForeground } from '../../lib/window-focus-filter';
 import { TierTerminal } from './TierTerminal';
+import { ConversationView } from './ConversationView';
 import { FourSplitGrid } from './FourSplitGrid';
 import { ToolConfigModal } from './ToolConfigModal';
 import { ContributionHeatmap } from './ContributionHeatmap';
@@ -10,6 +11,7 @@ import { ErrorBoundary } from '../common/ErrorBoundary';
 import { DiffPanel } from '../right/DiffPanel';
 import { supportsNativeAgentStatus, useAppState, type ToolType } from '../../store/app-state';
 import { isFrostShape } from '../../lib/personalization';
+import { supportsConversationTool } from '../../lib/chat-tools';
 
 // Dropdown shown when a tool card's folder icon is clicked: the globally
 // recent project folders (any tool that used one) + "Open folder…" last.
@@ -1475,25 +1477,68 @@ export function CenterPanel() {
                 paneCount={4}
               />
             ) : (
-              <ErrorBoundary key={`err-${t.id}-${t.restartKey || 0}`} fallbackLabel="Tier Terminal Error">
-                <TierTerminal
-                  key={`tier-${t.id}-${t.restartKey || 0}`}
-                  sessionId={t.id}
-                  tool={t.tool}
-                  toolName={AGENT_CATALOG.find(a => a.key === t.tool)?.label}
-                  theme={state.currentTheme}
-                  lang={state.currentLang}
-                  isActive={t.id === activeTerminalId && !diffTabActive}
-                  toolData={t.toolData}
-                  folderPath={t.folderPath}
-                  resumeToken={t.resumeToken}
-                  hasBg={hasBg}
-                  bgUrl={bgUrl}
-                  bgType={bgType}
-                  termColorScheme={state.termColorScheme}
-                  termFont={state.termFont}
-                />
-              </ErrorBoundary>
+              <>
+                <div className="terminal-mode-surface" style={{ display: t.viewMode === 'chat' ? 'none' : 'flex' }}>
+                  <ErrorBoundary key={`err-${t.id}-${t.restartKey || 0}`} fallbackLabel="Tier Terminal Error">
+                    <TierTerminal
+                      key={`tier-${t.id}-${t.restartKey || 0}`}
+                      sessionId={t.id}
+                      tool={t.tool}
+                      toolName={AGENT_CATALOG.find(a => a.key === t.tool)?.label}
+                      theme={state.currentTheme}
+                      lang={state.currentLang}
+                      isActive={t.id === activeTerminalId && !diffTabActive && t.viewMode !== 'chat'}
+                      conversationActive={t.id === activeTerminalId && !diffTabActive && t.viewMode === 'chat'}
+                      toolData={t.toolData}
+                      folderPath={t.folderPath}
+                      resumeToken={t.resumeToken}
+                      hasBg={hasBg && t.viewMode !== 'chat'}
+                      bgUrl={t.viewMode === 'chat' ? '' : bgUrl}
+                      bgType={bgType}
+                      termColorScheme={state.termColorScheme}
+                      termFont={state.termFont}
+                    />
+                  </ErrorBoundary>
+                </div>
+                {supportsConversationTool(t.tool) && (t.viewMode === 'chat' || t.chatPending) && (
+                  <div
+                    className="conversation-mode-surface"
+                    style={{ display: t.viewMode === 'chat' ? 'flex' : 'none' }}
+                  >
+                    <ErrorBoundary fallbackLabel="Conversation Error">
+                      <ConversationView
+                        key={`conversation-${t.id}-${t.tool}-${t.folderPath ?? ''}-${t.resumeToken ?? ''}-${t.startedAt ?? 0}-${t.restartKey ?? 0}`}
+                        sessionId={t.id}
+                        tool={t.tool}
+                        folderPath={t.folderPath}
+                        resumeToken={t.resumeToken}
+                        startedAt={t.startedAt}
+                        pending={t.chatPending}
+                        agentStatus={t.agentStatus}
+                        isActive={t.id === activeTerminalId && !diffTabActive}
+                        isVisible={t.viewMode === 'chat'}
+                        onPendingResolved={() => dispatch({ type: 'SET_CHAT_PENDING', id: t.id })}
+                        onPasteToDraft={(text) => dispatch({ type: 'APPEND_GAMBIT_DRAFT', id: t.id, text })}
+                        hasBg={hasBg && t.viewMode === 'chat'}
+                        bgUrl={t.viewMode === 'chat' ? bgUrl : ''}
+                        bgType={bgType}
+                        competingBindings={state.terminals
+                          .filter(other =>
+                            other.id !== t.id &&
+                            other.tool === t.tool &&
+                            Boolean(other.chatPending) &&
+                            (other.folderPath ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() ===
+                              (t.folderPath ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+                          )
+                          .map(other => ({
+                            startedAt: other.startedAt,
+                            sentAt: other.chatPending?.sentAt,
+                          }))}
+                      />
+                    </ErrorBoundary>
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : null)}
