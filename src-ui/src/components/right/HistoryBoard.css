@@ -233,9 +233,9 @@
 }
 
 /* ─── Card delete button + inline rename ─── */
-/* No permanent action gutter: the title uses the card's full width. On hover,
-   one opaque delete button overlays the text at the right-hand centre. Pinning
-   remains available from the card's context menu. */
+/* No permanent action gutter: the title uses the card's full width. The delete
+   action keeps only an opaque panel-coloured backing so covered text cannot
+   show through; hover feedback is limited to a subtle fill + icon lift. */
 .history-card-delete-btn {
   position: absolute;
   top: 50%;
@@ -249,14 +249,13 @@
   padding: 0;
   background-color: var(--bg-app);
   background-image: linear-gradient(var(--bg-panel), var(--bg-panel));
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-xs);
   color: var(--text-2);
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
-  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: opacity 0.15s ease, color 0.15s ease;
 }
 .history-card:hover .history-card-delete-btn,
 .history-card-delete-btn:focus-visible {
@@ -264,8 +263,10 @@
   pointer-events: auto;
 }
 .history-card-delete-btn:hover {
+  background-image:
+    linear-gradient(var(--bg-hover), var(--bg-hover)),
+    linear-gradient(var(--bg-panel), var(--bg-panel));
   color: var(--text-1);
-  border-color: color-mix(in srgb, var(--text-2) 55%, var(--border));
 }
 
 /* Inline rename — seamless, no border/background/padding so switching into
