@@ -250,7 +250,7 @@
   background-color: var(--bg-app);
   background-image: linear-gradient(var(--bg-panel), var(--bg-panel));
   border: none;
-  border-radius: var(--radius-xs);
+  border-radius: var(--shape-radius-btn, var(--radius-sm));
   color: var(--text-2);
   cursor: pointer;
   opacity: 0;
