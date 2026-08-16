@@ -42,10 +42,36 @@
   min-height: 100%;
   margin: 0 auto;
   padding: 34px 0 46px;
+  overflow-anchor: none;
 }
 
 .conversation-view--has-navigation .conversation-thread {
   width: min(860px, calc(100% - 96px));
+}
+
+.conversation-virtual-row {
+  display: flow-root;
+  overflow-anchor: none;
+}
+
+.conversation-virtual-spacer {
+  width: 1px;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.conversation-virtual-index {
+  display: none;
+}
+
+.conversation-selection-proxy {
+  position: fixed;
+  top: -10000px;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .conversation-navigation {

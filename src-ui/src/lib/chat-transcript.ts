@@ -55,11 +55,19 @@ function stringValue(value: unknown): string {
   try { return JSON.stringify(value, null, 2); } catch { return String(value); }
 }
 
-function push(out: ChatMessage[], message: ChatMessage) {
+function push(
+  out: ChatMessage[], message: ChatMessage, previousCount: number, owned: Set<number>,
+) {
   if (!message.content.trim()) return;
-  const previous = out[out.length - 1];
+  const previousIndex = out.length - 1;
+  let previous = out[previousIndex];
   if (previous && previous.role === message.role && message.role !== 'tool' &&
       previous.id.split(':')[0] === message.id.split(':')[0]) {
+    if (previousIndex < previousCount && !owned.has(previousIndex)) {
+      previous = { ...previous };
+      out[previousIndex] = previous;
+      owned.add(previousIndex);
+    }
     previous.content += `\n\n${message.content}`;
     return;
   }
@@ -68,12 +76,12 @@ function push(out: ChatMessage[], message: ChatMessage) {
 
 function parseBlocks(
   out: ChatMessage[], blocks: unknown, role: 'user' | 'assistant', rowId: string,
-  toolById: Map<string, ChatMessage>,
+  toolById: Map<string, number>, previousCount: number, owned: Set<number>,
 ) {
   const values = Array.isArray(blocks) ? blocks : [blocks];
   values.forEach((raw, index) => {
     if (typeof raw === 'string') {
-      if (!isInjected(raw)) push(out, { id: `${rowId}:${index}`, role, content: raw });
+      if (!isInjected(raw)) push(out, { id: `${rowId}:${index}`, role, content: raw }, previousCount, owned);
       return;
     }
     if (!raw || typeof raw !== 'object') return;
@@ -81,9 +89,9 @@ function parseBlocks(
     const type = String(block.type ?? 'text');
     if (['text', 'input_text', 'output_text'].includes(type) || (!block.type && block.text)) {
       const text = stringValue(block.text ?? block.content);
-      if (!isInjected(text)) push(out, { id: `${rowId}:${index}`, role, content: text });
+      if (!isInjected(text)) push(out, { id: `${rowId}:${index}`, role, content: text }, previousCount, owned);
     } else if (type === 'thinking' || type === 'reasoning') {
-      push(out, { id: `${rowId}:${index}`, role: 'reasoning', content: stringValue(block.thinking ?? block.text ?? block.summary) });
+      push(out, { id: `${rowId}:${index}`, role: 'reasoning', content: stringValue(block.thinking ?? block.text ?? block.summary) }, previousCount, owned);
     } else if (type === 'tool_use' || type === 'function_call' || type === 'custom_tool_call') {
       // Codex emits both an item `id` and a `call_id`; its corresponding
       // function_call_output references call_id. Claude only has `id`, so
@@ -96,19 +104,29 @@ function parseBlocks(
         content: stringValue(block.input ?? block.arguments ?? block.command),
         toolStatus: 'running',
       };
-      toolById.set(id, message);
       out.push(message);
+      toolById.set(id, out.length - 1);
     } else if (type === 'tool_result' || type === 'function_call_output' || type === 'custom_tool_call_output') {
       const id = String(block.tool_use_id ?? block.call_id ?? block.id ?? '');
-      const target = toolById.get(id);
+      const targetIndex = toolById.get(id);
       const failed = block.is_error === true || block.error != null;
-      if (target) target.toolStatus = failed ? 'failed' : 'done';
+      if (targetIndex !== undefined) {
+        const status = failed ? 'failed' : 'done';
+        if (out[targetIndex].toolStatus !== status) {
+          if (targetIndex < previousCount && !owned.has(targetIndex)) {
+            out[targetIndex] = { ...out[targetIndex] };
+            owned.add(targetIndex);
+          }
+          out[targetIndex].toolStatus = status;
+        }
+      }
     }
   });
 }
 
 function parseLine(
-  out: ChatMessage[], toolById: Map<string, ChatMessage>, line: string, lineIndex: number,
+  out: ChatMessage[], toolById: Map<string, number>, line: string, lineIndex: number,
+  previousCount: number, owned: Set<number>,
 ) {
     if (!line.trim()) return;
     let parsed: unknown;
@@ -133,6 +151,8 @@ function parseLine(
           rawMessage.role,
           `${rowId}:message-${index}`,
           toolById,
+          previousCount,
+          owned,
         );
       });
       return;
@@ -141,9 +161,9 @@ function parseLine(
     // Codex rollout rows place messages and tool calls under payload.
     if (payload) {
       if (payload.type === 'message' && (payload.role === 'user' || payload.role === 'assistant')) {
-        parseBlocks(out, payload.content, payload.role, rowId, toolById);
+        parseBlocks(out, payload.content, payload.role, rowId, toolById, previousCount, owned);
       } else if (['function_call', 'custom_tool_call', 'function_call_output', 'custom_tool_call_output', 'reasoning'].includes(String(payload.type))) {
-        parseBlocks(out, payload, 'assistant', rowId, toolById);
+        parseBlocks(out, payload, 'assistant', rowId, toolById, previousCount, owned);
       }
       return;
     }
@@ -157,26 +177,26 @@ function parseLine(
       if (event.type === 'content.part' && isObject(event.part)) {
         const part = event.part;
         if (part.type === 'think') {
-          push(out, { id: rowId, role: 'reasoning', content: stringValue(part.think) });
+          push(out, { id: rowId, role: 'reasoning', content: stringValue(part.think) }, previousCount, owned);
         } else if (part.type === 'text') {
-          push(out, { id: rowId, role: 'assistant', content: stringValue(part.text) });
+          push(out, { id: rowId, role: 'assistant', content: stringValue(part.text) }, previousCount, owned);
         }
       }
       return;
     }
 
     if (message && Array.isArray(message.parts)) {
-      parseBlocks(out, message.parts, message.role === 'user' ? 'user' : 'assistant', rowId, toolById);
+      parseBlocks(out, message.parts, message.role === 'user' ? 'user' : 'assistant', rowId, toolById, previousCount, owned);
       return;
     }
     if (message?.role === 'user' || message?.role === 'assistant') {
-      parseBlocks(out, message.content, message.role === 'user' ? 'user' : 'assistant', rowId, toolById);
+      parseBlocks(out, message.content, message.role === 'user' ? 'user' : 'assistant', rowId, toolById, previousCount, owned);
       return;
     }
 
     // Antigravity/Gemini and several wire protocols use root-level roles.
     if (root.type === 'reasoning') {
-      push(out, { id: rowId, role: 'reasoning', content: stringValue(root.summary ?? root.content) });
+      push(out, { id: rowId, role: 'reasoning', content: stringValue(root.summary ?? root.content) }, previousCount, owned);
       return;
     }
     const rootRole = root.role ?? root.type;
@@ -184,7 +204,7 @@ function parseLine(
       if (rootRole === 'user' && root.synthetic_reason) return;
       const role = rootRole === 'user' ? 'user' : 'assistant';
       const data = isObject(root.data) ? root.data : null;
-      parseBlocks(out, root.content ?? root.parts ?? root.text ?? data?.content, role, rowId, toolById);
+      parseBlocks(out, root.content ?? root.parts ?? root.text ?? data?.content, role, rowId, toolById, previousCount, owned);
     }
 }
 
@@ -196,10 +216,16 @@ export function updateChatTranscript(
   raw: string,
   previous?: ChatTranscriptState,
 ): ChatTranscriptState {
-  const out = previous?.messages.map(message => ({ ...message })) ?? [];
-  const toolById = new Map<string, ChatMessage>();
-  out.forEach(message => {
-    if (message.role === 'tool') toolById.set(message.id, message);
+  // The array itself is copied so React sees an append, but settled message
+  // objects retain their identity. Only a merged live tail or a tool whose
+  // status changed is cloned on write; long sessions therefore avoid an O(n)
+  // object allocation burst on every streamed chunk.
+  const out = previous ? [...previous.messages] : [];
+  const previousCount = out.length;
+  const owned = new Set<number>();
+  const toolById = new Map<string, number>();
+  out.forEach((message, index) => {
+    if (message.role === 'tool') toolById.set(message.id, index);
   });
 
   const combined = `${previous?.remainder ?? ''}${raw}`;
@@ -219,7 +245,7 @@ export function updateChatTranscript(
 
   let nextLineIndex = previous?.nextLineIndex ?? 0;
   lines.forEach(line => {
-    parseLine(out, toolById, line, nextLineIndex);
+    parseLine(out, toolById, line, nextLineIndex, previousCount, owned);
     nextLineIndex += 1;
   });
 

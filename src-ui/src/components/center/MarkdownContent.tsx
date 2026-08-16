@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -48,7 +48,7 @@ const MARKDOWN_COMPONENTS: Components = {
   },
 };
 
-export function MarkdownContent({ content }: { content: string }) {
+function MarkdownContentImpl({ content }: { content: string }) {
   return (
     <div className="md-body">
       <ReactMarkdown
@@ -60,3 +60,5 @@ export function MarkdownContent({ content }: { content: string }) {
     </div>
   );
 }
+
+export const MarkdownContent = memo(MarkdownContentImpl);

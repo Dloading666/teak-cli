@@ -2098,10 +2098,17 @@ fn validated_native_session_path(file_path: &str) -> Result<std::path::PathBuf, 
 // has zero text turns, returns an empty string and the frontend renders the
 // "no readable conversation records" empty state.
 
-fn read_opencode_sqlite_session(
+struct DatabaseChatPage {
+    data: String,
+    history_cursor: u64,
+    has_older: bool,
+}
+
+fn read_opencode_sqlite_session_page(
     db_path: &std::path::Path,
     session_id: &str,
-) -> Result<String, String> {
+    before: Option<u64>,
+) -> Result<DatabaseChatPage, String> {
     use rusqlite::Connection;
     let conn = Connection::open_with_flags(
         db_path,
@@ -2109,14 +2116,26 @@ fn read_opencode_sqlite_session(
     )
     .map_err(|e| format!("open opencode.db: {e}"))?;
 
-    // 1. Pull all messages for the session (ordered by creation time).
+    let total: u64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM message WHERE session_id = ?1",
+            [session_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("count messages: {e}"))?;
+    let end = before.unwrap_or(total).min(total);
+    let start = end.saturating_sub(CHAT_WINDOW_ROWS as u64);
+    let limit = end.saturating_sub(start);
+
+    // 1. Pull only this history window, ordered by creation time.
     let mut msg_stmt = conn
         .prepare(
-            "SELECT id, data FROM message WHERE session_id = ?1 ORDER BY time_created ASC",
+            "SELECT id, data FROM message WHERE session_id = ?1 \
+             ORDER BY time_created ASC LIMIT ?2 OFFSET ?3",
         )
         .map_err(|e| format!("prepare message query: {e}"))?;
     let msg_rows = msg_stmt
-        .query_map([session_id], |row| {
+        .query_map(rusqlite::params![session_id, limit, start], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })
         .map_err(|e| format!("query messages: {e}"))?;
@@ -2132,17 +2151,24 @@ fn read_opencode_sqlite_session(
         }
     }
     if messages.is_empty() {
-        return Ok(String::new());
+        return Ok(DatabaseChatPage {
+            data: String::new(), history_cursor: start, has_older: start > 0,
+        });
     }
 
-    // 2. Pull all parts for the session in one query, then bucket by message_id.
+    // 2. Pull parts only for the same selected messages. The subquery keeps
+    // SQLite work proportional to one page even for whale sessions.
     let mut part_stmt = conn
         .prepare(
-            "SELECT message_id, data FROM part WHERE session_id = ?1 ORDER BY time_created ASC",
+            "SELECT p.message_id, p.data FROM part p \
+             JOIN (SELECT id FROM message WHERE session_id = ?1 \
+                   ORDER BY time_created ASC LIMIT ?2 OFFSET ?3) selected \
+               ON selected.id = p.message_id \
+             WHERE p.session_id = ?1 ORDER BY p.time_created ASC",
         )
         .map_err(|e| format!("prepare part query: {e}"))?;
     let part_rows = part_stmt
-        .query_map([session_id], |row| {
+        .query_map(rusqlite::params![session_id, limit, start], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })
         .map_err(|e| format!("query parts: {e}"))?;
@@ -2180,12 +2206,20 @@ fn read_opencode_sqlite_session(
             continue;
         }
         let line = serde_json::json!({
+            "id": msg_id,
             "message": { "role": role, "content": text_blocks }
         });
         out.push_str(&line.to_string());
         out.push('\n');
     }
-    Ok(out)
+    Ok(DatabaseChatPage { data: out, history_cursor: start, has_older: start > 0 })
+}
+
+fn read_opencode_sqlite_session(
+    db_path: &std::path::Path,
+    session_id: &str,
+) -> Result<String, String> {
+    read_opencode_sqlite_session_page(db_path, session_id, None).map(|page| page.data)
 }
 
 fn read_opencode_json_dir(message_dir: &std::path::Path) -> Result<String, String> {
@@ -2229,7 +2263,11 @@ fn read_opencode_json_dir(message_dir: &std::path::Path) -> Result<String, Strin
         if text_blocks.is_empty() {
             continue;
         }
+        let message_id = path.file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("legacy-message");
         let line = serde_json::json!({
+            "id": message_id,
             "message": { "role": role, "content": text_blocks }
         });
         out.push_str(&line.to_string());
@@ -2329,9 +2367,18 @@ fn read_mimocode_session(session_token: String) -> Result<String, String> {
 struct ChatSessionRead {
     data: String,
     cursor: Option<u64>,
+    history_cursor: Option<u64>,
+    has_older: bool,
     revision: String,
     append: bool,
+    prepend: bool,
     unchanged: bool,
+}
+
+#[derive(Serialize)]
+struct ChatNavigationRow {
+    data: String,
+    cursor: u64,
 }
 
 /// Read one session through the storage adapter for its tool. Append-only
@@ -2342,12 +2389,233 @@ async fn read_chat_session(
     session: SavedSession,
     cursor: Option<u64>,
     revision: Option<String>,
+    before: Option<u64>,
 ) -> Result<ChatSessionRead, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        read_chat_session_blocking(session, cursor, revision.as_deref())
+        read_chat_session_blocking(session, cursor, revision.as_deref(), before)
     })
     .await
     .map_err(|e| format!("Chat session task join failed: {e}"))?
+}
+
+#[tauri::command]
+async fn read_chat_navigation(session: SavedSession) -> Result<Vec<ChatNavigationRow>, String> {
+    tauri::async_runtime::spawn_blocking(move || read_chat_navigation_blocking(session))
+        .await
+        .map_err(|error| format!("Chat navigation task join failed: {error}"))?
+}
+
+fn navigation_candidate(line: &str) -> bool {
+    // Native writers serialize compact JSON in practice; the frontend's
+    // normal transcript parser remains the final injected-message filter.
+    line.contains("\"role\":\"user\"") ||
+        line.contains("\"role\": \"user\"") ||
+        line.contains("context.append_message")
+}
+
+fn push_navigation_lines(
+    rows: &mut Vec<ChatNavigationRow>,
+    data: &str,
+    base_cursor: u64,
+    exact_byte_offsets: bool,
+) {
+    let mut offset = 0u64;
+    for line in data.split_inclusive('\n') {
+        if navigation_candidate(line) {
+            rows.push(ChatNavigationRow {
+                data: line.to_string(),
+                cursor: if exact_byte_offsets { base_cursor + offset } else { base_cursor },
+            });
+        }
+        offset += line.len() as u64;
+    }
+}
+
+fn read_chat_navigation_blocking(
+    session: SavedSession,
+) -> Result<Vec<ChatNavigationRow>, String> {
+    if let Some(path) = chat_session_file_path(&session)? {
+        if path.extension().and_then(|extension| extension.to_str()) != Some("jsonl") {
+            let data = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
+            let mut rows = Vec::new();
+            if let Ok(root) = serde_json::from_str::<serde_json::Value>(&data) {
+                let root_id = root
+                    .get("uuid")
+                    .or_else(|| root.get("id"))
+                    .or_else(|| root.get("session_id"))
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("document");
+                if let Some(messages) = root.get("messages").and_then(|value| value.as_array()) {
+                    for (index, message) in messages.iter().enumerate() {
+                        if message.get("role").and_then(|value| value.as_str()) != Some("user") {
+                            continue;
+                        }
+                        rows.push(ChatNavigationRow {
+                            data: serde_json::json!({
+                                "id": format!("{root_id}:message-{index}"),
+                                "message": message,
+                            })
+                            .to_string(),
+                            cursor: 0,
+                        });
+                    }
+                    return Ok(rows);
+                }
+            }
+            if navigation_candidate(&data) {
+                rows.push(ChatNavigationRow { data, cursor: 0 });
+            }
+            return Ok(rows);
+        }
+
+        use std::io::BufRead;
+        let file = std::fs::File::open(&path).map_err(|error| error.to_string())?;
+        let mut reader = std::io::BufReader::new(file);
+        let mut rows = Vec::new();
+        let mut line = Vec::new();
+        let mut cursor = 0u64;
+        loop {
+            line.clear();
+            let consumed = reader.read_until(b'\n', &mut line).map_err(|error| error.to_string())?;
+            if consumed == 0 { break; }
+            let text = String::from_utf8_lossy(&line);
+            if navigation_candidate(&text) {
+                rows.push(ChatNavigationRow { data: text.into_owned(), cursor });
+            }
+            cursor += consumed as u64;
+        }
+        return Ok(rows);
+    }
+
+    let token = session.session_token.clone().unwrap_or_default();
+    if !token.is_empty() && database_chat_revision(&session.tool, &token).is_some() {
+        let mut page_groups: Vec<Vec<ChatNavigationRow>> = Vec::new();
+        let mut before = None;
+        loop {
+            let Some(page) = database_chat_page(&session.tool, &token, before) else { break };
+            let page = page?;
+            let mut page_rows = Vec::new();
+            push_navigation_lines(&mut page_rows, &page.data, page.history_cursor, false);
+            page_groups.push(page_rows);
+            if !page.has_older { break; }
+            before = Some(page.history_cursor);
+        }
+        page_groups.reverse();
+        return Ok(page_groups.into_iter().flatten().collect());
+    }
+
+    // Legacy directory/document adapters do not expose an ordinal query, but
+    // their normalized JSONL projection is still cheap to reduce to user rows
+    // here and never crosses IPC as a full transcript.
+    let data = match session.tool.as_str() {
+        "opencode" if !token.is_empty() => read_opencode_session(token),
+        _ => Err("Session navigation adapter is unavailable".to_string()),
+    }?;
+    let mut rows = Vec::new();
+    push_navigation_lines(&mut rows, &data, 0, true);
+    Ok(rows)
+}
+
+// A conversation window is bounded by both row count and bytes. The row cap
+// keeps ordinary chats close to Zeron's recent-tail strategy, while the byte
+// cap prevents one turn with a large tool payload from monopolising the IPC
+// channel and React's Markdown pipeline.
+const CHAT_WINDOW_ROWS: usize = 192;
+const CHAT_WINDOW_BYTES: u64 = 1024 * 1024;
+
+fn jsonl_window_bounds(bytes: &[u8], absolute_start: u64) -> (usize, u64) {
+    let mut aligned_start = 0usize;
+    if absolute_start > 0 {
+        // The byte window can begin in the middle of a UTF-8 codepoint or JSON
+        // row. Drop only that leading fragment. Its complete row remains
+        // reachable from the previous history page, whose end is the aligned
+        // absolute offset returned here.
+        aligned_start = bytes
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .map_or(bytes.len(), |index| index + 1);
+    }
+
+    let aligned = &bytes[aligned_start..];
+    let mut line_starts = Vec::with_capacity(CHAT_WINDOW_ROWS + 1);
+    if !aligned.is_empty() {
+        line_starts.push(0usize);
+        for (index, byte) in aligned.iter().enumerate() {
+            if *byte == b'\n' && index + 1 < aligned.len() {
+                line_starts.push(index + 1);
+            }
+        }
+    }
+    let selected_line = line_starts.len().saturating_sub(CHAT_WINDOW_ROWS);
+    let selected_start = aligned_start + line_starts.get(selected_line).copied().unwrap_or(0);
+    (selected_start, absolute_start + selected_start as u64)
+}
+
+fn decode_window(bytes: Vec<u8>) -> (String, u64) {
+    match String::from_utf8(bytes) {
+        Ok(data) => {
+            let consumed = data.len() as u64;
+            (data, consumed)
+        }
+        Err(error) => {
+            // A live writer may have flushed only part of the last UTF-8
+            // codepoint. Return the valid prefix and let the append cursor
+            // retry the remaining bytes on the next poll.
+            let valid = error.utf8_error().valid_up_to();
+            let bytes = error.into_bytes();
+            (String::from_utf8_lossy(&bytes[..valid]).into_owned(), valid as u64)
+        }
+    }
+}
+
+fn read_jsonl_file_window(
+    path: &std::path::Path,
+    end: u64,
+) -> Result<(String, u64, u64, bool), String> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    let read_start = end.saturating_sub(CHAT_WINDOW_BYTES);
+    let mut file = std::fs::File::open(path).map_err(|error| error.to_string())?;
+    file.seek(SeekFrom::Start(read_start)).map_err(|error| error.to_string())?;
+    let mut bytes = vec![0u8; end.saturating_sub(read_start) as usize];
+    file.read_exact(&mut bytes).map_err(|error| error.to_string())?;
+    let (relative_start, history_cursor) = jsonl_window_bounds(&bytes, read_start);
+    if read_start > 0 && relative_start == bytes.len() {
+        // One JSONL row is larger than the IPC window. Scanning farther back
+        // into the same row would either allocate the entire tool payload or
+        // loop forever with an unchanged history cursor. Find that row's
+        // beginning with small reverse probes and omit it from the preview;
+        // older normal rows remain available and live polling resumes at EOF.
+        let mut probe_end = read_start;
+        let oversized_row_start = loop {
+            if probe_end == 0 { break 0; }
+            let probe_start = probe_end.saturating_sub(64 * 1024);
+            file.seek(SeekFrom::Start(probe_start)).map_err(|error| error.to_string())?;
+            let mut probe = vec![0u8; probe_end.saturating_sub(probe_start) as usize];
+            file.read_exact(&mut probe).map_err(|error| error.to_string())?;
+            if let Some(index) = probe.iter().rposition(|byte| *byte == b'\n') {
+                break probe_start + index as u64 + 1;
+            }
+            probe_end = probe_start;
+        };
+        let (data, history_cursor, valid_end, _) =
+            read_jsonl_file_window(path, oversized_row_start)?;
+        return Ok((data, history_cursor, valid_end, true));
+    }
+    let (data, consumed) = decode_window(bytes[relative_start..].to_vec());
+    Ok((data, history_cursor, history_cursor + consumed, false))
+}
+
+fn slice_jsonl_window(data: &str, end: u64) -> (String, u64) {
+    let bytes = data.as_bytes();
+    let safe_end = (end as usize).min(bytes.len());
+    let read_start = (safe_end as u64).saturating_sub(CHAT_WINDOW_BYTES) as usize;
+    let (relative_start, history_cursor) = jsonl_window_bounds(
+        &bytes[read_start..safe_end],
+        read_start as u64,
+    );
+    let start = read_start + relative_start;
+    (data[start..safe_end].to_string(), history_cursor)
 }
 
 fn chat_session_file_path(session: &SavedSession) -> Result<Option<std::path::PathBuf>, String> {
@@ -2460,10 +2728,35 @@ fn database_chat_revision(tool: &str, session_token: &str) -> Option<String> {
     }
 }
 
+fn database_chat_page(
+    tool: &str,
+    session_token: &str,
+    before: Option<u64>,
+) -> Option<Result<DatabaseChatPage, String>> {
+    let home = dirs::home_dir()?;
+    match tool {
+        "opencode" => {
+            let root = crate::tool_config::history_path_for(
+                "opencode",
+                home.join(".local").join("share").join("opencode"),
+            );
+            let db = root.join("opencode.db");
+            db.is_file().then(|| read_opencode_sqlite_session_page(&db, session_token, before))
+        }
+        "mimocode" => mimocode_db(&home)
+            .map(|db| read_opencode_sqlite_session_page(&db, session_token, before)),
+        "kilo" => kilo_db(&home)
+            .map(|db| read_opencode_sqlite_session_page(&db, session_token, before)),
+        "hermes" => Some(read_hermes_session_page(session_token, before)),
+        _ => None,
+    }
+}
+
 fn read_chat_session_blocking(
     session: SavedSession,
     cursor: Option<u64>,
     known_revision: Option<&str>,
+    before: Option<u64>,
 ) -> Result<ChatSessionRead, String> {
     if let Some(path) = chat_session_file_path(&session)? {
         use std::io::{Read, Seek, SeekFrom};
@@ -2476,14 +2769,36 @@ fn read_chat_session_blocking(
             .map(|value| value.as_nanos())
             .unwrap_or(0);
         let next_revision = format!("file:{len}:{modified}");
-        if known_revision == Some(next_revision.as_str()) && cursor == Some(len) {
+        if before.is_none() && known_revision == Some(next_revision.as_str()) && cursor == Some(len) {
             return Ok(ChatSessionRead {
-                data: String::new(), cursor: Some(len), revision: next_revision,
-                append: true, unchanged: true,
+                data: String::new(), cursor: Some(len), history_cursor: None,
+                has_older: false, revision: next_revision, append: true,
+                prepend: false, unchanged: true,
             });
         }
 
         let is_jsonl = path.extension().and_then(|value| value.to_str()) == Some("jsonl");
+        let needs_snapshot = cursor.is_none() || cursor.is_some_and(|offset| offset > len) ||
+            (cursor == Some(len) && known_revision != Some(next_revision.as_str()));
+        if is_jsonl && (before.is_some() || needs_snapshot) {
+            let window_end = before.unwrap_or(len).min(len);
+            let (data, history_cursor, valid_end, skipped_oversized) =
+                read_jsonl_file_window(&path, window_end)?;
+            return Ok(ChatSessionRead {
+                data,
+                // History reads must not rewind the live append cursor. The
+                // frontend retains its existing cursor for prepend responses.
+                cursor: before.is_some().then_some(len).or(Some(
+                    if skipped_oversized { len } else { valid_end }
+                )),
+                history_cursor: Some(history_cursor),
+                has_older: history_cursor > 0,
+                revision: next_revision,
+                append: false,
+                prepend: before.is_some(),
+                unchanged: false,
+            });
+        }
         let can_append = is_jsonl && cursor.is_some_and(|offset| offset < len);
         let offset = if can_append { cursor.unwrap_or(0) } else { 0 };
         let mut file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
@@ -2509,8 +2824,11 @@ fn read_chat_session_blocking(
         return Ok(ChatSessionRead {
             data,
             cursor: Some(offset + consumed),
+            history_cursor: None,
+            has_older: false,
             revision: next_revision,
             append: can_append,
+            prepend: false,
             unchanged: false,
         });
     }
@@ -2520,15 +2838,34 @@ fn read_chat_session_blocking(
         .then(|| database_chat_revision(&session.tool, &token))
         .flatten();
     if let Some(next_revision) = cheap_revision.as_ref() {
-        if known_revision == Some(next_revision.as_str()) {
+        if before.is_none() && known_revision == Some(next_revision.as_str()) {
             return Ok(ChatSessionRead {
                 data: String::new(),
                 cursor: None,
+                history_cursor: None,
+                has_older: false,
                 revision: next_revision.clone(),
                 append: false,
+                prepend: false,
                 unchanged: true,
             });
         }
+    }
+    if let Some(page) = (cheap_revision.is_some() && !token.is_empty())
+        .then(|| database_chat_page(&session.tool, &token, before))
+        .flatten()
+    {
+        let page = page?;
+        return Ok(ChatSessionRead {
+            data: page.data,
+            cursor: None,
+            history_cursor: Some(page.history_cursor),
+            has_older: page.has_older,
+            revision: cheap_revision.unwrap_or_default(),
+            append: false,
+            prepend: before.is_some(),
+            unchanged: false,
+        });
     }
     let data = match session.tool.as_str() {
         "opencode" if !token.is_empty() => read_opencode_session(token),
@@ -2542,12 +2879,21 @@ fn read_chat_session_blocking(
         _ => Err("Session storage adapter is unavailable".to_string()),
     }?;
     let next_revision = cheap_revision.unwrap_or_else(|| content_revision(&data));
-    let unchanged = known_revision == Some(next_revision.as_str());
+    let unchanged = before.is_none() && known_revision == Some(next_revision.as_str());
+    let data_len = data.len() as u64;
+    let (window, history_cursor) = if unchanged {
+        (String::new(), 0)
+    } else {
+        slice_jsonl_window(&data, before.unwrap_or(data_len).min(data_len))
+    };
     Ok(ChatSessionRead {
-        data: if unchanged { String::new() } else { data },
+        data: window,
         cursor: None,
+        history_cursor: (!unchanged).then_some(history_cursor),
+        has_older: !unchanged && history_cursor > 0,
         revision: next_revision,
         append: false,
+        prepend: before.is_some(),
         unchanged,
     })
 }
@@ -3396,7 +3742,10 @@ fn hermes_extract_text(v: &serde_json::Value) -> String {
 ///
 /// Schema (messages table): `session_id`, `role`, `content`, ordered by
 /// rowid (insertion order). Best-effort.
-fn read_hermes_session(session_token: String) -> Result<String, String> {
+fn read_hermes_session_page(
+    session_token: &str,
+    before: Option<u64>,
+) -> Result<DatabaseChatPage, String> {
     let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
     let db = hermes_state_db(&home).ok_or_else(|| "hermes not in registry".to_string())?;
     let conn = rusqlite::Connection::open_with_flags(
@@ -3404,27 +3753,46 @@ fn read_hermes_session(session_token: String) -> Result<String, String> {
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .map_err(|e| format!("open hermes state.db: {e}"))?;
+    let total: u64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM messages WHERE session_id = ?1",
+            [session_token],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("count Hermes messages: {e}"))?;
+    let end = before.unwrap_or(total).min(total);
+    let start = end.saturating_sub(CHAT_WINDOW_ROWS as u64);
+    let limit = end.saturating_sub(start);
     let mut stmt = conn
-        .prepare("SELECT role, content FROM messages WHERE session_id = ?1 ORDER BY rowid")
+        .prepare(
+            "SELECT rowid, role, content FROM messages WHERE session_id = ?1 \
+             ORDER BY rowid LIMIT ?2 OFFSET ?3",
+        )
         .map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map([&session_token], |row| {
-            let role: String = row.get(0)?;
+        .query_map(rusqlite::params![session_token, limit, start], |row| {
+            let row_id: i64 = row.get(0)?;
+            let role: String = row.get(1)?;
             let content: String =
-                row.get::<_, Option<String>>(1).unwrap_or(None).unwrap_or_default();
-            Ok((role, content))
+                row.get::<_, Option<String>>(2).unwrap_or(None).unwrap_or_default();
+            Ok((row_id, role, content))
         })
         .map_err(|e| e.to_string())?;
     let mut out = String::new();
     for r in rows.flatten() {
-        let (role, content) = r;
+        let (row_id, role, content) = r;
         let line = serde_json::json!({
+            "id": format!("hermes-{row_id}"),
             "message": { "role": role, "content": hermes_decode_content(&content) }
         });
         out.push_str(&line.to_string());
         out.push('\n');
     }
-    Ok(out)
+    Ok(DatabaseChatPage { data: out, history_cursor: start, has_older: start > 0 })
+}
+
+fn read_hermes_session(session_token: String) -> Result<String, String> {
+    read_hermes_session_page(&session_token, None).map(|page| page.data)
 }
 
 #[tauri::command]
@@ -4312,6 +4680,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             get_native_history,
             get_message_heatmap,
             read_chat_session,
+            read_chat_navigation,
             get_terminal_session_token,
             check_network_port,
             check_tools_installed,
@@ -4676,6 +5045,66 @@ mod resume_cwd_tests {
 mod tests {
     use super::*;
 
+    #[test]
+    fn navigation_lines_keep_only_candidate_rows_and_exact_cursor() {
+        let assistant = "{\"message\":{\"role\":\"assistant\",\"content\":\"done\"}}\n";
+        let user = "{\"id\":\"u-1\",\"message\":{\"role\":\"user\",\"content\":\"hello\"}}\n";
+        let data = format!("{assistant}{user}");
+        let mut rows = Vec::new();
+
+        push_navigation_lines(&mut rows, &data, 41, true);
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].data, user);
+        assert_eq!(rows[0].cursor, 41 + assistant.len() as u64);
+    }
+
+    #[test]
+    fn jsonl_history_windows_reassemble_without_gap_or_overlap() {
+        let data = (0..250)
+            .map(|index| format!("{{\"message\":{{\"role\":\"user\",\"content\":\"第 {index} 条\"}}}}\n"))
+            .collect::<String>();
+        let (tail, tail_start) = slice_jsonl_window(&data, data.len() as u64);
+        let (older, older_start) = slice_jsonl_window(&data, tail_start);
+
+        assert_eq!(older_start, 0);
+        assert_eq!(format!("{older}{tail}"), data);
+        assert_eq!(tail.lines().count(), CHAT_WINDOW_ROWS);
+    }
+
+    #[test]
+    fn jsonl_window_drops_only_the_leading_partial_row() {
+        let bytes = b"partial row\nsecond\nthird\n";
+        let (relative, absolute) = jsonl_window_bounds(bytes, 100);
+        assert_eq!(&bytes[relative..], b"second\nthird\n");
+        assert_eq!(absolute, 112);
+    }
+
+    #[test]
+    fn jsonl_window_skips_one_oversized_row_without_stalling_history() {
+        use std::io::Write;
+        let path = std::env::temp_dir().join(format!(
+            "coffee-cli-chat-window-{}.jsonl",
+            std::process::id(),
+        ));
+        let mut file = std::fs::File::create(&path).expect("create window fixture");
+        file.write_all(b"first\nsecond\n").expect("write ordinary rows");
+        file.write_all(&vec![b'x'; CHAT_WINDOW_BYTES as usize + 32])
+            .expect("write oversized row");
+        file.write_all(b"\n").expect("finish oversized row");
+        drop(file);
+
+        let len = std::fs::metadata(&path).expect("fixture metadata").len();
+        let (data, history_cursor, valid_end, skipped) =
+            read_jsonl_file_window(&path, len).expect("read tail window");
+        let _ = std::fs::remove_file(&path);
+
+        assert!(skipped);
+        assert_eq!(data, "first\nsecond\n");
+        assert_eq!(history_cursor, 0);
+        assert_eq!(valid_end, 13);
+    }
+
     /// Build a temp Drizzle-schema SQLite db (the `session` + `message` shape
     /// `find_drizzle_sessions_sqlite` reads), seeded with one parent session,
     /// two sub-agent children (parent_id set), and one archived session. Only
@@ -4770,6 +5199,48 @@ mod tests {
         let after = drizzle_session_revision(&db, "ses_parent").expect("updated revision");
         let _ = std::fs::remove_file(&db);
         assert_ne!(before, after);
+    }
+
+    #[test]
+    fn drizzle_chat_page_queries_only_the_requested_message_window() {
+        let db = seed_drizzle_db("chat-page");
+        let mut conn = rusqlite::Connection::open(&db).expect("reopen temp db");
+        let transaction = conn.transaction().expect("start seed transaction");
+        for index in 0..205 {
+            let message_id = format!("page-message-{index:03}");
+            transaction.execute(
+                "INSERT INTO message (id, session_id, time_created, time_updated, data) \
+                 VALUES (?1, 'ses_parent', ?2, ?2, '{\"role\":\"assistant\"}')",
+                rusqlite::params![message_id, 10_000 + index],
+            ).expect("insert paged message");
+            transaction.execute(
+                "INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) \
+                 VALUES (?1, ?2, 'ses_parent', ?3, ?3, ?4)",
+                rusqlite::params![
+                    format!("page-part-{index:03}"),
+                    message_id,
+                    10_000 + index,
+                    format!(r#"{{"type":"text","text":"message {index}"}}"#),
+                ],
+            ).expect("insert paged part");
+        }
+        transaction.commit().expect("commit seed transaction");
+        drop(conn);
+
+        let tail = read_opencode_sqlite_session_page(&db, "ses_parent", None)
+            .expect("read tail page");
+        let older = read_opencode_sqlite_session_page(
+            &db,
+            "ses_parent",
+            Some(tail.history_cursor),
+        ).expect("read older page");
+        let _ = std::fs::remove_file(&db);
+
+        assert!(tail.has_older);
+        assert_eq!(tail.data.lines().count(), CHAT_WINDOW_ROWS);
+        assert!(!older.has_older);
+        assert!(older.data.contains("hello"));
+        assert!(!older.data.contains("message 204"));
     }
 
     #[test]

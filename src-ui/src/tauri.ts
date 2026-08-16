@@ -102,9 +102,17 @@ export interface SavedSession {
 export interface ChatSessionRead {
   data: string;
   cursor: number | null;
+  history_cursor: number | null;
+  has_older: boolean;
   revision: string;
   append: boolean;
+  prepend: boolean;
   unchanged: boolean;
+}
+
+export interface ChatNavigationRow {
+  data: string;
+  cursor: number;
 }
 
 export interface DirEntryInfo {
@@ -167,8 +175,11 @@ export const commands = {
    *  Frontend buckets ts into local-day boxes for the grid. */
   getMessageHeatmap: () =>
     invoke<{ ts: number; count: number }[]>('get_message_heatmap'),
-  readChatSession: (session: SavedSession, cursor?: number | null, revision?: string) =>
-    invoke<ChatSessionRead>('read_chat_session', { session, cursor, revision }),
+  readChatSession: (
+    session: SavedSession, cursor?: number | null, revision?: string, before?: number | null,
+  ) => invoke<ChatSessionRead>('read_chat_session', { session, cursor, revision, before }),
+  readChatNavigation: (session: SavedSession) =>
+    invoke<ChatNavigationRow[]>('read_chat_navigation', { session }),
   checkNetworkPort: (host: string, port: number) => invoke<boolean>('check_network_port', { host, port }),
 
   // Tool availability detection

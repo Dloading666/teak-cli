@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState,
+  type ReactNode, type RefObject,
+} from 'react';
 import type { AgentStatus, TerminalSession, ToolType } from '../../store/app-state';
-import type { ChatSessionRead, SavedSession } from '../../tauri';
+import type { ChatNavigationRow, ChatSessionRead, SavedSession } from '../../tauri';
 import { commands, isTauri } from '../../tauri';
 import { bindAutoHideScrollbar } from '../../lib/auto-hide-scrollbar';
 import { clipboardRead, clipboardReadImage, clipboardWrite } from '../../lib/clipboard';
@@ -12,6 +15,7 @@ import {
 } from '../../lib/chat-transcript';
 import { MarkdownContent } from './MarkdownContent';
 import { TermContextMenu, type TermContextMenuState } from './TermContextMenu';
+import { useConversationVirtualizer } from './conversation-virtualizer';
 import './ConversationView.css';
 
 interface ConversationViewProps {
@@ -32,10 +36,58 @@ interface ConversationViewProps {
   competingBindings?: Array<{ startedAt?: number; sentAt?: number }>;
 }
 
+interface ConversationNavigationItem {
+  id: string;
+  sourceMessageId: string;
+  content: string;
+  messageIndex: number;
+  top: number;
+  cursor: number | null;
+}
+
+function sameCompetingBindings(
+  previous: ConversationViewProps['competingBindings'],
+  next: ConversationViewProps['competingBindings'],
+): boolean {
+  const left = previous ?? [];
+  const right = next ?? [];
+  return left.length === right.length && left.every((binding, index) =>
+    binding.startedAt === right[index].startedAt && binding.sentAt === right[index].sentAt
+  );
+}
+
+/** Gambit's controlled draft lives in AppState, so each keystroke replaces the
+ * active TerminalSession and re-renders CenterPanel. None of that changes the
+ * conversation projection. Keep the potentially large Markdown tree out of
+ * that hot path; its callbacks close over the stable session id + dispatch and
+ * the component key remounts whenever that identity changes. */
+function conversationPropsEqual(
+  previous: ConversationViewProps,
+  next: ConversationViewProps,
+): boolean {
+  return previous.sessionId === next.sessionId &&
+    previous.tool === next.tool &&
+    previous.folderPath === next.folderPath &&
+    previous.resumeToken === next.resumeToken &&
+    previous.startedAt === next.startedAt &&
+    previous.pending?.text === next.pending?.text &&
+    previous.pending?.sentAt === next.pending?.sentAt &&
+    previous.agentStatus === next.agentStatus &&
+    previous.isActive === next.isActive &&
+    previous.isVisible === next.isVisible &&
+    previous.hasBg === next.hasBg &&
+    previous.bgUrl === next.bgUrl &&
+    previous.bgType === next.bgType &&
+    sameCompetingBindings(previous.competingBindings, next.competingBindings);
+}
+
 interface ConversationCacheEntry {
   source: SavedSession | null;
   transcript: ChatTranscriptState;
+  raw: string;
   cursor: number | null;
+  historyCursor: number | null;
+  hasOlder: boolean;
   revision: string;
 }
 
@@ -46,6 +98,28 @@ let historyRequest: Promise<SavedSession[]> | null = null;
 let historyRequestForced = false;
 let recentHistory: { sessions: SavedSession[]; fetchedAt: number } | null = null;
 const HISTORY_CACHE_TTL_MS = 5_000;
+const navigationCache = new Map<string, ChatNavigationRow[]>();
+const navigationRequests = new Map<string, Promise<ChatNavigationRow[]>>();
+
+function navigationCacheKey(source: SavedSession): string {
+  return `${source.tool}:${source.id}:${source.session_token ?? ''}`;
+}
+
+function loadNavigationIndex(source: SavedSession): Promise<ChatNavigationRow[]> {
+  const key = navigationCacheKey(source);
+  const cached = navigationCache.get(key);
+  if (cached) return Promise.resolve(cached);
+  const pending = navigationRequests.get(key);
+  if (pending) return pending;
+  const request = commands.readChatNavigation(source)
+    .then(rows => {
+      navigationCache.set(key, rows);
+      return rows;
+    })
+    .finally(() => navigationRequests.delete(key));
+  navigationRequests.set(key, request);
+  return request;
+}
 
 function writeConversationCache(ownerKey: string, entry: ConversationCacheEntry) {
   conversationCache.delete(ownerKey);
@@ -198,16 +272,109 @@ function hasAssistantAfterPrompt(
 
 function applySessionRead(
   current: ChatTranscriptState,
+  currentRaw: string,
   read: ChatSessionRead,
-): ChatTranscriptState {
-  if (read.unchanged) return current;
-  return read.append ? updateChatTranscript(read.data, current) : updateChatTranscript(read.data);
+): { transcript: ChatTranscriptState; raw: string } {
+  if (read.unchanged) return { transcript: current, raw: currentRaw };
+  if (read.prepend) {
+    const raw = `${read.data}${currentRaw}`;
+    return { transcript: updateChatTranscript(raw), raw };
+  }
+  if (read.append) {
+    return {
+      transcript: updateChatTranscript(read.data, current),
+      raw: `${currentRaw}${read.data}`,
+    };
+  }
+  return { transcript: updateChatTranscript(read.data), raw: read.data };
+}
+
+function jsonlRowId(line: string): string | null {
+  try {
+    const root = JSON.parse(line) as Record<string, unknown>;
+    const message = root.message && typeof root.message === 'object'
+      ? root.message as Record<string, unknown>
+      : null;
+    const payload = root.payload && typeof root.payload === 'object'
+      ? root.payload as Record<string, unknown>
+      : null;
+    const id = root.uuid ?? root.id ?? message?.id ?? payload?.id;
+    return typeof id === 'string' || typeof id === 'number' ? String(id) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** SQLite/document adapters poll with a refreshed tail snapshot rather than
+ * byte appends. Merge that tail over the loaded history by durable row id so
+ * a live update cannot throw away pages the user has already scrolled into. */
+function mergeSessionSnapshot(
+  current: ChatTranscriptState,
+  currentRaw: string,
+  snapshotRaw: string,
+): { transcript: ChatTranscriptState; raw: string } {
+  const snapshot = updateChatTranscript(snapshotRaw);
+  if (!currentRaw || current.messages.length === 0) {
+    return { transcript: snapshot, raw: snapshotRaw };
+  }
+
+  const currentMessageIndexes = new Map(current.messages.map((message, index) => [message.id, index]));
+  const snapshotMessageIds = new Set(snapshot.messages.map(message => message.id));
+  const firstMessageOverlap = snapshot.messages.find(message => currentMessageIndexes.has(message.id));
+  const messageCut = firstMessageOverlap
+    ? currentMessageIndexes.get(firstMessageOverlap.id) ?? current.messages.length
+    : current.messages.length;
+  const messagePrefix = current.messages
+    .slice(0, messageCut)
+    .filter(message => !snapshotMessageIds.has(message.id));
+
+  const currentLines = currentRaw.split(/\r?\n/).filter(Boolean);
+  const snapshotLines = snapshotRaw.split(/\r?\n/).filter(Boolean);
+  const currentLineIndexes = new Map<string, number>();
+  currentLines.forEach((line, index) => {
+    const id = jsonlRowId(line);
+    if (id !== null && !currentLineIndexes.has(id)) currentLineIndexes.set(id, index);
+  });
+  const snapshotLineIds = new Set<string>();
+  let lineCut = currentLines.length;
+  let foundLineOverlap = false;
+  snapshotLines.forEach(line => {
+    const id = jsonlRowId(line);
+    if (id === null) return;
+    snapshotLineIds.add(id);
+    if (!foundLineOverlap && currentLineIndexes.has(id)) {
+      lineCut = currentLineIndexes.get(id) ?? currentLines.length;
+      foundLineOverlap = true;
+    }
+  });
+  const linePrefix = currentLines
+    .slice(0, lineCut)
+    .filter(line => {
+      const id = jsonlRowId(line);
+      return id === null || !snapshotLineIds.has(id);
+    });
+  const mergedLines = [...linePrefix, ...snapshotLines];
+
+  return {
+    transcript: {
+      messages: [...messagePrefix, ...snapshot.messages],
+      remainder: snapshot.remainder,
+      nextLineIndex: mergedLines.length,
+    },
+    raw: mergedLines.length > 0 ? `${mergedLines.join('\n')}\n` : '',
+  };
 }
 
 function ToolRow({ message }: { message: ChatMessage }) {
   const status = message.toolStatus ?? 'running';
+  const [expanded, setExpanded] = useState(status === 'failed');
+  const open = expanded || status === 'failed';
   return (
-    <details className="conversation-tool" open={status === 'failed'}>
+    <details
+      className="conversation-tool"
+      open={open}
+      onToggle={event => setExpanded(event.currentTarget.open)}
+    >
       <summary>
         <span className={`conversation-tool-status conversation-tool-status--${status}`} aria-hidden="true" />
         <span>{message.toolName}</span>
@@ -215,7 +382,21 @@ function ToolRow({ message }: { message: ChatMessage }) {
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </summary>
-      {message.content && <pre>{message.content}</pre>}
+      {open && message.content && <pre>{message.content}</pre>}
+    </details>
+  );
+}
+
+function ReasoningRow({ message }: { message: ChatMessage }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <details
+      className="conversation-reasoning"
+      open={expanded}
+      onToggle={event => setExpanded(event.currentTarget.open)}
+    >
+      <summary><span className="conversation-reasoning-glyph">✦</span> 思考过程</summary>
+      {expanded && <MarkdownContent content={message.content} />}
     </details>
   );
 }
@@ -242,7 +423,173 @@ function MessageCopyButton({ copied, onCopy }: { copied: boolean; onCopy: () => 
   );
 }
 
-export function ConversationView({
+function MeasuredConversationRow({
+  messageId, onMeasure, children,
+}: {
+  messageId: string;
+  onMeasure: (messageId: string, height: number) => void;
+  children: ReactNode;
+}) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    const measure = () => onMeasure(messageId, row.getBoundingClientRect().height);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [messageId, onMeasure]);
+  return <div ref={rowRef} className="conversation-virtual-row">{children}</div>;
+}
+
+interface ConversationNavigationProps {
+  items: ConversationNavigationItem[];
+  scrollRef: RefObject<HTMLDivElement | null>;
+  onJump: (item: ConversationNavigationItem) => void;
+}
+
+/** Navigation owns every high-frequency hover/scroll state update. Keeping it
+ * outside ConversationViewImpl prevents a tooltip move or active-line change
+ * from reconciling the full Markdown transcript. Target positions are measured
+ * only when layout changes; scrolling performs an O(log n) lookup over that
+ * cache instead of getBoundingClientRect() on every user turn each frame. */
+const ConversationNavigation = memo(function ConversationNavigation({
+  items, scrollRef, onJump,
+}: ConversationNavigationProps) {
+  const navigationRef = useRef<HTMLElement>(null);
+  const navigationScrollRef = useRef<HTMLDivElement>(null);
+  const tooltipId = useId();
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [tooltipTop, setTooltipTop] = useState(0);
+
+  const hoveredIndex = items.findIndex(item => item.id === hoveredId);
+  const hoveredItem = hoveredIndex >= 0 ? items[hoveredIndex] : null;
+
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    if (!scroll || items.length === 0) return;
+
+    let activeFrame: number | null = null;
+
+    const updateActive = () => {
+      activeFrame = null;
+      const readingTop = scroll.scrollTop + Math.min(120, scroll.clientHeight * 0.24);
+
+      let low = 0;
+      let high = items.length;
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (items[middle].top < readingTop) low = middle + 1;
+        else high = middle;
+      }
+      let closest = Math.min(low, items.length - 1);
+      if (closest > 0 &&
+          Math.abs(items[closest - 1].top - readingTop) <=
+            Math.abs(items[closest].top - readingTop)) {
+        closest -= 1;
+      }
+      const nextId = items[closest].id;
+      setActiveId(current => current === nextId ? current : nextId);
+    };
+
+    const scheduleActive = () => {
+      if (activeFrame === null) activeFrame = window.requestAnimationFrame(updateActive);
+    };
+
+    scroll.addEventListener('scroll', scheduleActive, { passive: true });
+    scheduleActive();
+
+    return () => {
+      scroll.removeEventListener('scroll', scheduleActive);
+      if (activeFrame !== null) window.cancelAnimationFrame(activeFrame);
+    };
+  }, [items, scrollRef]);
+
+  useEffect(() => {
+    const container = navigationScrollRef.current;
+    if (!container || !activeId) return;
+    const item = container.querySelector<HTMLElement>(
+      `[data-conversation-navigation-target="${CSS.escape(activeId)}"]`,
+    );
+    if (!item) return;
+    const itemTop = item.offsetTop;
+    const itemBottom = itemTop + item.offsetHeight;
+    if (itemTop < container.scrollTop) container.scrollTop = itemTop;
+    else if (itemBottom > container.scrollTop + container.clientHeight) {
+      container.scrollTop = itemBottom - container.clientHeight;
+    }
+  }, [activeId]);
+
+  const showTooltip = (messageId: string, item: HTMLElement) => {
+    const navigation = navigationRef.current;
+    if (!navigation) return;
+    const itemRect = item.getBoundingClientRect();
+    const navigationRect = navigation.getBoundingClientRect();
+    setHoveredId(messageId);
+    setTooltipTop(itemRect.top + itemRect.height / 2 - navigationRect.top);
+  };
+
+  return (
+    <nav
+      ref={navigationRef}
+      className="conversation-navigation"
+      aria-label="对话快速定位"
+      onMouseLeave={() => setHoveredId(null)}
+    >
+      <div
+        ref={navigationScrollRef}
+        className="conversation-navigation-scroll"
+        onScroll={() => {
+          if (!hoveredId) return;
+          const item = navigationScrollRef.current?.querySelector<HTMLElement>(
+            `[data-conversation-navigation-target="${CSS.escape(hoveredId)}"]`,
+          );
+          if (item) showTooltip(hoveredId, item);
+        }}
+      >
+        {items.map((item, index) => {
+          const hoverDistance = hoveredIndex < 0 ? undefined : Math.abs(index - hoveredIndex);
+          return (
+            <button
+              type="button"
+              key={item.id}
+              className="conversation-navigation-item"
+              data-conversation-navigation-target={item.id}
+              data-active={activeId === item.id ? 'true' : undefined}
+              data-hover-distance={hoverDistance !== undefined && hoverDistance <= 2
+                ? hoverDistance
+                : undefined}
+              aria-label={`跳转到第 ${index + 1} 轮提问`}
+              aria-current={activeId === item.id ? 'step' : undefined}
+              aria-describedby={hoveredId === item.id ? tooltipId : undefined}
+              onMouseEnter={event => showTooltip(item.id, event.currentTarget)}
+              onFocus={event => showTooltip(item.id, event.currentTarget)}
+              onBlur={() => setHoveredId(null)}
+              onClick={() => onJump(item)}
+            >
+              <span aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
+      {hoveredItem && (
+        <div
+          id={tooltipId}
+          className="conversation-navigation-tooltip"
+          role="tooltip"
+          style={{ top: tooltipTop }}
+        >
+          <span>{hoveredItem.content.replace(/\s+/g, ' ').trim()}</span>
+        </div>
+      )}
+    </nav>
+  );
+});
+
+function ConversationViewImpl({
   sessionId, tool, folderPath, resumeToken, startedAt, pending, agentStatus, isActive, isVisible,
   onPendingResolved, onPasteToDraft, hasBg, bgUrl, bgType, competingBindings = [],
 }: ConversationViewProps) {
@@ -251,21 +598,29 @@ export function ConversationView({
   const initialTranscript = cached?.transcript ?? { messages: [], remainder: '', nextLineIndex: 0 };
   const [source, setSource] = useState<SavedSession | null>(cached?.source ?? null);
   const [messages, setMessages] = useState<ChatMessage[]>(initialTranscript.messages);
+  const [navigationRows, setNavigationRows] = useState<ChatNavigationRow[]>(
+    cached?.source ? navigationCache.get(navigationCacheKey(cached.source)) ?? [] : [],
+  );
   const transcriptRef = useRef<ChatTranscriptState>(initialTranscript);
+  const rawRef = useRef(cached?.raw ?? '');
   const cursorRef = useRef<number | null>(cached?.cursor ?? null);
+  const historyCursorRef = useRef<number | null>(cached?.historyCursor ?? null);
+  const hasOlderRef = useRef(cached?.hasOlder ?? false);
   const revisionRef = useRef(cached?.revision ?? '');
   const scrollRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  const selectAllProxyRef = useRef<HTMLTextAreaElement>(null);
   const pinnedRef = useRef(true);
+  const loadingOlderRef = useRef(false);
+  const loadOlderRef = useRef<() => void>(() => undefined);
+  const prependAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const pendingNavigationJumpRef = useRef<{
+    sourceMessageId: string;
+    content: string;
+  } | null>(null);
   const onPendingResolvedRef = useRef(onPendingResolved);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<TermContextMenuState | null>(null);
-  const navigationRef = useRef<HTMLElement>(null);
-  const navigationScrollRef = useRef<HTMLDivElement>(null);
-  const navigationTooltipId = useId();
-  const [hoveredNavigationId, setHoveredNavigationId] = useState<string | null>(null);
-  const [activeNavigationId, setActiveNavigationId] = useState<string | null>(null);
-  const [navigationTooltipTop, setNavigationTooltipTop] = useState(0);
   const copyResetTimerRef = useRef<number | null>(null);
   const pendingBaselineRef = useRef<{ sentAt: number; userCount: number } | null>(null);
   const competingBindingsRef = useRef(competingBindings);
@@ -290,10 +645,6 @@ export function ConversationView({
 
   useLayoutEffect(() => {
     if (isActive && isVisible) return;
-    if (navigationRef.current?.contains(document.activeElement)) {
-      (document.activeElement as HTMLElement).blur();
-    }
-    setHoveredNavigationId(null);
     setCtxMenu(null);
   }, [isActive, isVisible]);
 
@@ -304,6 +655,17 @@ export function ConversationView({
       if (sourceOwners.get(source.id) === ownerKey) sourceOwners.delete(source.id);
     };
   }, [source, ownerKey]);
+
+  useEffect(() => {
+    if (!source) return;
+    let cancelled = false;
+    void loadNavigationIndex(source).then(rows => {
+      if (!cancelled) setNavigationRows(rows);
+    }).catch(error => {
+      console.warn('[Conversation] navigation index unavailable', source.id, error);
+    });
+    return () => { cancelled = true; };
+  }, [source]);
 
   useEffect(() => () => {
     if (copyResetTimerRef.current !== null) window.clearTimeout(copyResetTimerRef.current);
@@ -325,9 +687,13 @@ export function ConversationView({
   const selectionText = (): string => {
     const root = scrollRef.current;
     const selection = window.getSelection();
-    if (!root || !selection || selection.isCollapsed || selection.rangeCount === 0) return '';
-    const range = selection.getRangeAt(0);
-    return root.contains(range.commonAncestorContainer) ? selection.toString() : '';
+    if (root && selection && !selection.isCollapsed && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      if (root.contains(range.commonAncestorContainer)) return selection.toString();
+    }
+    const proxy = selectAllProxyRef.current;
+    if (!proxy || proxy.selectionStart === proxy.selectionEnd) return '';
+    return proxy.value.slice(proxy.selectionStart, proxy.selectionEnd);
   };
 
   const openContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -361,9 +727,26 @@ export function ConversationView({
           continue;
         }
         if (cancelled) return false;
-        const nextTranscript = applySessionRead(
-          { messages: [], remainder: '', nextLineIndex: 0 }, read,
+        let applied = applySessionRead(
+          { messages: [], remainder: '', nextLineIndex: 0 }, '', read,
         );
+        const liveCursor = read.cursor;
+        // A busy agent can emit enough tool rows to push its initiating prompt
+        // outside the first tail page before discovery binds the source. Walk
+        // a few older windows for identity validation; this remains bounded
+        // and happens only during initial attachment, never on every poll.
+        let validationPages = 0;
+        while (pending && !transcriptHasPrompt(applied.transcript.messages, pending.text) &&
+               read.has_older && read.history_cursor !== null && validationPages < 8) {
+          const older = await commands.readChatSession(
+            candidate, liveCursor, read.revision || undefined, read.history_cursor,
+          );
+          if (!older.prepend || older.unchanged) break;
+          applied = applySessionRead(applied.transcript, applied.raw, older);
+          read = { ...older, cursor: liveCursor };
+          validationPages += 1;
+        }
+        const nextTranscript = applied.transcript;
         const nextMessages = nextTranscript.messages;
         const updatedAfterPrompt = !pending || savedAtMs(candidate.saved_at) >= pending.sentAt;
         if (pending && !updatedAfterPrompt) continue;
@@ -376,11 +759,15 @@ export function ConversationView({
 
         sourceOwners.set(candidate.id, ownerKey);
         transcriptRef.current = nextTranscript;
-        cursorRef.current = read.cursor;
+        rawRef.current = applied.raw;
+        cursorRef.current = liveCursor;
+        historyCursorRef.current = read.history_cursor;
+        hasOlderRef.current = read.has_older;
         revisionRef.current = read.revision;
         writeConversationCache(ownerKey, {
-          source: candidate, transcript: nextTranscript,
-          cursor: read.cursor, revision: read.revision,
+          source: candidate, transcript: nextTranscript, raw: applied.raw,
+          cursor: liveCursor, historyCursor: read.history_cursor,
+          hasOlder: read.has_older, revision: read.revision,
         });
         setMessages(nextMessages);
         setSource(candidate);
@@ -471,15 +858,31 @@ export function ConversationView({
         const read = await commands.readChatSession(
           source, cursorRef.current, revisionRef.current || undefined,
         );
-        if (!cancelled && !read.unchanged) {
-          const nextTranscript = applySessionRead(transcriptRef.current, read);
+        // An upward history read owns the transcript snapshot while it is in
+        // flight. Discard a concurrent poll response; the next heartbeat will
+        // cheaply catch up from the retained live cursor.
+        if (!cancelled && !loadingOlderRef.current && !read.unchanged) {
+          const previousHistoryCursor = historyCursorRef.current;
+          const mergeSnapshot = !read.append && cursorRef.current === null &&
+            previousHistoryCursor !== null && read.history_cursor !== null &&
+            read.history_cursor >= previousHistoryCursor;
+          const applied = mergeSnapshot
+            ? mergeSessionSnapshot(transcriptRef.current, rawRef.current, read.data)
+            : applySessionRead(transcriptRef.current, rawRef.current, read);
+          const nextTranscript = applied.transcript;
           const nextMessages = nextTranscript.messages;
           transcriptRef.current = nextTranscript;
-          cursorRef.current = read.cursor;
+          rawRef.current = applied.raw;
+          if (!read.prepend) cursorRef.current = read.cursor;
+          if (!read.append && !mergeSnapshot) {
+            historyCursorRef.current = read.history_cursor;
+            hasOlderRef.current = read.has_older;
+          }
           revisionRef.current = read.revision;
           writeConversationCache(ownerKey, {
-            source, transcript: nextTranscript,
-            cursor: read.cursor, revision: read.revision,
+            source, transcript: nextTranscript, raw: applied.raw,
+            cursor: cursorRef.current, historyCursor: historyCursorRef.current,
+            hasOlder: hasOlderRef.current, revision: read.revision,
           });
           setMessages(nextMessages);
           const baselineState = pendingBaselineRef.current;
@@ -529,15 +932,99 @@ export function ConversationView({
     };
   }, [source, pending, ownerKey, sessionId, agentStatus, isActive]);
 
+  const loadOlder = useCallback(async (target?: ConversationNavigationItem) => {
+    let before = historyCursorRef.current;
+    const scroll = scrollRef.current;
+    if (!source || !scroll || loadingOlderRef.current || !hasOlderRef.current || before === null) {
+      return;
+    }
+    loadingOlderRef.current = true;
+    const expectedRaw = rawRef.current;
+    pinnedRef.current = false;
+    prependAnchorRef.current = target ? null : {
+        scrollHeight: scroll.scrollHeight,
+        scrollTop: scroll.scrollTop,
+    };
+    try {
+      const olderChunks: string[] = [];
+      let hasOlder: boolean = hasOlderRef.current;
+      let revision = revisionRef.current;
+      do {
+        const read = await commands.readChatSession(
+          source, cursorRef.current, revision || undefined, before,
+        );
+        if (read.unchanged || !read.prepend || rawRef.current !== expectedRaw) {
+          prependAnchorRef.current = null;
+          return;
+        }
+        olderChunks.push(read.data);
+        before = read.history_cursor;
+        hasOlder = read.has_older;
+        revision = read.revision;
+      } while (target?.cursor !== null && target?.cursor !== undefined &&
+               hasOlder && before !== null && before > target.cursor);
+
+      // A direct rail jump can cross many pages. Rebuild once after collecting
+      // them instead of reparsing an ever-growing transcript after every IPC
+      // response (which becomes quadratic on very long histories).
+      const raw = `${olderChunks.reverse().join('')}${expectedRaw}`;
+      const transcript = updateChatTranscript(raw);
+
+      transcriptRef.current = transcript;
+      rawRef.current = raw;
+      historyCursorRef.current = before;
+      hasOlderRef.current = hasOlder;
+      revisionRef.current = revision;
+      if (target) {
+        pendingNavigationJumpRef.current = {
+          sourceMessageId: target.sourceMessageId,
+          content: target.content,
+        };
+      }
+      writeConversationCache(ownerKey, {
+        source,
+        transcript,
+        raw,
+        cursor: cursorRef.current,
+        historyCursor: before,
+        hasOlder,
+        revision,
+      });
+      setMessages(transcript.messages);
+    } catch (error) {
+      prependAnchorRef.current = null;
+      console.error('[Conversation] read older session page failed', error);
+    } finally {
+      loadingOlderRef.current = false;
+    }
+  }, [source, ownerKey]);
+  loadOlderRef.current = () => { void loadOlder(); };
+
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
-    const onScroll = () => {
+    const onScroll = (event: Event) => {
       pinnedRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 72;
+      if (event.isTrusted && element.scrollTop < 520) loadOlderRef.current();
     };
     element.addEventListener('scroll', onScroll, { passive: true });
     return () => element.removeEventListener('scroll', onScroll);
   }, []);
+
+  // A heavily filtered page can contain fewer visible bubbles than one
+  // viewport. In that case there is no scrollbar for the user to reach the
+  // normal top threshold, so quietly pull older pages until the viewport is
+  // filled (or history is exhausted).
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const element = scrollRef.current;
+      if (source && hasOlderRef.current && element &&
+          element.scrollHeight <= element.clientHeight + 80) {
+        loadOlderRef.current();
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages.length, source]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -574,38 +1061,92 @@ export function ConversationView({
   const pendingBaseline = baselineState && baselineState.sentAt === pending?.sentAt
     ? baselineState.userCount
     : 0;
-  const promptInTranscript = pending
-    ? promptIndexSince(messages, pending.text, pendingBaseline) >= 0
-    : false;
-  const lastConversationalRole = [...messages].reverse().find(message =>
+  const pendingPromptIndex = useMemo(() => pending
+    ? promptIndexSince(messages, pending.text, pendingBaseline)
+    : -1, [messages, pending, pendingBaseline]);
+  const promptInTranscript = pendingPromptIndex >= 0;
+  const assistantAfterPending = pendingPromptIndex >= 0 && messages
+    .slice(pendingPromptIndex + 1)
+    .some(message => message.role === 'assistant');
+  const lastConversationalRole = messages.findLast(message =>
     message.role === 'user' || message.role === 'assistant'
   )?.role;
   const isThinking = pending
-    ? !hasAssistantAfterPrompt(messages, pending.text, pendingBaseline)
+    ? !assistantAfterPending
     : agentStatus === 'working' && lastConversationalRole === 'user';
-  const navigationMessages = useMemo(() => {
-    const items = messages
+  const virtual = useConversationVirtualizer(messages, scrollRef);
+  const indexedNavigationMessages = useMemo(() => navigationRows.flatMap((row, rowIndex) => {
+    const parsed = updateChatTranscript(row.data).messages;
+    return parsed
       .filter(message => message.role === 'user')
-      .map(message => ({ id: message.id, content: message.content }));
+      .map((message, messageIndex) => ({
+        id: `navigation:${row.cursor}:${rowIndex}:${messageIndex}`,
+        sourceMessageId: message.id,
+        content: message.content,
+        cursor: row.cursor,
+      }));
+  }), [navigationRows]);
+  const navigationMessages = useMemo(() => {
+    const indexedIdCounts = new Map<string, number>();
+    indexedNavigationMessages.forEach(item => {
+      indexedIdCounts.set(item.sourceMessageId, (indexedIdCounts.get(item.sourceMessageId) ?? 0) + 1);
+    });
+    const loadedUserIndexes = new Map<string, number>();
+    messages.forEach((message, messageIndex) => {
+      if (message.role === 'user') loadedUserIndexes.set(message.id, messageIndex);
+    });
+    const items: ConversationNavigationItem[] = indexedNavigationMessages.length > 0
+      ? indexedNavigationMessages.map(item => {
+          // Some legacy transcript formats have no durable message id. Their
+          // parser fallback repeats when each lightweight navigation row is
+          // parsed alone, so only use id matching when the full index proves
+          // that id is unique. Cursor-driven paging remains authoritative.
+          const messageIndex = indexedIdCounts.get(item.sourceMessageId) === 1
+            ? loadedUserIndexes.get(item.sourceMessageId) ?? -1
+            : -1;
+          return {
+            ...item,
+            messageIndex,
+            top: messageIndex >= 0 ? (virtual.offsets[messageIndex] ?? 0) + 34 : 0,
+          };
+        })
+      : messages
+          .map((message, messageIndex) => ({ message, messageIndex }))
+          .filter(({ message }) => message.role === 'user')
+          .map(({ message, messageIndex }) => ({
+            id: message.id,
+            sourceMessageId: message.id,
+            content: message.content,
+            messageIndex,
+            top: (virtual.offsets[messageIndex] ?? 0) + 34,
+            cursor: null,
+          }));
+    if (indexedNavigationMessages.length > 0) {
+      const indexedIds = new Set(indexedNavigationMessages.map(item => item.sourceMessageId));
+      messages.forEach((message, messageIndex) => {
+        if (message.role !== 'user' || indexedIds.has(message.id)) return;
+        items.push({
+          id: `loaded:${message.id}`,
+          sourceMessageId: message.id,
+          content: message.content,
+          messageIndex,
+          top: (virtual.offsets[messageIndex] ?? 0) + 34,
+          cursor: null,
+        });
+      });
+    }
     if (pending && !promptInTranscript) {
-      items.push({ id: `pending:${pending.sentAt}`, content: pending.text });
+      items.push({
+        id: `pending:${pending.sentAt}`,
+        sourceMessageId: `pending:${pending.sentAt}`,
+        content: pending.text,
+        messageIndex: messages.length,
+        top: (virtual.offsets[messages.length] ?? 0) + 34,
+        cursor: null,
+      });
     }
     return items;
-  }, [messages, pending, promptInTranscript]);
-  const hoveredNavigationIndex = navigationMessages.findIndex(
-    message => message.id === hoveredNavigationId,
-  );
-  const hoveredNavigationMessage = hoveredNavigationIndex >= 0
-    ? navigationMessages[hoveredNavigationIndex]
-    : null;
-
-  useEffect(() => {
-    if (navigationMessages.length < 2 || (
-      hoveredNavigationId && !navigationMessages.some(message => message.id === hoveredNavigationId)
-    )) {
-      setHoveredNavigationId(null);
-    }
-  }, [hoveredNavigationId, navigationMessages]);
+  }, [messages, indexedNavigationMessages, pending, promptInTranscript, virtual.offsets]);
   // One conversation turn can contain several assistant narration fragments
   // around tool calls. The copy action belongs to the LAST assistant fragment
   // of EACH turn: either the assistant immediately preceding the next user
@@ -613,111 +1154,89 @@ export function ConversationView({
   // backwards over conversational roles so tool/reasoning rows do not split a
   // turn. While the agent is still working, withhold only the current trailing
   // candidate; summaries from completed earlier turns remain copyable.
-  const assistantSummaryMessageIds = new Set<string>();
-  let nextConversationalRole: 'user' | 'assistant' | null = null;
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.role === 'assistant') {
-      if (nextConversationalRole === null || nextConversationalRole === 'user') {
-        assistantSummaryMessageIds.add(message.id);
+  const assistantSummaryMessageIds = useMemo(() => {
+    const summaryIds = new Set<string>();
+    let nextConversationalRole: 'user' | 'assistant' | null = null;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.role === 'assistant') {
+        if (nextConversationalRole === null || nextConversationalRole === 'user') {
+          summaryIds.add(message.id);
+        }
+        nextConversationalRole = 'assistant';
+      } else if (message.role === 'user') {
+        nextConversationalRole = 'user';
       }
-      nextConversationalRole = 'assistant';
-    } else if (message.role === 'user') {
-      nextConversationalRole = 'user';
     }
-  }
-  if (agentStatus === 'working' && (!pending || promptInTranscript)) {
-    const lastUserIndex = messages.findLastIndex(message => message.role === 'user');
-    const currentTurnAssistant = messages
-      .slice(lastUserIndex + 1)
-      .reverse()
-      .find(message => message.role === 'assistant');
-    if (currentTurnAssistant) {
-      assistantSummaryMessageIds.delete(currentTurnAssistant.id);
+    if (agentStatus === 'working' && (!pending || promptInTranscript)) {
+      const lastUserIndex = messages.findLastIndex(message => message.role === 'user');
+      for (let index = messages.length - 1; index > lastUserIndex; index -= 1) {
+        if (messages[index].role === 'assistant') {
+          summaryIds.delete(messages[index].id);
+          break;
+        }
+      }
     }
-  }
+    return summaryIds;
+  }, [messages, agentStatus, pending, promptInTranscript]);
 
   useLayoutEffect(() => {
-    if (!pinnedRef.current) return;
     const element = scrollRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [messages, pending, isThinking]);
-
-  useEffect(() => {
-    const scroll = scrollRef.current;
-    if (!scroll || navigationMessages.length < 2) {
-      setActiveNavigationId(navigationMessages[0]?.id ?? null);
+    if (!element) return;
+    const prependAnchor = prependAnchorRef.current;
+    if (prependAnchor) {
+      prependAnchorRef.current = null;
+      element.scrollTop = prependAnchor.scrollTop +
+        Math.max(0, element.scrollHeight - prependAnchor.scrollHeight);
       return;
     }
-    let frame: number | null = null;
-    const updateActiveMessage = () => {
-      frame = null;
-      const scrollRect = scroll.getBoundingClientRect();
-      const readingLine = scrollRect.top + Math.min(120, scrollRect.height * 0.24);
-      let closestId = navigationMessages[0]?.id ?? null;
-      let closestDistance = Number.POSITIVE_INFINITY;
-      scroll.querySelectorAll<HTMLElement>('[data-conversation-navigation-id]').forEach(target => {
-        const distance = Math.abs(target.getBoundingClientRect().top - readingLine);
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestId = target.dataset.conversationNavigationId ?? closestId;
-        }
-      });
-      setActiveNavigationId(closestId);
-    };
-    const schedule = () => {
-      if (frame === null) frame = window.requestAnimationFrame(updateActiveMessage);
-    };
-    const resizeObserver = typeof ResizeObserver === 'undefined'
-      ? null
-      : new ResizeObserver(schedule);
-    updateActiveMessage();
-    scroll.addEventListener('scroll', schedule, { passive: true });
-    if (threadRef.current) resizeObserver?.observe(threadRef.current);
-    return () => {
-      scroll.removeEventListener('scroll', schedule);
-      resizeObserver?.disconnect();
-      if (frame !== null) window.cancelAnimationFrame(frame);
-    };
-  }, [navigationMessages]);
+    if (pinnedRef.current) element.scrollTop = element.scrollHeight;
+  }, [messages, pending, isThinking, virtual.total]);
 
-  useEffect(() => {
-    const container = navigationScrollRef.current;
-    if (!container || !activeNavigationId) return;
-    const item = container.querySelector<HTMLElement>(
-      `[data-conversation-navigation-target="${CSS.escape(activeNavigationId)}"]`,
+  useLayoutEffect(() => {
+    const target = pendingNavigationJumpRef.current;
+    if (!target) return;
+    let messageIndex = messages.findIndex(message =>
+      message.role === 'user' && message.id === target.sourceMessageId
     );
-    if (!item) return;
-    const itemTop = item.offsetTop;
-    const itemBottom = itemTop + item.offsetHeight;
-    if (itemTop < container.scrollTop) container.scrollTop = itemTop;
-    else if (itemBottom > container.scrollTop + container.clientHeight) {
-      container.scrollTop = itemBottom - container.clientHeight;
+    if (messageIndex < 0) {
+      const normalized = normalizePrompt(target.content);
+      messageIndex = messages.findLastIndex(message =>
+        message.role === 'user' && normalizePrompt(message.content) === normalized
+      );
     }
-  }, [activeNavigationId]);
-
-  const jumpToNavigationMessage = (messageId: string) => {
-    const scroll = scrollRef.current;
-    const target = scroll?.querySelector<HTMLElement>(
-      `[data-conversation-navigation-id="${CSS.escape(messageId)}"]`,
-    );
-    if (!scroll || !target) return;
-    const top = target.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
+    if (messageIndex < 0) return;
+    pendingNavigationJumpRef.current = null;
     pinnedRef.current = false;
-    scroll.scrollTo({
-      top: Math.max(0, scroll.scrollTop + top - 24),
-      behavior: 'smooth',
-    });
-  };
+    virtual.scrollToIndex(messageIndex, 'auto');
+  }, [messages, virtual]);
 
-  const showNavigationTooltip = (messageId: string, item: HTMLElement) => {
-    const navigation = navigationRef.current;
-    if (!navigation) return;
-    const itemRect = item.getBoundingClientRect();
-    const navigationRect = navigation.getBoundingClientRect();
-    setHoveredNavigationId(messageId);
-    setNavigationTooltipTop(itemRect.top + itemRect.height / 2 - navigationRect.top);
-  };
+  const jumpToNavigationMessage = useCallback((item: ConversationNavigationItem) => {
+    pinnedRef.current = false;
+    if (item.messageIndex >= 0 && item.messageIndex < messages.length) {
+      virtual.scrollToIndex(item.messageIndex);
+      return;
+    }
+    if (item.messageIndex >= messages.length) {
+      const scroll = scrollRef.current;
+      if (scroll) scroll.scrollTo({ top: scroll.scrollHeight, behavior: 'smooth' });
+      return;
+    }
+    const historyCursor = historyCursorRef.current;
+    const targetShouldAlreadyBeLoaded = item.cursor === null || historyCursor === null ||
+      item.cursor >= historyCursor;
+    if (targetShouldAlreadyBeLoaded) {
+      const normalized = normalizePrompt(item.content);
+      const loadedIndex = messages.findLastIndex(message =>
+        message.role === 'user' && normalizePrompt(message.content) === normalized
+      );
+      if (loadedIndex >= 0) {
+        virtual.scrollToIndex(loadedIndex);
+        return;
+      }
+    }
+    if (item.cursor !== null) void loadOlder(item);
+  }, [messages, virtual, loadOlder]);
 
   return (
     <div
@@ -731,93 +1250,51 @@ export function ConversationView({
             : <img src={bgUrl} alt="" draggable={false} />}
         </div>
       )}
-      {navigationMessages.length > 1 && (
-        <nav
-          ref={navigationRef}
-          className="conversation-navigation"
-          aria-label="对话快速定位"
-          onMouseLeave={() => setHoveredNavigationId(null)}
-        >
-          <div
-            ref={navigationScrollRef}
-            className="conversation-navigation-scroll"
-            onScroll={() => {
-              if (!hoveredNavigationId) return;
-              const item = navigationScrollRef.current?.querySelector<HTMLElement>(
-                `[data-conversation-navigation-target="${CSS.escape(hoveredNavigationId)}"]`,
-              );
-              if (item) showNavigationTooltip(hoveredNavigationId, item);
-            }}
-          >
-            {navigationMessages.map((message, index) => {
-              const hoverDistance = hoveredNavigationIndex < 0
-                ? undefined
-                : Math.abs(index - hoveredNavigationIndex);
-              return (
-                <button
-                  type="button"
-                  key={message.id}
-                  className="conversation-navigation-item"
-                  data-conversation-navigation-target={message.id}
-                  data-active={activeNavigationId === message.id ? 'true' : undefined}
-                  data-hover-distance={hoverDistance !== undefined && hoverDistance <= 2
-                    ? hoverDistance
-                    : undefined}
-                  aria-label={`跳转到第 ${index + 1} 轮提问`}
-                  aria-current={activeNavigationId === message.id ? 'step' : undefined}
-                  aria-describedby={hoveredNavigationId === message.id
-                    ? navigationTooltipId
-                    : undefined}
-                  onMouseEnter={event => showNavigationTooltip(message.id, event.currentTarget)}
-                  onFocus={event => showNavigationTooltip(message.id, event.currentTarget)}
-                  onBlur={() => setHoveredNavigationId(null)}
-                  onClick={() => jumpToNavigationMessage(message.id)}
-                >
-                  <span aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
-          {hoveredNavigationMessage && (
-            <div
-              id={navigationTooltipId}
-              className="conversation-navigation-tooltip"
-              role="tooltip"
-              style={{ top: navigationTooltipTop }}
-            >
-              <span>{hoveredNavigationMessage.content.replace(/\s+/g, ' ').trim()}</span>
-            </div>
-          )}
-        </nav>
+      {navigationMessages.length > 1 && isActive && isVisible && (
+        <ConversationNavigation
+          items={navigationMessages}
+          scrollRef={scrollRef}
+          onJump={jumpToNavigationMessage}
+        />
       )}
       <div className="conversation-scroll" ref={scrollRef}>
         <div className="conversation-thread" ref={threadRef}>
-        {messages.map(message => {
-          if (message.role === 'tool') return <ToolRow key={message.id} message={message} />;
-          if (message.role === 'reasoning') {
-            return (
-              <details key={message.id} className="conversation-reasoning">
-                <summary><span className="conversation-reasoning-glyph">✦</span> 思考过程</summary>
-                <MarkdownContent content={message.content} />
-              </details>
+        <div className="conversation-virtual-spacer" style={{ height: virtual.topSpacer }} aria-hidden="true" />
+        {messages.slice(virtual.start, virtual.end).map((message, visibleIndex) => {
+          const messageIndex = virtual.start + visibleIndex;
+          let content: ReactNode;
+          if (message.role === 'tool') {
+            content = <ToolRow message={message} />;
+          } else if (message.role === 'reasoning') {
+            content = <ReasoningRow message={message} />;
+          } else {
+            content = (
+              <article
+                className={`conversation-message conversation-message--${message.role}`}
+                data-conversation-navigation-id={message.role === 'user' ? message.id : undefined}
+              >
+                <div className="conversation-bubble"><MarkdownContent content={message.content} /></div>
+                {(message.role === 'user' || assistantSummaryMessageIds.has(message.id)) && (
+                  <MessageCopyButton
+                    copied={copiedMessageId === message.id}
+                    onCopy={() => copyMessage(message.id, message.content)}
+                  />
+                )}
+              </article>
             );
           }
           return (
-            <article
+            <MeasuredConversationRow
               key={message.id}
-              className={`conversation-message conversation-message--${message.role}`}
-              data-conversation-navigation-id={message.role === 'user' ? message.id : undefined}
+              messageId={virtual.measurementKeys[messageIndex] ?? message.id}
+              onMeasure={virtual.measureRow}
             >
-              <div className="conversation-bubble"><MarkdownContent content={message.content} /></div>
-              {(message.role === 'user' || assistantSummaryMessageIds.has(message.id)) && (
-                <MessageCopyButton
-                  copied={copiedMessageId === message.id}
-                  onCopy={() => copyMessage(message.id, message.content)}
-                />
-              )}
-            </article>
+              {content}
+              <span className="conversation-virtual-index" data-message-index={messageIndex} aria-hidden="true" />
+            </MeasuredConversationRow>
           );
         })}
+        <div className="conversation-virtual-spacer" style={{ height: virtual.bottomSpacer }} aria-hidden="true" />
 
         {pending && !promptInTranscript && (
           <article
@@ -840,6 +1317,13 @@ export function ConversationView({
         )}
         </div>
       </div>
+      <textarea
+        ref={selectAllProxyRef}
+        className="conversation-selection-proxy"
+        readOnly
+        tabIndex={-1}
+        aria-hidden="true"
+      />
       {ctxMenu && (
         <TermContextMenu
           menu={ctxMenu}
@@ -847,6 +1331,7 @@ export function ConversationView({
           onCopy={() => {
             const text = selectionText();
             if (text) void clipboardWrite(text);
+            if (selectAllProxyRef.current) selectAllProxyRef.current.value = '';
             closeCtxMenu();
           }}
           onPaste={async () => {
@@ -861,13 +1346,19 @@ export function ConversationView({
             closeCtxMenu();
           }}
           onSelectAll={() => {
-            const thread = threadRef.current;
-            const selection = window.getSelection();
-            if (thread && selection) {
-              const range = document.createRange();
-              range.selectNodeContents(thread);
-              selection.removeAllRanges();
-              selection.addRange(range);
+            const proxy = selectAllProxyRef.current;
+            if (proxy) {
+              proxy.value = messages.map(message => {
+                if (message.role === 'tool' && message.toolName) {
+                  return `${message.toolName}\n${message.content}`;
+                }
+                return message.content;
+              }).filter(Boolean).join('\n\n');
+              if (pending && !promptInTranscript) {
+                proxy.value += `${proxy.value ? '\n\n' : ''}${pending.text}`;
+              }
+              proxy.focus({ preventScroll: true });
+              proxy.select();
             }
             closeCtxMenu();
           }}
@@ -876,3 +1367,5 @@ export function ConversationView({
     </div>
   );
 }
+
+export const ConversationView = memo(ConversationViewImpl, conversationPropsEqual);
