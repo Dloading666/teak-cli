@@ -3,6 +3,7 @@
 
 ### AI 终端，从此有了第二种更舒服的打开方式
 
+- **v3.4.6：工具执行反馈现在更连续、更克制。** 工具结果返回后，「正在执行中…」会在 Agent 处理结果或继续调用下一项工具时保持稳定，不再短暂跳回思考状态；失败的工具输出默认折叠，错误仍以红点清楚提示，需要时再手动展开查看详情。
 - **v3.4.5：泡泡对话的排版现在稳定一致。** Markdown 标题不再突然放大，消息正文始终使用统一字号；宽表格会限制在对话区域内，长网址、长命令与连续字符串会安全换行，不再撑破气泡或被窗口裁切。
 - **Claude Code 的内部 Agent 通知不再冒充用户消息。** 完成子任务时写入 JSONL 的 `<task-notification>` 会被识别为协议消息并隐藏；真实用户即使在问题中提到这个标签，内容也会正常保留。
 - **v3.4.4：思考与执行，现在有了连续而准确的状态反馈。** Agent 开始调用工具或运行命令时，泡泡对话会把六点动画旁的「正在思考中…」切换为「正在执行中…」；提示仅跟随当前活跃回合，执行结束、切换回合或 Agent 空闲后会及时消失，不会被历史工具记录误触发。
@@ -20,6 +21,7 @@
 
 ### A new way to work with AI terminals
 
+- **v3.4.6: Tool execution feedback is now steadier and less intrusive.** “Executing…” remains visible while the agent processes a tool result or moves to the next tool instead of briefly falling back to thinking. Failed tool output stays collapsed by default, with a clear red indicator and details available on demand.
 - **v3.4.5: Bubble Conversation typography is now stable and predictable.** Markdown headings no longer jump to oversized text, message content keeps one consistent font size, and wide tables stay inside the conversation area. Long URLs, commands and uninterrupted strings wrap safely instead of overflowing or being clipped.
 - **Claude Code's internal agent notifications no longer appear as user messages.** `<task-notification>` rows written to JSONL after subtask completion are recognized as protocol traffic and hidden, while genuine user questions that mention the tag remain visible.
 - **v3.4.4: Thinking and execution now have continuous, accurate status feedback.** When the agent starts a tool call or command, Bubble Conversation switches the six-dot activity label from “Thinking…” to “Executing…”. The indicator is scoped to the active turn and clears when execution finishes, the turn changes or the agent becomes idle, so historical tool records cannot reactivate it.
@@ -37,6 +39,7 @@
 
 ### AI 終端，從此有了第二種更舒服的開啟方式
 
+- **v3.4.6：工具執行回饋現在更連續、更克制。** 工具結果返回後，「正在執行中…」會在 Agent 處理結果或繼續呼叫下一項工具時保持穩定，不再短暫跳回思考狀態；失敗的工具輸出預設收合，錯誤仍以紅點清楚提示，需要時再手動展開查看詳細資訊。
 - **v3.4.5：泡泡對話的排版現在穩定一致。** Markdown 標題不再突然放大，訊息正文始終使用統一字級；寬表格會限制在對話區域內，長網址、長指令與連續字串會安全換行，不再撐破氣泡或被視窗裁切。
 - **Claude Code 的內部 Agent 通知不再偽裝成使用者訊息。** 子任務完成後寫入 JSONL 的 `<task-notification>` 會被辨識為協定訊息並隱藏；真正的使用者即使在問題中提到此標籤，內容仍會正常保留。
 - **v3.4.4：思考與執行，現在有了連續而準確的狀態回饋。** Agent 開始呼叫工具或執行命令時，泡泡對話會把六點動畫旁的「正在思考中…」切換為「正在執行中…」；提示僅跟隨目前的活動回合，執行結束、切換回合或 Agent 閒置後會即時消失，不會被歷史工具記錄誤觸發。
@@ -54,6 +57,7 @@
 
 ### AI ターミナルに、もっと心地よいもう一つの使い方
 
+- **v3.4.6：ツール実行のフィードバックが、より安定して控えめになりました。** ツール結果を Agent が処理している間や次のツールへ進む間も「実行中…」が安定して表示され、途中で一瞬「考え中…」へ戻ることがなくなりました。失敗したツールの出力は既定で折りたたまれ、赤いインジケーターでエラーを示し、必要なときだけ詳細を展開できます。
 - **v3.4.5：バブル会話の表示が常に安定するようになりました。** Markdown の見出しだけが突然大きくなることがなくなり、メッセージ本文は統一された文字サイズで表示されます。幅の広い表も会話領域内に収まり、長い URL、コマンド、連続文字列ははみ出したり切れたりせず安全に折り返されます。
 - **Claude Code の内部 Agent 通知がユーザーメッセージとして表示されなくなりました。** サブタスク完了時に JSONL へ書き込まれる `<task-notification>` をプロトコル通知として識別して非表示にし、ユーザーが質問内でこのタグに言及した場合は正常に表示します。
 - **v3.4.4：思考と実行の状態を、途切れず正確に確認できるようになりました。** Agent がツール呼び出しやコマンド実行を始めると、6 点アニメーションの表示が「考え中…」から「実行中…」へ切り替わります。表示は現在進行中のターンだけに限定され、実行完了、ターン切り替え、待機状態への移行時に消えるため、過去のツール履歴で再表示されることはありません。
@@ -71,6 +75,7 @@
 
 ### AI 터미널을 더 편안하게 사용하는 새로운 방식
 
+- **v3.4.6: 도구 실행 피드백이 더 안정적이고 절제된 방식으로 표시됩니다.** Agent가 도구 결과를 처리하거나 다음 도구로 넘어가는 동안에도 “실행 중…”이 안정적으로 유지되어 잠시 “생각 중…”으로 되돌아가지 않습니다. 실패한 도구 출력은 기본적으로 접힌 상태를 유지하며, 빨간 표시로 오류를 분명히 알리고 필요할 때만 세부 내용을 펼칠 수 있습니다.
 - **v3.4.5: 버블 대화의 타이포그래피가 항상 안정적으로 표시됩니다.** Markdown 제목만 갑자기 커지는 현상을 없애고 메시지 본문에 통일된 글자 크기를 적용했습니다. 넓은 표는 대화 영역 안에 맞춰지며 긴 URL, 명령어, 연속 문자열도 넘치거나 잘리지 않고 안전하게 줄바꿈됩니다.
 - **Claude Code의 내부 Agent 알림이 더 이상 사용자 메시지로 표시되지 않습니다.** 하위 작업 완료 후 JSONL에 기록되는 `<task-notification>`을 프로토콜 알림으로 인식해 숨기며, 사용자가 질문에서 해당 태그를 언급한 경우에는 내용을 그대로 표시합니다.
 - **v3.4.4: 사고와 실행 상태를 끊김 없이 정확하게 보여줍니다.** Agent가 도구 호출이나 명령 실행을 시작하면 6점 애니메이션 옆 문구가 “생각 중…”에서 “실행 중…”으로 바뀝니다. 표시는 현재 활성 턴에만 적용되며 실행 완료, 턴 전환 또는 Agent 대기 상태에서 사라지므로 이전 도구 기록 때문에 다시 나타나지 않습니다.
