@@ -11,7 +11,7 @@ import {
   getHistorySnapshot,
 } from '../../lib/history-cache';
 import { subscribeHidden, getHiddenSnapshot, hideSession } from '../../lib/hidden-sessions';
-import { subscribePinned, getPinnedSnapshot, togglePin } from '../../lib/pinned-sessions';
+import { subscribePinned, getPinnedSnapshot } from '../../lib/pinned-sessions';
 import { subscribeRenamed, getRenamedSnapshot, setCustomName } from '../../lib/renamed-sessions';
 import { SessionContextMenu, type SessionCtxMenuState } from './SessionContextMenu';
 import { useTextContextMenu } from '../../lib/use-text-context-menu';
@@ -482,7 +482,6 @@ export function HistoryBoard() {
         }
 
         const sessionKey = `${session.tool ?? ''}:${session.id}`;
-        const isPinnedSession = pinned.has(sessionKey);
         const displayName = renamed[sessionKey] ?? session.name;
         const isRenaming = renamingKey === sessionKey;
         return (
@@ -550,27 +549,11 @@ export function HistoryBoard() {
                 hideSession(session.tool ?? '', session.id);
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"/>
                 <path d="m19 6-.867 13.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 6"/>
                 <path d="M10 11v6"/><path d="M14 11v6"/>
                 <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-              </svg>
-            </button>
-            {/* One-click pin, hover-revealed (always visible once pinned,
-                replacing the old passive marker). stopPropagation so it
-                doesn't trigger the card's click-to-resume. */}
-            <button
-              type="button"
-              className={`history-card-pin-btn${isPinnedSession ? ' pinned' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                togglePin(session.tool ?? '', session.id);
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill={isPinnedSession ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 17v5"/>
-                <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>
               </svg>
             </button>
           </div>

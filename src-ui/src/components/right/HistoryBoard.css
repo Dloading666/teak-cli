@@ -34,9 +34,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* Reserve room for the hover pin + delete buttons (right:8/36, 24px each)
-     so a long title ellipsizes instead of painting under them. */
-  padding-right: 64px;
 }
 
 .history-card-meta {
@@ -235,67 +232,46 @@
   font-size: 11px;
 }
 
-/* ─── Card pin/delete buttons + inline rename ─── */
-/* One-click pin at the card's top-right. Hidden until hover; always shown
-   (accent, filled) once pinned — it doubles as the pinned marker. The
-   delete button sits just left of it, same hover-reveal pattern — both go
-   through the existing localStorage soft-delete (hideSession), no real
-   removal. The title reserves padding-right so long names ellipsize before
-   reaching the buttons instead of painting under them. */
-.history-card-pin-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-xs);
-  color: var(--text-3);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
+/* ─── Card delete button + inline rename ─── */
+/* No permanent action gutter: the title uses the card's full width. On hover,
+   one opaque delete button overlays the text at the right-hand centre. Pinning
+   remains available from the card's context menu. */
 .history-card-delete-btn {
   position: absolute;
-  top: 8px;
-  right: 36px;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  background: transparent;
-  border: none;
+  background-color: var(--bg-app);
+  background-image: linear-gradient(var(--bg-panel), var(--bg-panel));
+  border: 1px solid var(--border);
   border-radius: var(--radius-xs);
-  color: var(--text-3);
+  color: var(--text-2);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.history-card:hover .history-card-pin-btn,
-.history-card-pin-btn.pinned,
-.history-card:hover .history-card-delete-btn {
+.history-card:hover .history-card-delete-btn,
+.history-card-delete-btn:focus-visible {
   opacity: 1;
+  pointer-events: auto;
 }
-.history-card-pin-btn:hover,
 .history-card-delete-btn:hover {
-  background: var(--bg-hover);
   color: var(--text-1);
-}
-.history-card-pin-btn.pinned {
-  color: var(--accent);
+  border-color: color-mix(in srgb, var(--text-2) 55%, var(--border));
 }
 
 /* Inline rename — seamless, no border/background/padding so switching into
    edit mode causes zero layout shift (same pattern as TaskBoard's
    .task-title-edit). Sized to match .history-card-title exactly (font-size,
-   weight, line-height, padding-right gutter for the pin/delete buttons);
+   weight and line-height);
    the only tell-tale is the accent caret. */
 .history-card-rename-input {
   width: 100%;
@@ -303,7 +279,7 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  padding: 0 64px 0 0;
+  padding: 0;
   margin: 0;
   color: var(--text-1);
   font-size: 13px;
