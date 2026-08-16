@@ -16,6 +16,7 @@ import {
 import { MarkdownContent } from './MarkdownContent';
 import { TermContextMenu, type TermContextMenuState } from './TermContextMenu';
 import { useConversationVirtualizer } from './conversation-virtualizer';
+import { useT } from '../../i18n/useT';
 import './ConversationView.css';
 
 interface ConversationViewProps {
@@ -388,6 +389,7 @@ function ToolRow({ message }: { message: ChatMessage }) {
 }
 
 function ReasoningRow({ message }: { message: ChatMessage }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   return (
     <details
@@ -395,18 +397,19 @@ function ReasoningRow({ message }: { message: ChatMessage }) {
       open={expanded}
       onToggle={event => setExpanded(event.currentTarget.open)}
     >
-      <summary><span className="conversation-reasoning-glyph">✦</span> 思考过程</summary>
+      <summary><span className="conversation-reasoning-glyph">✦</span> {t('conversation.reasoning')}</summary>
       {expanded && <MarkdownContent content={message.content} />}
     </details>
   );
 }
 
 function MessageCopyButton({ copied, onCopy }: { copied: boolean; onCopy: () => void }) {
+  const t = useT();
   return (
     <button
       type="button"
       className={`conversation-copy${copied ? ' conversation-copy--copied' : ''}`}
-      aria-label={copied ? 'Copied' : 'Copy message'}
+      aria-label={copied ? t('conversation.copied') : t('conversation.copy_message')}
       onClick={onCopy}
     >
       {copied ? (
@@ -458,6 +461,7 @@ interface ConversationNavigationProps {
 const ConversationNavigation = memo(function ConversationNavigation({
   items, scrollRef, onJump,
 }: ConversationNavigationProps) {
+  const t = useT();
   const navigationRef = useRef<HTMLElement>(null);
   const navigationScrollRef = useRef<HTMLDivElement>(null);
   const tooltipId = useId();
@@ -536,7 +540,7 @@ const ConversationNavigation = memo(function ConversationNavigation({
     <nav
       ref={navigationRef}
       className="conversation-navigation"
-      aria-label="对话快速定位"
+      aria-label={t('conversation.navigation')}
       onMouseLeave={() => setHoveredId(null)}
     >
       <div
@@ -562,7 +566,7 @@ const ConversationNavigation = memo(function ConversationNavigation({
               data-hover-distance={hoverDistance !== undefined && hoverDistance <= 2
                 ? hoverDistance
                 : undefined}
-              aria-label={`跳转到第 ${index + 1} 轮提问`}
+              aria-label={t('conversation.jump_to_turn', { turn: index + 1 })}
               aria-current={activeId === item.id ? 'step' : undefined}
               aria-describedby={hoveredId === item.id ? tooltipId : undefined}
               onMouseEnter={event => showTooltip(item.id, event.currentTarget)}
@@ -593,6 +597,7 @@ function ConversationViewImpl({
   sessionId, tool, folderPath, resumeToken, startedAt, pending, agentStatus, isActive, isVisible,
   onPendingResolved, onPasteToDraft, hasBg, bgUrl, bgType, competingBindings = [],
 }: ConversationViewProps) {
+  const t = useT();
   const ownerKey = `${sessionId}:${tool ?? 'none'}:${resumeToken ?? 'fresh'}:${startedAt ?? 'unknown'}`;
   const cached = conversationCache.get(ownerKey);
   const initialTranscript = cached?.transcript ?? { messages: [], remainder: '', nextLineIndex: 0 };
@@ -1312,7 +1317,7 @@ function ConversationViewImpl({
         {isThinking && (
           <div className="conversation-thinking" role="status" aria-live="polite">
             <span className="conversation-thinking-braille" aria-hidden="true" />
-            <span className="conversation-thinking-text">正在思考中…</span>
+            <span className="conversation-thinking-text">{t('conversation.thinking')}</span>
           </div>
         )}
         </div>

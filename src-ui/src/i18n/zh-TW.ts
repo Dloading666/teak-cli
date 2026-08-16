@@ -182,6 +182,12 @@ export const zhTW = {
   'gambit.send_empty_hint': '先輸入內容或貼上圖片 (Ctrl+V)',
 
 
+  'conversation.reasoning': '思考過程',
+  'conversation.thinking': '正在思考中…',
+  'conversation.copied': '已複製',
+  'conversation.copy_message': '複製訊息',
+  'conversation.navigation': '對話快速定位',
+  'conversation.jump_to_turn': '跳至第 {turn} 輪提問',
   'heatmap.title': '{sessions} 次對話、{messages} 則訊息',
   'heatmap.title_empty': '故事還沒開始 — 跟 AI 聊起來，點亮你的第一格',
   'heatmap.legend_less': '少',

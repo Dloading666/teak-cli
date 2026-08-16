@@ -184,6 +184,12 @@ Xóa tờ ghi chú này khi bạn sẵn sàng và bắt đầu tác vụ đầu 
   'gambit.send_empty_hint': 'Nhập nội dung hoặc dán ảnh trước (Ctrl+V)',
 
 
+  'conversation.reasoning': 'Quá trình suy luận',
+  'conversation.thinking': 'Đang suy nghĩ…',
+  'conversation.copied': 'Đã sao chép',
+  'conversation.copy_message': 'Sao chép tin nhắn',
+  'conversation.navigation': 'Điều hướng cuộc trò chuyện',
+  'conversation.jump_to_turn': 'Chuyển đến câu hỏi {turn}',
   'heatmap.title': '{sessions} phiên · {messages} tin nhắn',
   'heatmap.title_empty': 'Câu chuyện chưa bắt đầu — trò chuyện với AI để thắp sáng ô đầu tiên',
   'heatmap.legend_less': 'Ít',

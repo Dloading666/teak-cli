@@ -183,6 +183,12 @@ export const zhCN = {
 
 
   // 贡献热力图（桌面 Launchpad 上的 6 张卡片上方）
+  'conversation.reasoning': '思考过程',
+  'conversation.thinking': '正在思考中…',
+  'conversation.copied': '已复制',
+  'conversation.copy_message': '复制消息',
+  'conversation.navigation': '对话快速定位',
+  'conversation.jump_to_turn': '跳转到第 {turn} 轮提问',
   'heatmap.title': '{sessions} 次会话、{messages} 条消息',
   'heatmap.title_empty': '故事还没开始 — 跟 AI 聊起来，点亮你的第一格',
   'heatmap.legend_less': '少',

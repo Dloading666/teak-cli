@@ -183,6 +183,12 @@ Delete this note whenever you're ready, and start your first task.`,
   'gambit.send_empty_hint': 'Type a message or paste an image first (Ctrl+V)',
 
   // Contribution heatmap (above pinned cards on Desktop launchpad).
+  'conversation.reasoning': 'Thinking process',
+  'conversation.thinking': 'Thinking…',
+  'conversation.copied': 'Copied',
+  'conversation.copy_message': 'Copy message',
+  'conversation.navigation': 'Conversation navigation',
+  'conversation.jump_to_turn': 'Jump to question {turn}',
   'heatmap.title': '{sessions} sessions · {messages} messages',
   'heatmap.title_empty': 'Story not started yet — chat with an AI to light up your first square',
   'heatmap.legend_less': 'Less',

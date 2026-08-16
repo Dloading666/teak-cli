@@ -178,6 +178,12 @@ Lösch diesen Zettel, wann du willst, und starte deine erste Aufgabe.`,
 
   'gambit.send_failed_hint': 'Öffne zuerst eine aktive Sitzung',
 
+  'conversation.reasoning': 'Denkprozess',
+  'conversation.thinking': 'Denkt nach…',
+  'conversation.copied': 'Kopiert',
+  'conversation.copy_message': 'Nachricht kopieren',
+  'conversation.navigation': 'Konversationsnavigation',
+  'conversation.jump_to_turn': 'Zu Frage {turn} springen',
   'heatmap.title': '{sessions} Sitzungen · {messages} Nachrichten',
   'heatmap.title_empty': 'Noch nichts los — chatte mit einer KI, um dein erstes Feld zum Leuchten zu bringen',
   'heatmap.legend_less': 'Weniger',

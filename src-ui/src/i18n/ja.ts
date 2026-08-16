@@ -181,6 +181,12 @@ export const ja = {
   'gambit.send_empty_hint': 'メッセージを入力するか画像を貼り付けてください (Ctrl+V)',
 
 
+  'conversation.reasoning': '思考プロセス',
+  'conversation.thinking': '考え中…',
+  'conversation.copied': 'コピーしました',
+  'conversation.copy_message': 'メッセージをコピー',
+  'conversation.navigation': '会話ナビゲーション',
+  'conversation.jump_to_turn': '質問 {turn} に移動',
   'heatmap.title': 'セッション {sessions} 回・メッセージ {messages} 件',
   'heatmap.title_empty': 'まだ何もありません — AI と話してマスを点灯させよう',
   'heatmap.legend_less': '少',

@@ -178,6 +178,12 @@ export const ru = {
 
   'gambit.send_failed_hint': 'Сначала откройте активную сессию',
 
+  'conversation.reasoning': 'Ход рассуждений',
+  'conversation.thinking': 'Размышляет…',
+  'conversation.copied': 'Скопировано',
+  'conversation.copy_message': 'Копировать сообщение',
+  'conversation.navigation': 'Навигация по диалогу',
+  'conversation.jump_to_turn': 'Перейти к вопросу {turn}',
   'heatmap.title': 'Сессий: {sessions} · Сообщений: {messages}',
   'heatmap.title_empty': 'История ещё не началась — поговори с ИИ, чтобы зажечь первую клетку',
   'heatmap.legend_less': 'Меньше',

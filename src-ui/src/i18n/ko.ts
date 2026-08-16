@@ -181,6 +181,12 @@ export const ko = {
   'gambit.send_empty_hint': '내용을 입력하거나 이미지를 붙여넣으세요 (Ctrl+V)',
 
 
+  'conversation.reasoning': '사고 과정',
+  'conversation.thinking': '생각 중…',
+  'conversation.copied': '복사됨',
+  'conversation.copy_message': '메시지 복사',
+  'conversation.navigation': '대화 탐색',
+  'conversation.jump_to_turn': '{turn}번째 질문으로 이동',
   'heatmap.title': '세션 {sessions}회 · 메시지 {messages}개',
   'heatmap.title_empty': '아직 시작되지 않았어요 — AI와 대화하여 첫 칸을 채워보세요',
   'heatmap.legend_less': '적음',

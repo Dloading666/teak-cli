@@ -177,6 +177,12 @@ Borra esta nota cuando quieras y empieza tu primera tarea.`,
 
   'gambit.send_failed_hint': 'Abre primero una sesión activa',
 
+  'conversation.reasoning': 'Proceso de razonamiento',
+  'conversation.thinking': 'Pensando…',
+  'conversation.copied': 'Copiado',
+  'conversation.copy_message': 'Copiar mensaje',
+  'conversation.navigation': 'Navegación de la conversación',
+  'conversation.jump_to_turn': 'Ir a la pregunta {turn}',
   'heatmap.title': '{sessions} sesiones · {messages} mensajes',
   'heatmap.title_empty': 'La historia aún no empieza — chatea con una IA para iluminar tu primera casilla',
   'heatmap.legend_less': 'Menos',

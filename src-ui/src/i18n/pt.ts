@@ -178,6 +178,12 @@ Apague esta nota quando quiser e comece a sua primeira tarefa.`,
 
   'gambit.send_failed_hint': 'Abra primeiro uma sessão ativa',
 
+  'conversation.reasoning': 'Processo de raciocínio',
+  'conversation.thinking': 'Pensando…',
+  'conversation.copied': 'Copiado',
+  'conversation.copy_message': 'Copiar mensagem',
+  'conversation.navigation': 'Navegação da conversa',
+  'conversation.jump_to_turn': 'Ir para a pergunta {turn}',
   'heatmap.title': '{sessions} sessões · {messages} mensagens',
   'heatmap.title_empty': 'A história ainda não começou — converse com uma IA para acender seu primeiro quadrado',
   'heatmap.legend_less': 'Menos',

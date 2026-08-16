@@ -177,6 +177,12 @@ Supprimez cette note quand vous voulez et commencez votre première tâche.`,
 
   'gambit.send_failed_hint': "Ouvrez d'abord une session active",
 
+  'conversation.reasoning': 'Processus de réflexion',
+  'conversation.thinking': 'Réflexion en cours…',
+  'conversation.copied': 'Copié',
+  'conversation.copy_message': 'Copier le message',
+  'conversation.navigation': 'Navigation dans la conversation',
+  'conversation.jump_to_turn': 'Aller à la question {turn}',
   'heatmap.title': '{sessions} sessions · {messages} messages',
   'heatmap.title_empty': 'L\'histoire n\'a pas encore commencé — discutez avec une IA pour allumer votre première case',
   'heatmap.legend_less': 'Moins',
