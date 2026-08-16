@@ -211,6 +211,7 @@
 .conversation-bubble {
   min-width: 0;
   max-width: min(76%, 680px);
+  font-size: 14px;
   line-height: 1.65;
   user-select: text;
 }
@@ -283,10 +284,33 @@
 .conversation-reasoning .md-body > :first-child { margin-top: 0; }
 .conversation-bubble .md-body > :last-child,
 .conversation-reasoning .md-body > :last-child { margin-bottom: 0; }
+.conversation-bubble .md-body :is(h1, h2, h3, h4, h5, h6),
+.conversation-reasoning .md-body :is(h1, h2, h3, h4, h5, h6) {
+  margin: 16px 0 8px;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: 700;
+}
 .conversation-bubble .md-body p { margin: 0 0 10px; }
 .conversation-bubble .md-body ul,
 .conversation-bubble .md-body ol { padding-left: 22px; }
-.conversation-bubble .md-body a { color: var(--accent); }
+.conversation-bubble .md-body table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.conversation-bubble .md-body :is(th, td) {
+  min-width: 0;
+  padding: 5px 7px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.conversation-bubble .md-body a {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .conversation-bubble .md-inline-code {
   padding: 1px 5px;
   border-radius: var(--shape-radius-btn, 4px);

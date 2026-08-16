@@ -3,6 +3,8 @@
 
 ### AI 终端，从此有了第二种更舒服的打开方式
 
+- **v3.4.5：泡泡对话的排版现在稳定一致。** Markdown 标题不再突然放大，消息正文始终使用统一字号；宽表格会限制在对话区域内，长网址、长命令与连续字符串会安全换行，不再撑破气泡或被窗口裁切。
+- **Claude Code 的内部 Agent 通知不再冒充用户消息。** 完成子任务时写入 JSONL 的 `<task-notification>` 会被识别为协议消息并隐藏；真实用户即使在问题中提到这个标签，内容也会正常保留。
 - **v3.4.4：思考与执行，现在有了连续而准确的状态反馈。** Agent 开始调用工具或运行命令时，泡泡对话会把六点动画旁的「正在思考中…」切换为「正在执行中…」；提示仅跟随当前活跃回合，执行结束、切换回合或 Agent 空闲后会及时消失，不会被历史工具记录误触发。
 - **11 种语言保持完整同步，并新增编译期防漏机制。** 「正在执行中…」已覆盖全部支持语言；同时补齐了既有 Gambit 文案。现在每份语言包都严格包含相同的 164 个翻译键，任何漏译、多余键或拼写错误都会让 TypeScript 构建直接失败。
 - **v3.4.3：泡泡对话现在会完整跟随界面语言。** 「正在思考中」「思考过程」、复制按钮的读屏提示，以及对话快速定位与轮次跳转提示，现已覆盖简体中文、繁體中文、English、日本語、한국어、Español、Français、Deutsch、Português、Русский 和 Tiếng Việt。与此同时，前端 238 个 ESLint 错误与 2 个警告已全部清零，翻译键也恢复严格类型检查。
@@ -18,6 +20,8 @@
 
 ### A new way to work with AI terminals
 
+- **v3.4.5: Bubble Conversation typography is now stable and predictable.** Markdown headings no longer jump to oversized text, message content keeps one consistent font size, and wide tables stay inside the conversation area. Long URLs, commands and uninterrupted strings wrap safely instead of overflowing or being clipped.
+- **Claude Code's internal agent notifications no longer appear as user messages.** `<task-notification>` rows written to JSONL after subtask completion are recognized as protocol traffic and hidden, while genuine user questions that mention the tag remain visible.
 - **v3.4.4: Thinking and execution now have continuous, accurate status feedback.** When the agent starts a tool call or command, Bubble Conversation switches the six-dot activity label from “Thinking…” to “Executing…”. The indicator is scoped to the active turn and clears when execution finishes, the turn changes or the agent becomes idle, so historical tool records cannot reactivate it.
 - **All 11 languages now stay structurally in sync.** “Executing…” is localized everywhere, and previously missing Gambit strings have been completed. Every locale now contains the same 164 translation keys, with compile-time checks that fail the TypeScript build on missing, extra or misspelled keys.
 - **v3.4.3: Bubble Conversation now follows the selected interface language throughout.** Thinking status, reasoning labels, copy-button accessibility text, conversation navigation and turn-jump announcements are localized across all 11 supported languages. This release also clears all 238 frontend ESLint errors and 2 warnings and restores strict typing for translation keys.
@@ -33,6 +37,8 @@
 
 ### AI 終端，從此有了第二種更舒服的開啟方式
 
+- **v3.4.5：泡泡對話的排版現在穩定一致。** Markdown 標題不再突然放大，訊息正文始終使用統一字級；寬表格會限制在對話區域內，長網址、長指令與連續字串會安全換行，不再撐破氣泡或被視窗裁切。
+- **Claude Code 的內部 Agent 通知不再偽裝成使用者訊息。** 子任務完成後寫入 JSONL 的 `<task-notification>` 會被辨識為協定訊息並隱藏；真正的使用者即使在問題中提到此標籤，內容仍會正常保留。
 - **v3.4.4：思考與執行，現在有了連續而準確的狀態回饋。** Agent 開始呼叫工具或執行命令時，泡泡對話會把六點動畫旁的「正在思考中…」切換為「正在執行中…」；提示僅跟隨目前的活動回合，執行結束、切換回合或 Agent 閒置後會即時消失，不會被歷史工具記錄誤觸發。
 - **11 種語言保持完整同步，並新增編譯期防漏機制。** 「正在執行中…」已涵蓋所有支援語言，同時補齊既有 Gambit 文案。現在每份語言包都嚴格包含相同的 164 個翻譯鍵，任何漏譯、多餘鍵或拼寫錯誤都會讓 TypeScript 建置直接失敗。
 - **v3.4.3：泡泡對話現在會完整跟隨介面語言。** 「正在思考中」「思考過程」、複製按鈕的讀屏提示，以及對話快速定位與輪次跳轉提示，現已涵蓋全部 11 種支援語言。本次版本也清除了前端全部 238 個 ESLint 錯誤與 2 個警告，並恢復翻譯鍵的嚴格型別檢查。
@@ -48,6 +54,8 @@
 
 ### AI ターミナルに、もっと心地よいもう一つの使い方
 
+- **v3.4.5：バブル会話の表示が常に安定するようになりました。** Markdown の見出しだけが突然大きくなることがなくなり、メッセージ本文は統一された文字サイズで表示されます。幅の広い表も会話領域内に収まり、長い URL、コマンド、連続文字列ははみ出したり切れたりせず安全に折り返されます。
+- **Claude Code の内部 Agent 通知がユーザーメッセージとして表示されなくなりました。** サブタスク完了時に JSONL へ書き込まれる `<task-notification>` をプロトコル通知として識別して非表示にし、ユーザーが質問内でこのタグに言及した場合は正常に表示します。
 - **v3.4.4：思考と実行の状態を、途切れず正確に確認できるようになりました。** Agent がツール呼び出しやコマンド実行を始めると、6 点アニメーションの表示が「考え中…」から「実行中…」へ切り替わります。表示は現在進行中のターンだけに限定され、実行完了、ターン切り替え、待機状態への移行時に消えるため、過去のツール履歴で再表示されることはありません。
 - **11 言語を完全に同期し、翻訳漏れをビルド時に検出します。** 「実行中…」をすべての対応言語に追加し、既存の Gambit 文言の不足も補完しました。各言語ファイルは同じ 164 キーを持ち、不足・余分・タイプミスがある場合は TypeScript ビルドが失敗します。
 - **v3.4.3：バブル会話が選択中の表示言語に完全対応しました。** 思考中ステータス、思考プロセス、コピー操作のアクセシビリティ文言、会話ナビゲーション、質問へのジャンプ案内を、対応する全 11 言語で表示します。フロントエンドに残っていた ESLint の 238 エラーと 2 警告もすべて解消し、翻訳キーの厳密な型チェックを復元しました。
@@ -63,6 +71,8 @@
 
 ### AI 터미널을 더 편안하게 사용하는 새로운 방식
 
+- **v3.4.5: 버블 대화의 타이포그래피가 항상 안정적으로 표시됩니다.** Markdown 제목만 갑자기 커지는 현상을 없애고 메시지 본문에 통일된 글자 크기를 적용했습니다. 넓은 표는 대화 영역 안에 맞춰지며 긴 URL, 명령어, 연속 문자열도 넘치거나 잘리지 않고 안전하게 줄바꿈됩니다.
+- **Claude Code의 내부 Agent 알림이 더 이상 사용자 메시지로 표시되지 않습니다.** 하위 작업 완료 후 JSONL에 기록되는 `<task-notification>`을 프로토콜 알림으로 인식해 숨기며, 사용자가 질문에서 해당 태그를 언급한 경우에는 내용을 그대로 표시합니다.
 - **v3.4.4: 사고와 실행 상태를 끊김 없이 정확하게 보여줍니다.** Agent가 도구 호출이나 명령 실행을 시작하면 6점 애니메이션 옆 문구가 “생각 중…”에서 “실행 중…”으로 바뀝니다. 표시는 현재 활성 턴에만 적용되며 실행 완료, 턴 전환 또는 Agent 대기 상태에서 사라지므로 이전 도구 기록 때문에 다시 나타나지 않습니다.
 - **11개 언어를 완전히 동기화하고 번역 누락을 빌드 단계에서 차단합니다.** “실행 중…”을 모든 지원 언어에 추가하고 기존 Gambit 문구의 누락도 보완했습니다. 이제 각 언어 파일은 동일한 164개 키를 가지며 누락, 불필요한 키 또는 오타가 있으면 TypeScript 빌드가 실패합니다.
 - **v3.4.3: 버블 대화가 선택한 인터페이스 언어를 완전히 따릅니다.** 생각 중 상태, 사고 과정, 복사 버튼의 접근성 문구, 대화 탐색 및 질문 이동 안내를 지원되는 11개 언어로 제공합니다. 프런트엔드에 남아 있던 ESLint 오류 238개와 경고 2개도 모두 해결하고 번역 키의 엄격한 타입 검사를 복원했습니다.

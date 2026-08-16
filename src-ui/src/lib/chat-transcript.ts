@@ -27,6 +27,11 @@ const INJECTED_PREFIXES = [
   'Below is a conversation log from a Claude Code coding session',
 ];
 
+// Claude records completed sub-agent reports as external `user` rows even
+// though they are protocol notifications. Only treat the tag as structural at
+// the beginning of a message so a real user can still discuss the tag itself.
+const INJECTED_START_ONLY_PREFIXES = ['<task-notification>'];
+
 export function normalizePrompt(text: string): string {
   return text
     .replace(/"\s+((?:[A-Za-z]:[\\/]|\/)[^"]+?\.(?:png|jpe?g|gif|webp|bmp))\s+"/gi, '$1')
@@ -37,7 +42,8 @@ export function normalizePrompt(text: string): string {
 
 function isInjected(text: string): boolean {
   const trimmed = text.trim();
-  return INJECTED_PREFIXES.some(prefix => trimmed.startsWith(prefix) || trimmed.includes(prefix));
+  return INJECTED_PREFIXES.some(prefix => trimmed.startsWith(prefix) || trimmed.includes(prefix)) ||
+    INJECTED_START_ONLY_PREFIXES.some(prefix => trimmed.startsWith(prefix));
 }
 
 function stringValue(value: unknown): string {
