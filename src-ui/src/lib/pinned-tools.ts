@@ -33,6 +33,6 @@ export function getPinnedPaneToolKeys(): PaneToolKey[] {
         if (keys.length > 0) return keys;
       }
     }
-  } catch {}
+  } catch { /* Best-effort operation; failure is non-fatal. */ }
   return [...PANE_TOOL_KEYS];
 }

@@ -29,7 +29,7 @@ export function FontPicker({ fonts, value, onChange }: FontPickerProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const defaultLabel = t('settings.terminal.font.default' as any);
+  const defaultLabel = t('settings.terminal.font.default');
   const label = value || defaultLabel;
 
   const toggle = () => {
@@ -109,21 +109,21 @@ export function FontPicker({ fonts, value, onChange }: FontPickerProps) {
             <input
               ref={searchRef}
               className="settings-font-search"
-              placeholder={t('settings.font.search' as any)}
+              placeholder={t('settings.font.search')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
             <div className="settings-font-list">
               {!query && renderOpt('', '')}
               {fonts === null && (
-                <div className="settings-font-hint">{t('diff.loading' as any)}</div>
+                <div className="settings-font-hint">{t('diff.loading')}</div>
               )}
               {mono.length > 0 && (
-                <div className="settings-font-group">{t('settings.font.monospace' as any)}</div>
+                <div className="settings-font-group">{t('settings.font.monospace')}</div>
               )}
               {mono.map((f) => renderOpt(f.family, `"${f.family}", monospace`))}
               {other.length > 0 && (
-                <div className="settings-font-group">{t('settings.font.other' as any)}</div>
+                <div className="settings-font-group">{t('settings.font.other')}</div>
               )}
               {other.map((f) => renderOpt(f.family, `"${f.family}"`))}
             </div>

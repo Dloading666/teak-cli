@@ -5,18 +5,19 @@
 // switcher, settings dialog, system-color watcher) re-renders us cleanly
 // without manual broadcast plumbing.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 export function useDataAttr(name: string): string | null {
-  const [val, setVal] = useState<string | null>(() =>
-    typeof document === 'undefined' ? null : document.documentElement.getAttribute(name),
-  );
-  useEffect(() => {
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    if (typeof document === 'undefined') return () => undefined;
     const el = document.documentElement;
-    setVal(el.getAttribute(name));
-    const obs = new MutationObserver(() => setVal(el.getAttribute(name)));
+    const obs = new MutationObserver(onStoreChange);
     obs.observe(el, { attributes: true, attributeFilter: [name] });
     return () => obs.disconnect();
   }, [name]);
-  return val;
+  const getSnapshot = useCallback(
+    () => typeof document === 'undefined' ? null : document.documentElement.getAttribute(name),
+    [name],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, () => null);
 }

@@ -46,6 +46,7 @@ function useSlidingPanel(hidden: boolean): { mounted: boolean; collapsed: boolea
   const timeoutRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- This hook is an explicit CSS transition state machine synchronized to the hidden prop. */
   useEffect(() => {
     if (isFirstRun.current) {
       isFirstRun.current = false;
@@ -87,6 +88,7 @@ function useSlidingPanel(hidden: boolean): { mounted: boolean; collapsed: boolea
       }
     };
   }, [hidden]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return { mounted, collapsed };
 }
@@ -107,7 +109,7 @@ export function App() {
   // Apply theme + shape on mount and change — must sync with the inline script in index.html
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', state.currentTheme);
-    try { localStorage.setItem('cc-theme', state.currentTheme); } catch {}
+    try { localStorage.setItem('cc-theme', state.currentTheme); } catch { /* Best-effort operation; failure is non-fatal. */ }
   }, [state.currentTheme]);
 
   useEffect(() => {
@@ -123,7 +125,7 @@ export function App() {
       el.setAttribute('data-shape', state.currentShape);
       el.removeAttribute('data-frost');
     }
-    try { localStorage.setItem('cc-shape', state.currentShape); } catch {}
+    try { localStorage.setItem('cc-shape', state.currentShape); } catch { /* Best-effort operation; failure is non-fatal. */ }
 
     // Frost = OS/compositor blur under a CSS tint from the selected theme.
     // Windows uses DWM Acrylic, macOS NSVisualEffectView, and Linux requests
@@ -154,7 +156,7 @@ export function App() {
   // img+video elements. Larger value = more visible image.
   useEffect(() => {
     document.documentElement.style.setProperty('--wallpaper-opacity', String(state.wallpaperOpacity / 100));
-    try { localStorage.setItem('cc-wallpaper-opacity', String(state.wallpaperOpacity)); } catch {}
+    try { localStorage.setItem('cc-wallpaper-opacity', String(state.wallpaperOpacity)); } catch { /* Best-effort operation; failure is non-fatal. */ }
   }, [state.wallpaperOpacity]);
 
   // Startup: resolve IPC

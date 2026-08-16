@@ -79,7 +79,7 @@ function readPersistedHeatmapCache(): HeatmapCache | null {
 function writePersistedHeatmapCache(cache: HeatmapCache) {
   try {
     localStorage.setItem(HEATMAP_CACHE_KEY, JSON.stringify(cache));
-  } catch {}
+  } catch { /* Best-effort operation; failure is non-fatal. */ }
 }
 
 // Convert raw heatmap entries into the (messages, sessions) per-day Maps
@@ -119,7 +119,7 @@ export function ContributionHeatmap() {
   // Lazy initializers seed state from cache BEFORE the first render — when
   // the user switches launchpad ↔ tool tab there's no empty-grid flash
   // because by paint time the buckets are already populated.
-  const initialCache = pickInitialCache();
+  const [initialCache] = useState(pickInitialCache);
   const initialBuckets = initialCache ? entriesToBuckets(initialCache.entries) : null;
   const [buckets, setBuckets] = useState<Map<string, number>>(
     () => initialBuckets?.messages ?? new Map()
@@ -127,11 +127,10 @@ export function ContributionHeatmap() {
   const [sessionBuckets, setSessionBuckets] = useState<Map<string, number>>(
     () => initialBuckets?.sessions ?? new Map()
   );
-  const [loaded, setLoaded] = useState(initialCache !== null);
+  const [loaded, setLoaded] = useState(initialCache !== null || !isTauri);
 
   useEffect(() => {
     if (!isTauri) {
-      setLoaded(true);
       return;
     }
     // Skip the fetch ONLY if the cache is genuinely fresh (within TTL).
@@ -158,7 +157,7 @@ export function ContributionHeatmap() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialCache]);
 
   const { cells, total, totalMessages, totalSessions } = useMemo(() => {
     const today = new Date();

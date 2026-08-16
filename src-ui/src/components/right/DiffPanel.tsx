@@ -126,12 +126,15 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
   // blanked the diff to 'loading' and re-ran both IPC reads + double Shiki
   // tokenization on every tick. The guard only needs the value at open time.
   const badgeRef = useRef({ added: 0, deleted: 0 });
-  badgeRef.current = { added: added ?? 0, deleted: deleted ?? 0 };
+  useEffect(() => {
+    badgeRef.current = { added: added ?? 0, deleted: deleted ?? 0 };
+  }, [added, deleted]);
 
   // Which folded gaps the user has expanded in place. Keyed by gap.key
   // (stable per file). Reset when the file changes so a new diff starts
   // fully folded.
   const [expandedGaps, setExpandedGaps] = useState<Set<string>>(() => new Set());
+  /* eslint-disable-next-line react-hooks/set-state-in-effect -- Fold state belongs to the selected path and must reset when that identity changes. */
   useEffect(() => { setExpandedGaps(new Set()); }, [path]);
   const toggleGap = (key: string) =>
     setExpandedGaps(prev => {
@@ -168,6 +171,7 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
 
   useEffect(() => {
     let cancelled = false;
+    /* eslint-disable-next-line react-hooks/set-state-in-effect -- A new diff identity must synchronously replace stale content with its loading state. */
     setResult({ state: 'loading' });
 
     // Cheap pre-read guard: the Rust badge already knows the change
@@ -348,15 +352,15 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
       {header}
       <div className="diff-body">
         {result.state === 'loading' && (
-          <div className="diff-empty">{t('diff.loading' as any) || 'Loading…'}</div>
+          <div className="diff-empty">{t('diff.loading') || 'Loading…'}</div>
         )}
         {result.state === 'error' && (
-          <div className="diff-empty">{t('diff.error' as any) || 'Failed to load diff'}</div>
+          <div className="diff-empty">{t('diff.error') || 'Failed to load diff'}</div>
         )}
         {result.state === 'too_large' && (
           <div className="diff-toolarge">
             <div className="diff-toolarge-msg">
-              {t('diff.too_large' as any) || 'File too large to show inline diff'}
+              {t('diff.too_large') || 'File too large to show inline diff'}
             </div>
             <div className="diff-toolarge-stats">
               <span className="diff-add">+{result.added}</span>
@@ -365,7 +369,7 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
           </div>
         )}
         {result.state === 'ok' && result.added === 0 && result.deleted === 0 && (
-          <div className="diff-empty">{t('diff.no_changes' as any) || 'No changes'}</div>
+          <div className="diff-empty">{t('diff.no_changes') || 'No changes'}</div>
         )}
         {result.state === 'ok' && (result.added > 0 || result.deleted > 0) && (
           <pre className="diff-pre">
@@ -386,7 +390,7 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
                     }
                   }}
                 >
-                  {t('diff.unchanged_lines' as any, { count: row.lines.length }) ||
+                  {t('diff.unchanged_lines', { count: row.lines.length }) ||
                     `⋯ ${row.lines.length} unchanged lines`}
                 </div>
               );

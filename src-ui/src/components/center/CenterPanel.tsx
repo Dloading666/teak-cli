@@ -474,6 +474,11 @@ const VALID_PIN_KEYS = new Set<string>([
   'installer', 'four-split', 'three-split', 'two-split',
 ]);
 
+const CONFIGURABLE_AGENT_TOOLS = new Set<ToolType>([
+  'claude', 'codex', 'grok', 'antigravity', 'qwen', 'opencode',
+  'mimocode', 'kilo', 'openclaw', 'hermes', 'pi', 'kimicode',
+]);
+
 // Only tools with an authoritative native OSC title protocol get a Dynamic
 // Island. Every other tab shows the normal close button without a fake idle
 // state or PTY activity guess.
@@ -492,7 +497,7 @@ export function CenterPanel() {
   // mounting the DiffPanel body.
   const diffTabTitle = useMemo(() => {
     const p = state.diffSelection?.path ?? '';
-    return p.replace(/\\/g, '/').split('/').pop() || p || (t('task.tab.changes' as any) || 'Diff');
+    return p.replace(/\\/g, '/').split('/').pop() || p || (t('task.tab.changes') || 'Diff');
   }, [state.diffSelection?.path, t]);
 
   const [toolsInstalled, setToolsInstalled] = useState<Record<string, boolean>>({});
@@ -527,7 +532,7 @@ export function CenterPanel() {
         // pushed past the limit) may have left > CAP items in storage.
         // Trim and persist back so the state stays consistent.
         if (arr.length > CAP) arr = arr.slice(0, CAP);
-        try { localStorage.setItem('coffee_pinned_items', JSON.stringify(arr)); } catch {}
+        try { localStorage.setItem('coffee_pinned_items', JSON.stringify(arr)); } catch { /* Best-effort operation; failure is non-fatal. */ }
         return arr;
       }
       // First launch: pre-pin 6 useful defaults so desktop shows a full MAX_PINS
@@ -617,21 +622,21 @@ export function CenterPanel() {
       // ─── Independent split (descending 4→3→2): N side-by-side PTYs ──
       {
         key: 'four-split' as ToolType,
-        label: t('tool.four_split' as any),
+        label: t('tool.four_split'),
         icon: <SvgFourSplit />,
         type: 'utility' as const,
         requiresCwd: false,
       },
       {
         key: 'three-split' as ToolType,
-        label: t('tool.three_split' as any),
+        label: t('tool.three_split'),
         icon: <SvgThreeSplit />,
         type: 'utility' as const,
         requiresCwd: false,
       },
       {
         key: 'two-split' as ToolType,
-        label: t('tool.two_split' as any),
+        label: t('tool.two_split'),
         icon: <SvgTwoSplit />,
         type: 'utility' as const,
         requiresCwd: false,
@@ -652,7 +657,7 @@ export function CenterPanel() {
         if (prev.length >= MAX_PINS) return prev;
         next = [...prev, id];
       }
-      try { localStorage.setItem('coffee_pinned_items', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem('coffee_pinned_items', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return next;
     });
   };
@@ -737,14 +742,14 @@ export function CenterPanel() {
   const pushRecentFolder = (folder: string) => {
     setRecentFolders(prev => {
       const next = [folder, ...prev.filter(f => f !== folder)].slice(0, 8);
-      try { localStorage.setItem('coffee:recent-folders', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem('coffee:recent-folders', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return next;
     });
   };
   const removeRecentFolder = (folder: string) => {
     setRecentFolders(prev => {
       const next = prev.filter(f => f !== folder);
-      try { localStorage.setItem('coffee:recent-folders', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem('coffee:recent-folders', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return next;
     });
   };
@@ -798,7 +803,7 @@ export function CenterPanel() {
             .catch(() => {});
         }
       }
-    } catch (e) {}
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
   }, []);
 
   // Derived state — must be before hooks that depend on it
@@ -842,7 +847,7 @@ export function CenterPanel() {
       try {
         const raw = localStorage.getItem('coffee:last-cwd-by-tool');
         if (raw) setLastCwdByTool(JSON.parse(raw));
-      } catch {}
+      } catch { /* Best-effort operation; failure is non-fatal. */ }
     }, 300);
     return () => clearTimeout(handle);
   }, [isLaunchpadMode, showLibrary]);
@@ -1120,7 +1125,7 @@ export function CenterPanel() {
         dispatch({ type: 'SET_FOLDER', path: cwd });
         setLastCwdByTool(prev => {
           const next = { ...prev, [tool as string]: cwd };
-          try { localStorage.setItem('coffee:last-cwd-by-tool', JSON.stringify(next)); } catch {}
+          try { localStorage.setItem('coffee:last-cwd-by-tool', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
           return next;
         });
         pushRecentFolder(cwd);
@@ -1156,7 +1161,7 @@ export function CenterPanel() {
       const portNum = parseInt(sshPort) || (remoteProtocol === 'ssh' ? 22 : 7681);
       const isReachable = await commands.checkNetworkPort(sshHost.trim(), portNum);
       if (!isReachable) isOffline = true;
-    } catch(err) {
+    } catch {
       isOffline = true;
     }
 
@@ -1176,7 +1181,7 @@ export function CenterPanel() {
 
     try {
       localStorage.setItem('coffee_remote_cfg', JSON.stringify(connDataObj));
-    } catch(e) {}
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
 
     // Save password to OS keychain (Windows Credential Manager / macOS Keychain)
     if (isTauri && sshPass) {
@@ -1244,14 +1249,14 @@ export function CenterPanel() {
             } else if (data.host) {
               title = data.host;
             }
-          } catch (e) {}
+          } catch { /* Best-effort operation; failure is non-fatal. */ }
         }
         return { icon, title, tooltip: undefined };
       }
       case 'terminal': return { icon, title: cwd ?? t('tool.terminal'), tooltip: pathTip };
-      case 'two-split': return { icon, title: cwd ?? t('tool.two_split' as any), tooltip: pathTip };
-      case 'three-split': return { icon, title: cwd ?? t('tool.three_split' as any), tooltip: pathTip };
-      case 'four-split': return { icon, title: cwd ?? t('tool.four_split' as any), tooltip: pathTip };
+      case 'two-split': return { icon, title: cwd ?? t('tool.two_split'), tooltip: pathTip };
+      case 'three-split': return { icon, title: cwd ?? t('tool.three_split'), tooltip: pathTip };
+      case 'four-split': return { icon, title: cwd ?? t('tool.four_split'), tooltip: pathTip };
       default: return { icon: <SvgPlus active={isActive} />, title: t('tab.new'), tooltip: undefined };
     }
   };
@@ -1683,9 +1688,9 @@ export function CenterPanel() {
                     <div className="detect-help">
                       <span
                         className="detect-help-trigger"
-                        data-tip={t('launchpad.detect_help_tip' as any)}
+                        data-tip={t('launchpad.detect_help_tip')}
                       >
-                        {t('launchpad.detect_help_trigger' as any)}
+                        {t('launchpad.detect_help_trigger')}
                       </span>
                       {/* "Switch model" — external link to EchoBird, our
                           sister project for switching/comparing AI models.
@@ -1700,13 +1705,13 @@ export function CenterPanel() {
                         href="https://echobird.ai/"
                         target="_blank"
                         rel="noopener noreferrer"
-                        data-tip={t('launchpad.switch_model_tip' as any)}
+                        data-tip={t('launchpad.switch_model_tip')}
                         onClick={(e) => {
                           e.preventDefault();
                           commands.openUrl('https://echobird.ai/').catch(() => {});
                         }}
                       >
-                        {t('launchpad.switch_model_trigger' as any)}
+                        {t('launchpad.switch_model_trigger')}
                       </a>
                     </div>
 
@@ -1725,7 +1730,7 @@ export function CenterPanel() {
                           <div className="remote-form-card">
                             <div className="remote-form-header">
                             <TerminalIcon />
-                            <span>{t('remote.title' as any)}</span>
+                            <span>{t('remote.title')}</span>
                             <button className="remote-form-close" onClick={() => setShowRemoteForm(false)}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                             </button>
@@ -1743,11 +1748,11 @@ export function CenterPanel() {
                               >WebSocket</button>
                             </div>
                             <div className="remote-form-row">
-                              <label>{t('remote.host' as any)}</label>
+                              <label>{t('remote.host')}</label>
                               <div className="remote-form-host-row">
                                 <input
                                   type="text"
-                                  placeholder={t('remote.host_placeholder' as any) || "192.168.1.100"}
+                                  placeholder={t('remote.host_placeholder') || "192.168.1.100"}
                                   value={sshHost}
                                   onChange={e => setSshHost(e.target.value)}
                                   className="remote-input remote-input-host"
@@ -1768,7 +1773,7 @@ export function CenterPanel() {
                             {remoteProtocol === 'ssh' && (
                               <>
                                 <div className="remote-form-row">
-                                  <label>{t('remote.username' as any)}</label>
+                                  <label>{t('remote.username')}</label>
                                   <input
                                     type="text"
                                     placeholder="root"
@@ -1779,7 +1784,7 @@ export function CenterPanel() {
                                   />
                                 </div>
                                 <div className="remote-form-row">
-                                  <label>{t('remote.password' as any)}</label>
+                                  <label>{t('remote.password')}</label>
                                   <input
                                     type="password"
                                     value={sshPass}
@@ -1795,9 +1800,9 @@ export function CenterPanel() {
                               onClick={handleRemoteConnect}
                               disabled={!sshHost.trim() || (remoteProtocol === 'ssh' && !sshUser.trim()) || connStatus !== 'idle'}
                             >
-                              {connStatus === 'connecting' && t('remote.connecting' as any)}
-                              {connStatus === 'failed' && t('remote.connect_failed' as any)}
-                              {connStatus === 'idle' && t('remote.connect' as any)}
+                              {connStatus === 'connecting' && t('remote.connecting')}
+                              {connStatus === 'failed' && t('remote.connect_failed')}
+                              {connStatus === 'idle' && t('remote.connect')}
                             </button>
                           </div>
                         </div>
@@ -1823,7 +1828,7 @@ export function CenterPanel() {
                                     const portNum = parseInt(item.port) || (item.protocol === 'ssh' ? 22 : 7681);
                                     const isReachable = await commands.checkNetworkPort(item.host.trim(), portNum);
                                     if (!isReachable) isOffline = true;
-                                  } catch(err) {
+                                  } catch {
                                     isOffline = true;
                                   }
 
@@ -1840,7 +1845,7 @@ export function CenterPanel() {
                                     username: item.user || '',
                                     // password omitted from localStorage
                                   };
-                                  try { localStorage.setItem('coffee_remote_cfg', JSON.stringify(connDataObj)); } catch(e) {}
+                                  try { localStorage.setItem('coffee_remote_cfg', JSON.stringify(connDataObj)); } catch { /* Best-effort operation; failure is non-fatal. */ }
                                   // Load password for this specific host from keychain, fall back to current sshPass state
                                   const doConnect = (pw: string) => {
                                     if (isTauri && pw) commands.savePassword(item.host.trim(), item.user || '', pw).catch(() => {});
@@ -1881,7 +1886,7 @@ export function CenterPanel() {
                           {AGENT_CATALOG.filter(item => item.type === 'ai-cli').map(item => {
                             const pinId = `agent:${item.key}`;
                             const isPinned = pinnedItems.includes(pinId);
-                            const hasGear = (['claude', 'codex', 'grok', 'antigravity', 'qwen', 'opencode', 'mimocode', 'kilo', 'openclaw', 'hermes', 'pi', 'kimicode'] as const).includes(item.key as any);
+                            const hasGear = CONFIGURABLE_AGENT_TOOLS.has(item.key);
                             return (
                               <div
                                 key={item.key}
@@ -1910,7 +1915,7 @@ export function CenterPanel() {
                           })}
                         </div>
                         {/* Section 2: Agent Tools (3-col, split tools first, Coffee 101 last) */}
-                        <div className="library-section-title">{t('library.agent_tools' as any)}</div>
+                        <div className="library-section-title">{t('library.agent_tools')}</div>
                         <div className="library-grid library-grid--tools">
                           {AGENT_CATALOG.filter(item => item.type === 'utility').map(item => {
                             const pinId = `agent:${item.key}`;
@@ -2014,7 +2019,7 @@ export function CenterPanel() {
           x={folderMenu.x}
           y={folderMenu.y}
           recent={recentFolders}
-          openLabel={t('launchpad.open_folder' as any) || 'Open folder…'}
+          openLabel={t('launchpad.open_folder') || 'Open folder…'}
           onPick={(f) => { selectTool(folderMenu.tool, undefined, f); setFolderMenu(null); }}
           onRemove={(f) => removeRecentFolder(f)}
           onOpenNew={() => { const tk = folderMenu.tool; setFolderMenu(null); handlePickFolder(tk); }}

@@ -6,9 +6,10 @@
 // in the components.
 
 import type { ThemeColor, ThemeShape, IconTheme } from '../store/app-state';
+import type { I18nKey } from '../i18n/en';
 
 // ─── Theme colours (swatch grid) ─────────────────────────────────────────────
-export const THEME_COLORS: { code: ThemeColor; labelKey: string; swatch: string; ring: string }[] = [
+export const THEME_COLORS: { code: ThemeColor; labelKey: I18nKey; swatch: string; ring: string }[] = [
   { code: 'light',      labelKey: 'theme.color.light',      swatch: '#FAFAF7', ring: '#c4956a' },
   { code: 'dark',       labelKey: 'theme.color.dark',       swatch: '#1a1917', ring: '#c4956a' },
   { code: 'cappuccino', labelKey: 'theme.color.cappuccino', swatch: '#1a1a1a', ring: '#4a4a4a' },
@@ -58,7 +59,7 @@ export function isFrostShape(shape: ThemeShape): boolean {
 // ─── Task board form (to-do list vs sticky notes) ────────────────────────────
 // Two presentations of the same task data, chosen in the settings "Tasks"
 // section. Icons are inlined in SettingsModal (mirrors the other sections).
-export const TASK_VIEW_MODES: { code: 'list' | 'note' | 'prompt'; labelKey: string; subKey: string }[] = [
+export const TASK_VIEW_MODES: { code: 'list' | 'note' | 'prompt'; labelKey: I18nKey; subKey: I18nKey }[] = [
   { code: 'list', labelKey: 'task.view.list', subKey: 'task.view.list.sub' },
   { code: 'note', labelKey: 'task.view.note', subKey: 'task.view.note.sub' },
   { code: 'prompt', labelKey: 'task.view.prompt', subKey: 'task.view.prompt.sub' },

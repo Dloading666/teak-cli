@@ -12,7 +12,7 @@
 // Dispatch + persistence mirror the former Explorer wiring exactly so behaviour
 // is unchanged; only the presentation moved.
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { useAppState, useAppDispatch, HOTKEY_SCHEMES, type HotkeyScheme, type TitlebarToggleDisplay, type ThemeColor, type ThemeShape, type IconTheme } from '../../store/app-state';
 import { playNotifySound } from '../../lib/notify-sound';
 import { useT } from '../../i18n/useT';
@@ -178,14 +178,14 @@ export function SettingsModal() {
   const setShape = (s: ThemeShape) => dispatch({ type: 'SET_SHAPE', shape: s });
   const setIconTheme = (th: IconTheme) => {
     dispatch({ type: 'SET_ICON_THEME', theme: th });
-    try { localStorage.setItem('cc-icon-theme', th); } catch {}
+    try { localStorage.setItem('cc-icon-theme', th); } catch { /* Best-effort operation; failure is non-fatal. */ }
   };
   const setLang = (code: string) => {
     dispatch({ type: 'SET_LANG', lang: code });
     try {
       localStorage.setItem('cc-lang', code);
       if (code !== 'en') localStorage.setItem('cc-native-lang', code);
-    } catch {}
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
   };
   const pickBg = async () => {
     try {
@@ -196,43 +196,52 @@ export function SettingsModal() {
       if (selected && typeof selected === 'string') {
         const ext = selected.split('.').pop()?.toLowerCase() || '';
         const bgType = ['mp4', 'webm'].includes(ext) ? 'video' : 'image';
-        try { localStorage.setItem('cc-bg-path', selected); localStorage.setItem('cc-bg-type', bgType); } catch {}
+        try { localStorage.setItem('cc-bg-path', selected); localStorage.setItem('cc-bg-type', bgType); } catch { /* Best-effort operation; failure is non-fatal. */ }
         dispatch({ type: 'SET_BG', path: selected, bgType });
       }
     } catch (err) { console.error('[Settings] background picker failed:', err); }
   };
   const clearBg = () => {
-    try { localStorage.removeItem('cc-bg-path'); localStorage.removeItem('cc-bg-type'); } catch {}
+    try { localStorage.removeItem('cc-bg-path'); localStorage.removeItem('cc-bg-type'); } catch { /* Best-effort operation; failure is non-fatal. */ }
     dispatch({ type: 'CLEAR_BG' });
   };
   const setScheme = (id: string) => {
-    try { id ? localStorage.setItem('cc-term-scheme', id) : localStorage.removeItem('cc-term-scheme'); } catch {}
+    try {
+      if (id) localStorage.setItem('cc-term-scheme', id);
+      else localStorage.removeItem('cc-term-scheme');
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
     dispatch({ type: 'SET_TERM_SCHEME', scheme: id });
   };
   const setFont = (family: string) => {
     // Strip quotes/backslashes — the value is interpolated into a CSS
     // fontFamily string, so don't let a stray quote break out of it.
     const clean = family.replace(/["\\]/g, '');
-    try { clean ? localStorage.setItem('cc-term-font', clean) : localStorage.removeItem('cc-term-font'); } catch {}
+    try {
+      if (clean) localStorage.setItem('cc-term-font', clean);
+      else localStorage.removeItem('cc-term-font');
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
     dispatch({ type: 'SET_TERM_FONT', font: clean });
   };
   const setDefaultShell = (shell: string) => {
-    try { shell ? localStorage.setItem('cc-default-shell', shell) : localStorage.removeItem('cc-default-shell'); } catch {}
+    try {
+      if (shell) localStorage.setItem('cc-default-shell', shell);
+      else localStorage.removeItem('cc-default-shell');
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
     dispatch({ type: 'SET_DEFAULT_SHELL', shell });
   };
   const setOpacity = (n: number) => dispatch({ type: 'SET_WALLPAPER_OPACITY', opacity: n });
   const setTaskView = (mode: 'list' | 'note' | 'prompt') => dispatch({ type: 'SET_TASK_VIEW_MODE', mode });
   const setEnterToSend = (value: boolean) => {
     dispatch({ type: 'SET_GAMBIT_ENTER_TO_SEND', value });
-    try { localStorage.setItem('cc-gambit-enter-send', String(value)); } catch {}
+    try { localStorage.setItem('cc-gambit-enter-send', String(value)); } catch { /* Best-effort operation; failure is non-fatal. */ }
   };
   const setHotkeyScheme = (value: HotkeyScheme) => {
     dispatch({ type: 'SET_HOTKEY_SCHEME', value });
-    try { localStorage.setItem('cc-hotkey-scheme', value); } catch {}
+    try { localStorage.setItem('cc-hotkey-scheme', value); } catch { /* Best-effort operation; failure is non-fatal. */ }
   };
   const setTitlebarToggleDisplay = (value: TitlebarToggleDisplay) => {
     dispatch({ type: 'SET_TITLEBAR_TOGGLE_DISPLAY', value });
-    try { localStorage.setItem('cc-titlebar-toggle-display', value); } catch {}
+    try { localStorage.setItem('cc-titlebar-toggle-display', value); } catch { /* Best-effort operation; failure is non-fatal. */ }
   };
 
   // Sound notification toggles — local state + localStorage only. The
@@ -240,7 +249,7 @@ export function SettingsModal() {
   // so no app-state wiring is needed. Both default to ON.
   const writeSoundPref = (key: string, setter: (v: boolean) => void) => (v: boolean) => {
     setter(v);
-    try { localStorage.setItem(key, String(v)); } catch {}
+    try { localStorage.setItem(key, String(v)); } catch { /* Best-effort operation; failure is non-fatal. */ }
   };
   const setSoundDonePref = writeSoundPref('cc-sound-done', setSoundDone);
   const setSoundWaitPref = writeSoundPref('cc-sound-wait', setSoundWait);
@@ -249,14 +258,14 @@ export function SettingsModal() {
   const modKey = IS_MACOS ? '⌘' : 'Ctrl';
 
   const SECTIONS: { id: Section; label: string }[] = [
-    { id: 'appearance', label: t('settings.appearance' as any) },
-    { id: 'wallpaper',  label: t('settings.wallpaper' as any) },
-    { id: 'terminal',   label: t('settings.terminal' as any) },
-    { id: 'gambit',     label: t('settings.gambit' as any) },
-    { id: 'sound',      label: t('settings.sound' as any) },
-    { id: 'tasks',      label: t('settings.tasks' as any) },
-    { id: 'language',   label: t('settings.language' as any) },
-    { id: 'feedback',   label: t('settings.feedback' as any) },
+    { id: 'appearance', label: t('settings.appearance') },
+    { id: 'wallpaper',  label: t('settings.wallpaper') },
+    { id: 'terminal',   label: t('settings.terminal') },
+    { id: 'gambit',     label: t('settings.gambit') },
+    { id: 'sound',      label: t('settings.sound') },
+    { id: 'tasks',      label: t('settings.tasks') },
+    { id: 'language',   label: t('settings.language') },
+    { id: 'feedback',   label: t('settings.feedback') },
   ];
   const currentLabel = SECTIONS.find(s => s.id === section)?.label ?? '';
 
@@ -269,7 +278,7 @@ export function SettingsModal() {
         aria-modal="true"
       >
         <aside className="settings-rail">
-          <div className="settings-rail-title">{t('settings.title' as any)}</div>
+          <div className="settings-rail-title">{t('settings.title')}</div>
           {SECTIONS.map(s => (
             <button
               key={s.id}
@@ -318,7 +327,7 @@ export function SettingsModal() {
                         onClick={() => setTheme(c.code)}
                         aria-pressed={active}
                       >
-                        <span className="settings-theme-preview" style={{ ['--ring' as any]: c.ring }}>
+                        <span className="settings-theme-preview" style={{ '--ring': c.ring } as CSSProperties}>
                           <span className="settings-theme-band-bg" style={{ background: c.swatch }} />
                           <span className="settings-theme-band-accent" style={{ background: c.ring }} />
                           {active && (
@@ -327,7 +336,7 @@ export function SettingsModal() {
                             </span>
                           )}
                         </span>
-                        <span className="settings-theme-name">{t(c.labelKey as any)}</span>
+                        <span className="settings-theme-name">{t(c.labelKey)}</span>
                       </button>
                     );
                   })}
@@ -371,17 +380,17 @@ export function SettingsModal() {
 
             {section === 'wallpaper' && (
               <>
-                <div className="settings-section-label">{t('settings.wallpaper' as any)}</div>
+                <div className="settings-section-label">{t('settings.wallpaper')}</div>
                 <div className="settings-wallpaper-actions">
-                  <button className="settings-btn" onClick={pickBg}>{t('settings.wallpaper.pick' as any)}</button>
+                  <button className="settings-btn" onClick={pickBg}>{t('settings.wallpaper.pick')}</button>
                   {hasBg && (
                     <button className="settings-btn settings-btn-danger" onClick={clearBg}>
-                      {t('settings.wallpaper.clear' as any)}
+                      {t('settings.wallpaper.clear')}
                     </button>
                   )}
                 </div>
 
-                <div className="settings-section-label">{t('settings.wallpaper.opacity' as any)}</div>
+                <div className="settings-section-label">{t('settings.wallpaper.opacity')}</div>
                 <div className="settings-slider-row">
                   <input
                     type="range"
@@ -401,7 +410,7 @@ export function SettingsModal() {
 
             {section === 'terminal' && (
               <>
-                <div className="settings-section-label">{t('settings.terminal.scheme' as any)}</div>
+                <div className="settings-section-label">{t('settings.terminal.scheme')}</div>
                 <div className="settings-chip-row">
                   <button
                     className={`settings-term-chip reset${state.termColorScheme === '' ? ' active' : ''}`}
@@ -421,7 +430,7 @@ export function SettingsModal() {
                   ))}
                 </div>
 
-                <div className="settings-section-label">{t('settings.terminal.font' as any)}</div>
+                <div className="settings-section-label">{t('settings.terminal.font')}</div>
                 <FontPicker fonts={fonts} value={state.termFont} onChange={setFont} />
                 <div
                   className="settings-font-preview"
@@ -437,7 +446,7 @@ export function SettingsModal() {
                     surface the user already knows from hotkey selection.
                     Shells that weren't detected installed are omitted so
                     the user can't pick a dead one; Auto is always first. */}
-                <div className="settings-section-label">{t('settings.terminal.shell' as any)}</div>
+                <div className="settings-section-label">{t('settings.terminal.shell')}</div>
                 <div className="settings-key-row">
                   <button
                     className={`settings-key-card${state.defaultShell === '' ? ' active' : ''}`}
@@ -445,7 +454,7 @@ export function SettingsModal() {
                     aria-pressed={state.defaultShell === ''}
                   >
                     <span className="settings-key-combo"><kbd>Auto</kbd></span>
-                    <span className="settings-key-sub">{t('settings.terminal.shell.auto' as any)}</span>
+                    <span className="settings-key-sub">{t('settings.terminal.shell.auto')}</span>
                   </button>
                   {IS_WINDOWS && (() => {
                     const caps = shellCaps;
@@ -482,7 +491,7 @@ export function SettingsModal() {
                             <span className="settings-key-sub">{o.version}</span>
                           )}
                           {o.notRecommended && !o.version && (
-                            <span className="settings-key-sub">{t('settings.terminal.shell.not_recommended' as any)}</span>
+                            <span className="settings-key-sub">{t('settings.terminal.shell.not_recommended')}</span>
                           )}
                         </button>
                       );
@@ -519,7 +528,7 @@ export function SettingsModal() {
 
             {section === 'gambit' && (
               <>
-                <div className="settings-section-label">{t('settings.send.title' as any)}</div>
+                <div className="settings-section-label">{t('settings.send.title')}</div>
                 <div className="settings-key-row">
                   <button
                     className={`settings-key-card${state.gambitEnterToSend ? ' active' : ''}`}
@@ -527,7 +536,7 @@ export function SettingsModal() {
                     aria-pressed={state.gambitEnterToSend}
                   >
                     <span className="settings-key-combo"><kbd>Enter</kbd></span>
-                    <span className="settings-key-sub">Shift+Enter {t('settings.send.newline' as any)}</span>
+                    <span className="settings-key-sub">Shift+Enter {t('settings.send.newline')}</span>
                   </button>
                   <button
                     className={`settings-key-card${!state.gambitEnterToSend ? ' active' : ''}`}
@@ -535,11 +544,11 @@ export function SettingsModal() {
                     aria-pressed={!state.gambitEnterToSend}
                   >
                     <span className="settings-key-combo"><kbd>{modKey}</kbd><span className="settings-key-plus">+</span><kbd>Enter</kbd></span>
-                    <span className="settings-key-sub">Enter {t('settings.send.newline' as any)}</span>
+                    <span className="settings-key-sub">Enter {t('settings.send.newline')}</span>
                   </button>
                 </div>
 
-                <div className="settings-section-label">{t('settings.gambit.hotkey' as any)}</div>
+                <div className="settings-section-label">{t('settings.gambit.hotkey')}</div>
                 <div className="settings-key-row settings-key-row--keys">
                   {HOTKEY_SCHEMES.map(s => {
                     const active = state.hotkeyScheme === s.code;
@@ -558,7 +567,7 @@ export function SettingsModal() {
                   })}
                 </div>
 
-                <div className="settings-section-label">{t('settings.titlebar.toggle' as any)}</div>
+                <div className="settings-section-label">{t('settings.titlebar.toggle')}</div>
                 <div className="settings-key-row">
                   {([
                     { code: 'icon-hotkey', labelKey: 'settings.titlebar.toggle.icon-hotkey' },
@@ -568,7 +577,7 @@ export function SettingsModal() {
                     const active = state.titlebarToggleDisplay === m.code;
                     return (
                       <button key={m.code} className={`settings-key-card${active ? ' active' : ''}`} onClick={() => setTitlebarToggleDisplay(m.code)} aria-pressed={active}>
-                        <span className="settings-key-combo">{t(m.labelKey as any)}</span>
+                        <span className="settings-key-combo">{t(m.labelKey)}</span>
                       </button>
                     );
                   })}
@@ -584,30 +593,30 @@ export function SettingsModal() {
                 {([
                   { labelKey: 'settings.sound.done', value: soundDone, set: setSoundDonePref, preview: 'done' as const },
                   { labelKey: 'settings.sound.wait', value: soundWait, set: setSoundWaitPref, preview: 'wait' as const },
-                ]).map(row => (
+                ] as const).map(row => (
                   <div key={row.labelKey} style={{ marginBottom: 18 }}>
-                    <div className="settings-section-label">{t(row.labelKey as any)}</div>
+                    <div className="settings-section-label">{t(row.labelKey)}</div>
                     <div className="settings-key-row">
                       <button
                         className={`settings-key-card${row.value ? ' active' : ''}`}
                         onClick={() => row.set(true)}
                         aria-pressed={row.value}
                       >
-                        <span className="settings-key-combo">{t('settings.sound.on' as any)}</span>
+                        <span className="settings-key-combo">{t('settings.sound.on')}</span>
                       </button>
                       <button
                         className={`settings-key-card${!row.value ? ' active' : ''}`}
                         onClick={() => row.set(false)}
                         aria-pressed={!row.value}
                       >
-                        <span className="settings-key-combo">{t('settings.sound.off' as any)}</span>
+                        <span className="settings-key-combo">{t('settings.sound.off')}</span>
                       </button>
                       {row.preview && (
                         <button
                           className="settings-key-card"
                           onClick={() => playNotifySound(row.preview!)}
                         >
-                          <span className="settings-key-combo">{t('settings.sound.preview' as any)}</span>
+                          <span className="settings-key-combo">{t('settings.sound.preview')}</span>
                         </button>
                       )}
                     </div>
@@ -618,7 +627,7 @@ export function SettingsModal() {
 
             {section === 'tasks' && (
               <>
-                <div className="settings-section-label">{t('settings.tasks.view' as any)}</div>
+                <div className="settings-section-label">{t('settings.tasks.view')}</div>
                 <div className="settings-key-row">
                   {TASK_VIEW_MODES.map(m => {
                     const active = state.taskViewMode === m.code;
@@ -631,9 +640,9 @@ export function SettingsModal() {
                       >
                         <span className="settings-key-combo">
                           <span className="settings-taskview-icon">{TASK_VIEW_ICONS[m.code]}</span>
-                          <span className="settings-taskview-label">{t(m.labelKey as any)}</span>
+                          <span className="settings-taskview-label">{t(m.labelKey)}</span>
                         </span>
-                        <span className="settings-key-sub">{t(m.subKey as any)}</span>
+                        <span className="settings-key-sub">{t(m.subKey)}</span>
                       </button>
                     );
                   })}
@@ -663,7 +672,7 @@ export function SettingsModal() {
 
             {section === 'feedback' && (
               <>
-                <p className="settings-feedback-desc">{t('settings.feedback.desc' as any)}</p>
+                <p className="settings-feedback-desc">{t('settings.feedback.desc')}</p>
                 <div className="settings-feedback-cards">
                   <button
                     type="button"

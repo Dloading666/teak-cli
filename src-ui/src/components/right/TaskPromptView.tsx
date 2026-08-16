@@ -93,7 +93,7 @@ export function TaskPromptView({
   const toggleCollapse = (cat: string) => setCollapsed(prev => {
     const next = new Set(prev);
     if (next.has(cat)) next.delete(cat); else next.add(cat);
-    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next])); } catch {}
+    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next])); } catch { /* Best-effort operation; failure is non-fatal. */ }
     return next;
   });
 
@@ -116,6 +116,7 @@ export function TaskPromptView({
   // A freshly FAB-added item kicks its header into edit, pre-filled with a
   // default name (selected, so typing replaces it). The picker does NOT
   // auto-open - the user opens it manually via ▼.
+  /* eslint-disable react-hooks/set-state-in-effect -- addingId is an explicit parent signal to enter the new category editor. */
   useEffect(() => {
     if (addingId) {
       newItemRef.current = addingId;
@@ -123,6 +124,7 @@ export function TaskPromptView({
       setEditValue(t('task.default_title'));
     }
   }, [addingId, t]);
+  /* eslint-enable react-hooks/set-state-in-effect */
   // Focus the title input on edit. New category -> select-all (typing
   // replaces the default); rename -> caret at end (tweak-friendly).
   useEffect(() => {
@@ -354,7 +356,7 @@ export function TaskPromptView({
     const startY = e.clientY;
     // Pointer capture keeps move/up/cancel coming to this element even if the
     // pointer leaves the window or focus is stolen (WebView2).
-    try { handle.setPointerCapture(e.pointerId); } catch {}
+    try { handle.setPointerCapture(e.pointerId); } catch { /* Best-effort operation; failure is non-fatal. */ }
     const onMove = (me: PointerEvent) => {
       const next = Math.max(BODY_MIN_HEIGHT, Math.min(BODY_MAX_HEIGHT, startHeight + (me.clientY - startY)));
       setResizing({ id, height: Math.round(next) });

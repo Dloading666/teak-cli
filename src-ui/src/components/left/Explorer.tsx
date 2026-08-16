@@ -172,7 +172,7 @@ export function ContextMenu({ menu, onClose }: { menu: CtxMenuState; onClose: ()
           <path d="M10 14 21 3"/>
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
         </svg>
-        {t('menu.open' as any)}
+        {t('menu.open')}
       </button>
       <div className="ctx-menu-divider" />
       {/* Path copy group */}
@@ -181,13 +181,13 @@ export function ContextMenu({ menu, onClose }: { menu: CtxMenuState; onClose: ()
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
         </svg>
-        {t('menu.copy_abs' as any)}
+        {t('menu.copy_abs')}
       </button>
       <button className="ctx-menu-item" onClick={() => copyPath(menu.relativePath)}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="9 18 15 12 9 6"/>
         </svg>
-        {t('menu.copy_rel' as any)}
+        {t('menu.copy_rel')}
       </button>
       <div className="ctx-menu-divider" />
       <button className="ctx-menu-item ctx-menu-hint" onClick={() => copyPath('@' + menu.relativePath)}>
@@ -195,7 +195,7 @@ export function ContextMenu({ menu, onClose }: { menu: CtxMenuState; onClose: ()
           <circle cx="12" cy="12" r="4"/>
           <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/>
         </svg>
-        {t('menu.copy_ref' as any)}
+        {t('menu.copy_ref')}
       </button>
 
       {/* File operation group — hidden in compact mode (read-only audit view) */}
@@ -206,14 +206,14 @@ export function ContextMenu({ menu, onClose }: { menu: CtxMenuState; onClose: ()
           <circle cx="6" cy="20" r="2"/><circle cx="18" cy="20" r="2"/>
           <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
         </svg>
-        {t('menu.cut' as any)}
+        {t('menu.cut')}
       </button>
       <button className="ctx-menu-item" onClick={handleCopy}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
           <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
         </svg>
-        {t('menu.copy' as any)}
+        {t('menu.copy')}
       </button>
       {canPaste && (
         <button className="ctx-menu-item" onClick={handlePaste}>
@@ -221,7 +221,7 @@ export function ContextMenu({ menu, onClose }: { menu: CtxMenuState; onClose: ()
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
             <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
           </svg>
-          {t('menu.paste' as any)}
+          {t('menu.paste')}
         </button>
       )}
       <div className="ctx-menu-divider" />
@@ -229,7 +229,7 @@ export function ContextMenu({ menu, onClose }: { menu: CtxMenuState; onClose: ()
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
         </svg>
-        {t('menu.rename' as any)}
+        {t('menu.rename')}
       </button>
       <button className="ctx-menu-item" onClick={handleDelete}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -238,7 +238,7 @@ export function ContextMenu({ menu, onClose }: { menu: CtxMenuState; onClose: ()
           <path d="M10 11v6"/><path d="M14 11v6"/>
           <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
         </svg>
-        {t('menu.delete' as any)}
+        {t('menu.delete')}
       </button>
       </>}
       <div className="ctx-menu-divider" />
@@ -247,7 +247,7 @@ export function ContextMenu({ menu, onClose }: { menu: CtxMenuState; onClose: ()
           <path d="m19 20-3-3m0 0a4 4 0 1 0-5.656-5.656A4 4 0 0 0 16 17z"/>
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
         </svg>
-        {t('menu.show_in_folder' as any)}
+        {t('menu.show_in_folder')}
       </button>
     </div>,
     document.body
@@ -380,7 +380,7 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
       try {
         await commands.fsRename(absPath, renameVal.trim());
         // Notify parent directory to refresh
-        const parentDir = absPath.replace(/\/[^\/]+$/, '');
+        const parentDir = absPath.replace(/\/[^/]+$/, '');
         dispatchFsRefresh(parentDir);
       } catch (e) { console.error('[Explorer] rename failed:', e); }
     }
@@ -662,11 +662,11 @@ export function Explorer() {
     try {
       const saved = localStorage.getItem('cc-left-tab');
       if (saved === 'workspace' || saved === 'history') return saved;
-    } catch {}
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
     return 'workspace';
   });
   useEffect(() => {
-    try { localStorage.setItem('cc-left-tab', activeTab); } catch {}
+    try { localStorage.setItem('cc-left-tab', activeTab); } catch { /* Best-effort operation; failure is non-fatal. */ }
   }, [activeTab]);
 
   const handleOpenFolder = async (e: React.MouseEvent) => {
@@ -835,13 +835,13 @@ export function Explorer() {
           className={`explorer-tab ${activeTab === 'workspace' ? 'active' : ''}`}
           onClick={() => setActiveTab('workspace')}
         >
-          {t('explorer.tab.workspace' as any)}
+          {t('explorer.tab.workspace')}
         </button>
         <button
           className={`explorer-tab ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => { setActiveTab('history'); refreshHistory(); }}
         >
-          {t('explorer.tab.history' as any)}
+          {t('explorer.tab.history')}
         </button>
       </div>
 
@@ -856,7 +856,7 @@ export function Explorer() {
           <span className="workspace-dir-path">
             {activeSession.folderPath
               ? `⁦${activeSession.folderPath}⁩`
-              : t('explorer.workspace.select-dir' as any)}
+              : t('explorer.workspace.select-dir')}
           </span>
         </button>
       )}

@@ -219,7 +219,7 @@ export function TaskNoteView({
     // pointer leaves the window or focus is stolen (WebView2) — so a resize
     // can't get stuck mid-gesture and the listeners always tear down. Element
     // listeners (vs window) also go away with the node if the card unmounts.
-    try { handle.setPointerCapture(e.pointerId); } catch {}
+    try { handle.setPointerCapture(e.pointerId); } catch { /* Best-effort operation; failure is non-fatal. */ }
 
     const onMove = (me: PointerEvent) => {
       const next = Math.max(NOTE_MIN_HEIGHT, Math.min(NOTE_MAX_HEIGHT, startHeight + (me.clientY - startY)));

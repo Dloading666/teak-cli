@@ -91,14 +91,14 @@ export function SessionContextMenu({ menu, onClose, onRename }: { menu: SessionC
           <path d="M12 17v5"/>
           <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>
         </svg>
-        {pinned ? t('menu.unpin' as any) : t('menu.pin' as any)}
+        {pinned ? t('menu.unpin') : t('menu.pin')}
       </button>
 
       <button className="ctx-menu-item" onClick={handleRename}>
         <svg {...ICON_PROPS}>
           <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
         </svg>
-        {t('menu.rename' as any)}
+        {t('menu.rename')}
       </button>
 
       {hasGroup2 && <div className="ctx-menu-divider" />}
@@ -111,7 +111,7 @@ export function SessionContextMenu({ menu, onClose, onRename }: { menu: SessionC
             <line x1="10" x2="8" y1="3" y2="21"/>
             <line x1="16" x2="14" y1="3" y2="21"/>
           </svg>
-          {t('menu.copy_session_id' as any)}
+          {t('menu.copy_session_id')}
         </button>
       )}
       {hasResume && (
@@ -120,7 +120,7 @@ export function SessionContextMenu({ menu, onClose, onRename }: { menu: SessionC
             <polyline points="4 17 10 11 4 5"/>
             <line x1="12" x2="20" y1="19" y2="19"/>
           </svg>
-          {t('menu.copy_resume_command' as any)}
+          {t('menu.copy_resume_command')}
         </button>
       )}
       {hasPath && (
@@ -129,7 +129,7 @@ export function SessionContextMenu({ menu, onClose, onRename }: { menu: SessionC
             <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
             <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
           </svg>
-          {t('menu.copy_full_path' as any)}
+          {t('menu.copy_full_path')}
         </button>
       )}
       {hasPath && (
@@ -138,7 +138,7 @@ export function SessionContextMenu({ menu, onClose, onRename }: { menu: SessionC
             <path d="m19 20-3-3m0 0a4 4 0 1 0-5.656-5.656A4 4 0 0 0 16 17z"/>
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>
-          {t('menu.show_in_folder' as any)}
+          {t('menu.show_in_folder')}
         </button>
       )}
 
@@ -151,7 +151,7 @@ export function SessionContextMenu({ menu, onClose, onRename }: { menu: SessionC
           <path d="M10 11v6"/><path d="M14 11v6"/>
           <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
         </svg>
-        {t('menu.delete' as any)}
+        {t('menu.delete')}
       </button>
     </div>,
     document.body,

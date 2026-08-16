@@ -159,25 +159,25 @@ export function ToolConfigModal({ toolKey, toolLabel, onClose }: Props) {
         {!loading && (
           <div className="tool-config-body">
             <Field
-              label={t('tool_config.command' as any)}
+              label={t('tool_config.command')}
               value={entry.command}
               onChange={v => setEntry({ ...entry, command: v })}
             />
             <Field
-              label={t('tool_config.extra_args' as any)}
+              label={t('tool_config.extra_args')}
               value={extraArgsText}
               onChange={setExtraArgsText}
               multiline
               rows={3}
             />
             <Field
-              label={t('tool_config.default_cwd' as any)}
+              label={t('tool_config.default_cwd')}
               value={entry.default_cwd}
               onChange={v => setEntry({ ...entry, default_cwd: v })}
             />
             {HISTORY_SCANNED_TOOLS.has(toolKey) && (
               <Field
-                label={t('tool_config.history_path' as any)}
+                label={t('tool_config.history_path')}
                 value={entry.history_path}
                 onChange={v => setEntry({ ...entry, history_path: v })}
                 placeholder={toolKey === 'hermes' ? '<HERMES_HOME>/sessions' : undefined}
@@ -188,13 +188,13 @@ export function ToolConfigModal({ toolKey, toolLabel, onClose }: Props) {
 
         <div className="tool-config-buttons">
           <button onClick={handleReset} disabled={saving || loading} className="tool-config-btn tool-config-btn-subtle">
-            {t('tool_config.reset' as any)}
+            {t('tool_config.reset')}
           </button>
           <button onClick={onClose} disabled={saving} className="tool-config-btn tool-config-btn-subtle">
-            {t('tool_config.cancel' as any)}
+            {t('tool_config.cancel')}
           </button>
           <button onClick={handleSave} disabled={saving || loading} className="tool-config-btn tool-config-btn-primary">
-            {t('tool_config.save' as any)}
+            {t('tool_config.save')}
           </button>
         </div>
       </div>

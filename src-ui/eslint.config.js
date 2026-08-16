@@ -20,4 +20,19 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // These modules intentionally co-locate components with shared hooks,
+    // context, and terminal configuration. Vite safely falls back to a full
+    // reload for them; splitting the exports would create circular module
+    // boundaries without improving runtime correctness.
+    files: [
+      'src/store/app-state.tsx',
+      'src/lib/git-status.tsx',
+      'src/components/center/TierTerminal.tsx',
+      'src/components/center/CenterPanel.tsx',
+    ],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

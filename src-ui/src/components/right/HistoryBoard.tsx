@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useT } from '../../i18n/useT';
-import { useAppState } from '../../store/app-state';
+import { useAppState, type ToolType } from '../../store/app-state';
 import { isTauri } from '../../tauri';
 import type { SavedSession } from '../../tauri';
 import { getToolDisplayName } from '../../lib/tool-info';
@@ -99,7 +99,7 @@ const getToolIcon = (tool: string) => {
   return <img src={src} alt="" style={{ width: '1em', height: '1em', flexShrink: 0, objectFit: 'contain', ...extra }}/>;
 };
 
-const getToolName = (tool: string, _lang: string) => getToolDisplayName(tool);
+const getToolName = (tool: string) => getToolDisplayName(tool);
 
 // Project folder basename (e.g. "EchoBird" from "E:\EchoBird", "coffee"
 // from "~/projects/coffee") — the icon already conveys the tool, so the
@@ -115,7 +115,7 @@ const projectName = (cwd: string, tool: string) => {
   // (it has no user-project concept). Same story as the launchpad: the row
   // should read "OpenClaw", not a leaked internal folder name.
   if (tool === 'openclaw') {
-    return getToolName(tool, '');
+    return getToolName(tool);
   }
   if (cwd) {
     const trimmed = cwd.replace(/[\\/]+$/, '');
@@ -123,7 +123,7 @@ const projectName = (cwd: string, tool: string) => {
     if (idx >= 0) return trimmed.slice(idx + 1);
     if (trimmed) return trimmed;
   }
-  return getToolName(tool, '');
+  return getToolName(tool);
 };
 
 // Normalize a recorded cwd for grouping: trim trailing slashes and unify
@@ -140,6 +140,11 @@ const pathBasename = (p: string) => {
 export function HistoryBoard() {
   const t = useT();
   const { state, dispatch } = useAppState();
+  const [nowMs, setNowMs] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // History is prefetched at app startup (see App.tsx). We just subscribe
   // to the shared cache so the panel renders instantly when data is ready.
@@ -230,10 +235,10 @@ export function HistoryBoard() {
   // literal each render, defeating the debounce — a burst of keystrokes would
   // filter the whole list once per render instead of once per debounce tick).
   const baseSessions: SavedSession[] = useMemo(() => isTauri ? cachedSessions : cachedSessions.length > 0 ? cachedSessions : [
-    { id: 'mock-1', name: 'build a flash card website', tool: 'claude', cwd: '~/projects/flashcards', session_token: 'tk1', saved_at: new Date().toISOString() },
-    { id: 'mock-2', name: 'build a snake game', tool: 'claude', cwd: '~/projects/snake', session_token: 'tk2', saved_at: new Date(Date.now() - 3600000).toISOString() },
-    { id: 'mock-3', name: 'refactor components', tool: 'qwen', cwd: '~/projects/coffee', session_token: 'tk3', saved_at: new Date(Date.now() - 86400000 * 2).toISOString() },
-  ], [cachedSessions]);
+    { id: 'mock-1', name: 'build a flash card website', tool: 'claude', cwd: '~/projects/flashcards', session_token: 'tk1', saved_at: new Date(nowMs).toISOString() },
+    { id: 'mock-2', name: 'build a snake game', tool: 'claude', cwd: '~/projects/snake', session_token: 'tk2', saved_at: new Date(nowMs - 3600000).toISOString() },
+    { id: 'mock-3', name: 'refactor components', tool: 'qwen', cwd: '~/projects/coffee', session_token: 'tk3', saved_at: new Date(nowMs - 86400000 * 2).toISOString() },
+  ], [cachedSessions, nowMs]);
 
   // Project (workspace) filter: which cwd's sessions to show (null = all).
   // Keyed by normalized cwd (trailing slashes trimmed, separators unified —
@@ -281,6 +286,7 @@ export function HistoryBoard() {
   // <2 projects makes projectCounts.length drop below the render threshold,
   // the trigger vanishes, and the fixed-position menu would otherwise strand
   // at stale screen coordinates.
+  /* eslint-disable react-hooks/set-state-in-effect -- Invalid filter selections are reset when the available project set changes. */
   useEffect(() => {
     if (projectCounts.length < 2 && filterMenuOpen) {
       setFilterMenuOpen(false);
@@ -289,6 +295,7 @@ export function HistoryBoard() {
       setActiveProject(null);
     }
   }, [projectCounts, activeProject, filterMenuOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Debounce the raw query so fast typing doesn't re-filter the full session
   // list on every keystroke (history-cache can hold thousands of sessions —
@@ -325,7 +332,7 @@ export function HistoryBoard() {
       list = list.filter(s => {
         const name = (renamed[`${s.tool ?? ''}:${s.id}`] ?? s.name ?? '').toLowerCase();
         const proj = projectName(s.cwd ?? '', s.tool ?? '').toLowerCase();
-        const tool = getToolName(s.tool ?? '', '').toLowerCase();
+        const tool = getToolName(s.tool ?? '').toLowerCase();
         return name.includes(q) || proj.includes(q) || tool.includes(q);
       });
     }
@@ -351,6 +358,7 @@ export function HistoryBoard() {
   // change.
   const PAGE = 30;
   const [visibleCount, setVisibleCount] = useState(PAGE);
+  /* eslint-disable-next-line react-hooks/set-state-in-effect -- A changed query/filter starts a new pagination window. */
   useEffect(() => { setVisibleCount(PAGE); }, [debouncedQuery, activeProject]);
   const filteredSessions = matchedSessions.slice(0, visibleCount);
   const hasMore = matchedSessions.length > visibleCount;
@@ -390,7 +398,7 @@ export function HistoryBoard() {
     const targetId = crypto.randomUUID();
     dispatch({
       type: 'ADD_TERMINAL',
-      session: { id: targetId, tool: saved.tool as any, folderPath: saved.cwd, resumeToken: saved.session_token }
+      session: { id: targetId, tool: saved.tool as ToolType, folderPath: saved.cwd, resumeToken: saved.session_token }
     });
     dispatch({ type: 'SET_ACTIVE_TERMINAL', id: targetId });
   };
@@ -406,7 +414,7 @@ export function HistoryBoard() {
           <input
             type="text"
             className="agent-session-search"
-            placeholder={t('task.search_sessions' as any) || 'Search sessions...'}
+            placeholder={t('task.search_sessions') || 'Search sessions...'}
             value={sessionSearchQuery}
             onChange={e => setSessionSearchQuery(e.target.value)}
             onContextMenu={(e) => openCtxMenu(e, setSessionSearchQuery)}
@@ -428,7 +436,7 @@ export function HistoryBoard() {
             <span className="history-tool-filter-label">
               {activeProject
                 ? projectLabel(projectCounts.find(p => p.key === activeProject)?.cwd ?? '')
-                : (t('task.filter_all_projects' as any) || 'All projects')}
+                : (t('task.filter_all_projects') || 'All projects')}
             </span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 9l6 6 6-6" />
@@ -453,28 +461,28 @@ export function HistoryBoard() {
         if (isNaN(savedMs)) {
           const num = Number(session.saved_at);
           if (!isNaN(num) && num > 0) savedMs = num < 1e11 ? num * 1000 : num;
-          else savedMs = Date.now() - 86400000;
+          else savedMs = nowMs - 86400000;
         }
-        const dateDiff = Date.now() - savedMs;
+        const dateDiff = nowMs - savedMs;
         let dateStr = '';
-        const now = new Date();
+        const now = new Date(nowMs);
         const savedDate = new Date(savedMs);
         
         const isSameDay = now.getDate() === savedDate.getDate() && now.getMonth() === savedDate.getMonth() && now.getFullYear() === savedDate.getFullYear();
         
-        const yesterday = new Date(Date.now() - 86400000);
+        const yesterday = new Date(nowMs - 86400000);
         const isYesterday = yesterday.getDate() === savedDate.getDate() && yesterday.getMonth() === savedDate.getMonth() && yesterday.getFullYear() === savedDate.getFullYear();
 
         if (dateDiff < 3600000) {
-          dateStr = t('time.just_now' as any) || 'Just now';
+          dateStr = t('time.just_now') || 'Just now';
         } else if (isSameDay) {
-          dateStr = t('time.today' as any) || 'Today';
+          dateStr = t('time.today') || 'Today';
         } else if (isYesterday) {
-          dateStr = t('time.yesterday' as any) || 'Yesterday';
+          dateStr = t('time.yesterday') || 'Yesterday';
         } else {
           const days = Math.floor(dateDiff / 86400000);
           if (days < 7) {
-            dateStr = (t('time.days_ago' as any) || '{days} days ago').replace('{days}', days.toString());
+            dateStr = (t('time.days_ago') || '{days} days ago').replace('{days}', days.toString());
           } else {
             const locale = state.currentLang === 'zh-CN' ? 'zh-CN' : 'en-US';
             dateStr = savedDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
@@ -534,7 +542,7 @@ export function HistoryBoard() {
               <div className="history-card-meta">
                 <span className="history-card-tool-wrap">
                   {getToolIcon(session.tool)}
-                  <span>{projectName(session.cwd, session.tool)} &middot; {dateStr} {session.turn_count ? ` · ${(t('task.messages' as any) || '{count} messages').replace('{count}', session.turn_count.toString())}` : ''}</span>
+                  <span>{projectName(session.cwd, session.tool)} &middot; {dateStr} {session.turn_count ? ` · ${(t('task.messages') || '{count} messages').replace('{count}', session.turn_count.toString())}` : ''}</span>
                 </span>
               </div>
             </div>
@@ -584,7 +592,7 @@ export function HistoryBoard() {
 
       {!isLoading && filteredSessions.length === 0 && (
         <div className="task-empty">
-          <div className="task-empty-text">{t('menu.no_recent' as any) || 'No recent sessions'}</div>
+          <div className="task-empty-text">{t('menu.no_recent') || 'No recent sessions'}</div>
         </div>
       )}
     </div>
@@ -600,7 +608,7 @@ export function HistoryBoard() {
             className={`history-tool-filter-opt${activeProject === null ? ' active' : ''}`}
             onClick={() => { setActiveProject(null); setFilterMenuOpen(false); }}
           >
-            <span className="history-tool-filter-opt-name">{t('task.filter_all_projects' as any) || 'All projects'}</span>
+            <span className="history-tool-filter-opt-name">{t('task.filter_all_projects') || 'All projects'}</span>
             <span className="history-tool-filter-count">{baseSessions.reduce((n, s) => (hidden.has(`${s.tool ?? ''}:${s.id}`) ? n : n + 1), 0)}</span>
           </button>
           {projectCounts.map((p) => (

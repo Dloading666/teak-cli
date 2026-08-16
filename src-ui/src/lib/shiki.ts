@@ -4,7 +4,7 @@
 // time a file with that extension is highlighted; subsequent files of the
 // same language hit the cache.
 
-import type { Highlighter, ThemedToken } from 'shiki';
+import type { BundledLanguage, Highlighter, ThemedToken } from 'shiki';
 
 let highlighterPromise: Promise<Highlighter> | null = null;
 
@@ -87,13 +87,13 @@ async function tokenizeAt(
   const highlighter = await getHighlighter();
   if (!highlighter.getLoadedLanguages().includes(lang)) {
     try {
-      await highlighter.loadLanguage(lang as any);
+      await highlighter.loadLanguage(lang as BundledLanguage);
     } catch {
       return null;
     }
   }
   try {
-    return highlighter.codeToTokens(text, { lang: lang as any, theme }).tokens;
+    return highlighter.codeToTokens(text, { lang: lang as BundledLanguage, theme }).tokens;
   } catch {
     return null;
   }

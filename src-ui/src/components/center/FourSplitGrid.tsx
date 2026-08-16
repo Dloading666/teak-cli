@@ -252,7 +252,7 @@ interface EmptyPanePickerProps {
   toolsInstalled: Record<string, boolean>;
 }
 
-function EmptyPanePicker({ paneIdx: _paneIdx, onSelect, toolsInstalled }: EmptyPanePickerProps) {
+function EmptyPanePicker({ onSelect, toolsInstalled }: EmptyPanePickerProps) {
   const t = useT();
   // The user's pinned AI-CLIs (their launchpad "选择工具" selection), read fresh
   // so a pin change on the launchpad shows up the next time an empty pane opens.

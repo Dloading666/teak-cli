@@ -33,7 +33,7 @@ async function loadTasksFromBackend(): Promise<TaskItem[]> {
               return legacyTasks;
             }
           }
-        } catch {}
+        } catch { /* Best-effort operation; failure is non-fatal. */ }
       }
 
       return tasks;
@@ -46,7 +46,7 @@ async function loadTasksFromBackend(): Promise<TaskItem[]> {
   try {
     const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch { /* Best-effort operation; failure is non-fatal. */ }
   return [];
 }
 
@@ -55,10 +55,10 @@ function saveTasksToBackend(tasks: TaskItem[]) {
   if (isTauri) {
     commands.saveTasks(data).catch(() => {
       // Fallback
-      try { localStorage.setItem(LEGACY_STORAGE_KEY, data); } catch {}
+      try { localStorage.setItem(LEGACY_STORAGE_KEY, data); } catch { /* Best-effort operation; failure is non-fatal. */ }
     });
   } else {
-    try { localStorage.setItem(LEGACY_STORAGE_KEY, data); } catch {}
+    try { localStorage.setItem(LEGACY_STORAGE_KEY, data); } catch { /* Best-effort operation; failure is non-fatal. */ }
   }
 }
 
@@ -89,11 +89,11 @@ export function TaskBoard() {
     try {
       const saved = localStorage.getItem('cc-right-tab');
       if (saved === 'tasks' || saved === 'changes') return saved;
-    } catch {}
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
     return 'tasks';
   });
   useEffect(() => {
-    try { localStorage.setItem('cc-right-tab', activeTab); } catch {}
+    try { localStorage.setItem('cc-right-tab', activeTab); } catch { /* Best-effort operation; failure is non-fatal. */ }
   }, [activeTab]);
 
   // Selection lives at the AppState tier now (diffSelection), so a detour to
@@ -146,16 +146,16 @@ export function TaskBoard() {
     loadTasksFromBackend().then(data => {
       isLoadedRef.current = true;
       let seeded = false;
-      try { seeded = localStorage.getItem('cc-tasks-seeded') === '1'; } catch {}
+      try { seeded = localStorage.getItem('cc-tasks-seeded') === '1'; } catch { /* Best-effort operation; failure is non-fatal. */ }
 
       if (data.length === 0 && !seeded) {
-        try { localStorage.setItem('cc-tasks-seeded', '1'); } catch {}
+        try { localStorage.setItem('cc-tasks-seeded', '1'); } catch { /* Best-effort operation; failure is non-fatal. */ }
         dispatch({ type: 'SET_TASK_VIEW_MODE', mode: 'note' }); // remembers the view too
         setTasks([makeWelcomeNote(t('task.welcome_note'))]);
         return;
       }
 
-      if (!seeded) { try { localStorage.setItem('cc-tasks-seeded', '1'); } catch {} }
+      if (!seeded) { try { localStorage.setItem('cc-tasks-seeded', '1'); } catch { /* Best-effort operation; failure is non-fatal. */ } }
       skipNextSyncRef.current = true; // Prevent saving the initialized data purely due to React effect
       setTasks(data);
     });
@@ -198,7 +198,7 @@ export function TaskBoard() {
           const updated: TaskItem[] = JSON.parse(event.payload);
           skipNextSyncRef.current = true; // Mark incoming external data so we don't circularly save it
           setTasks(updated);
-        } catch {}
+        } catch { /* Best-effort operation; failure is non-fatal. */ }
       }).then(u => { unlisten = u; });
     });
     return () => { unlisten?.(); };
@@ -216,7 +216,7 @@ export function TaskBoard() {
   const handleAdd = useCallback(() => {
     const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     // Using explicit string cast since the dynamic key might be parsed tightly by the compiler
-    const title = t('task.default_title' as any, { id: randomSuffix });
+    const title = t('task.default_title', { id: randomSuffix });
     const newTask: TaskItem = {
       id: crypto.randomUUID(), title, status: 'todo', createdAt: Date.now()
     };
@@ -630,10 +630,10 @@ export function TaskBoard() {
       {/* ── Tabs Header ── */}
       <div className="right-tabs" style={{ position: 'relative' }}>
         <button className={`right-tab ${activeTab === 'tasks' ? 'active' : ''}`} onClick={() => setActiveTab('tasks')}>
-          {t('task.tab.tasks' as any) || 'Tasks'}
+          {t('task.tab.tasks') || 'Tasks'}
         </button>
         <button className={`right-tab ${activeTab === 'changes' ? 'active' : ''}`} onClick={() => setActiveTab('changes')}>
-          {t('task.tab.changes' as any) || 'Changes'}
+          {t('task.tab.changes') || 'Changes'}
         </button>
       </div>
 

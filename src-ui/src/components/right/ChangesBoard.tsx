@@ -80,9 +80,9 @@ const selKey = (tag: string, path: string) => `${tag}\x00${path}`;
 // than HistoryBoard's just-now/today/yesterday scheme (which would label every
 // commit in a burst "刚刚"). <60s reuses time.just_now; >=1 week falls back to
 // a locale short date.
-function formatCommitTime(epochSec: number, t: (k: any) => string, lang: string): string {
+function formatCommitTime(epochSec: number, t: ReturnType<typeof useT>, lang: string): string {
   const diffSec = Math.max(0, Math.floor((Date.now() / 1000) - epochSec));
-  if (diffSec < 60) return t('time.just_now' as any) || 'Just now';
+  if (diffSec < 60) return t('time.just_now') || 'Just now';
   const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
   if (diffSec < 3600) return rtf.format(-Math.floor(diffSec / 60), 'minute');
   if (diffSec < 86400) return rtf.format(-Math.floor(diffSec / 3600), 'hour');
@@ -135,7 +135,7 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
   };
 
   useEffect(() => {
-    try { localStorage.setItem(DIFF_HEIGHT_KEY, String(diffHeight)); } catch {}
+    try { localStorage.setItem(DIFF_HEIGHT_KEY, String(diffHeight)); } catch { /* Best-effort operation; failure is non-fatal. */ }
   }, [diffHeight]);
 
   const repoRoot = changes?.state === 'ok' ? changes.repo_root : null;
@@ -153,7 +153,7 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
     // contributes nothing here until the agent makes a commit.
     const commits: CommitRow[] = changes.session_commits.map(c => ({ hash: c.hash, message: c.message, author: c.author, time: c.time }));
     if (commits.length) {
-      out.push({ type: 'header', key: 'h-committed', label: t('changes.committed' as any) || 'Committed', count: commits.length });
+      out.push({ type: 'header', key: 'h-committed', label: t('changes.committed') || 'Committed', count: commits.length });
     }
     for (const c of commits) {
       // Session commits are collapsed-by-default + lazy on expand.
@@ -172,13 +172,13 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
     const uncommitted = changes.uncommitted;
     const untracked = changes.untracked;
     if (uncommitted.length) {
-      out.push({ type: 'header', key: 'h-uncommitted', label: t('changes.uncommitted' as any) || 'Uncommitted', count: uncommitted.length });
+      out.push({ type: 'header', key: 'h-uncommitted', label: t('changes.uncommitted') || 'Uncommitted', count: uncommitted.length });
       for (const entry of uncommitted) {
         out.push({ type: 'file', key: selKey('uncommitted', entry.path), entry, group: { tag: 'uncommitted', label: '', entries: [], kind: 'uncommitted' } });
       }
     }
     if (untracked.length) {
-      out.push({ type: 'header', key: 'h-untracked', label: t('changes.untracked' as any) || 'Untracked', count: untracked.length });
+      out.push({ type: 'header', key: 'h-untracked', label: t('changes.untracked') || 'Untracked', count: untracked.length });
       for (const entry of untracked) {
         out.push({ type: 'file', key: selKey('untracked', entry.path), entry, group: { tag: 'untracked', label: '', entries: [], kind: 'untracked' } });
       }
@@ -190,6 +190,7 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
   // repo lists thousands of untracked files.
   const PAGE_SIZE = 80;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  /* eslint-disable-next-line react-hooks/set-state-in-effect -- A changed flattened list starts a new pagination window. */
   useEffect(() => { setVisibleCount(PAGE_SIZE); }, [items.length]);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -237,19 +238,19 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
     try {
       await commands.gitInit(activeFolderPath);
       window.dispatchEvent(new CustomEvent('fs-refresh', { detail: { dirPath: activeFolderPath } }));
-    } catch {}
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
     setInitializing(false);
   };
 
   // ── Prompt / empty states ────────────────────────────────────────────────
   if (!changes) {
-    return <div className="task-empty"><div className="task-empty-text">{t('diff.loading' as any) || 'Loading…'}</div></div>;
+    return <div className="task-empty"><div className="task-empty-text">{t('diff.loading') || 'Loading…'}</div></div>;
   }
   if (changes.state === 'no_git') {
     return (
       <div className="task-empty">
         <div className="task-empty-text">
-          {t('changes.no_git' as any) || 'Git is not installed — code diff, branches and other git features are unavailable.'}
+          {t('changes.no_git') || 'Git is not installed — code diff, branches and other git features are unavailable.'}
         </div>
       </div>
     );
@@ -258,13 +259,13 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
     return (
       <div className="task-empty">
         <div className="task-empty-text">
-          {t('changes.not_repo' as any) || 'This folder is not a Git repository.'}
+          {t('changes.not_repo') || 'This folder is not a Git repository.'}
         </div>
         {activeFolderPath && (
           <button className="changes-init-btn" onClick={handleInit} disabled={initializing}>
             {initializing
-              ? (t('changes.initializing' as any) || 'Initializing…')
-              : (t('changes.init_here' as any) || 'Initialize Git here')}
+              ? (t('changes.initializing') || 'Initializing…')
+              : (t('changes.init_here') || 'Initialize Git here')}
           </button>
         )}
       </div>
@@ -301,7 +302,7 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
         )}
       </div>
       {items.length === 0 ? (
-        <div className="task-empty"><div className="task-empty-text">{t('changes.clean' as any) || 'No changes — working tree clean.'}</div></div>
+        <div className="task-empty"><div className="task-empty-text">{t('changes.clean') || 'No changes — working tree clean.'}</div></div>
       ) : (
        <>
       <ScrollPanel>

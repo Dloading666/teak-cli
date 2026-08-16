@@ -61,7 +61,7 @@ export function TitleBar() {
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow().startDragging();
-    } catch {}
+    } catch { /* Best-effort operation; failure is non-fatal. */ }
   };
   const onDragDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('button')) return;

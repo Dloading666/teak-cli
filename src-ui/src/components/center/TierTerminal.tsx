@@ -9,7 +9,7 @@
 // etc.) don't cascade into this component.
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
-import { Terminal } from '@xterm/xterm';
+import { Terminal, type ILink } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { UnicodeGraphemesAddon } from '@xterm/addon-unicode-graphemes';
@@ -370,6 +370,11 @@ interface TierTerminalProps {
    *  the workspace folder with sibling panes. Ignored outside
    *  multi-agent grids (single-terminal tabs always pass false). */
   sentinelEnabled?: boolean;
+}
+
+interface RemoteTerminalConfig {
+  protocol?: string;
+  password?: string;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -739,7 +744,7 @@ function TierTerminalImpl({
             if (ie.inputType !== 'insertText' || !ie.data || ie.isComposing) return;
             // Non-ASCII commit — arm the caret-key swallow no matter which
             // path delivers the text.
-            if (/[^\x00-\x7f]/.test(ie.data)) ime.lastNonAsciiCommitAt = performance.now();
+            if (/[^\p{ASCII}]/u.test(ie.data)) ime.lastNonAsciiCommitAt = performance.now();
             // Screen readers read the textarea itself — leave it untouched.
             if (term.options.screenReaderMode) return;
             // Chromium ordering: a 229 keydown just preceded this commit —
@@ -825,6 +830,7 @@ function TierTerminalImpl({
     // motion (bit 5) and wheel (bit 6) events are left untouched.
     const stripRightClickMouse = (data: string): string => {
       if (!data.includes('\x1b[<')) return data;
+      // eslint-disable-next-line no-control-regex -- Matches the PTY's literal ESC byte.
       return data.replace(/\x1b\[<(\d+);\d+;\d+[Mm]/g, (seq, b) => {
         const btn = Number(b);
         return (btn & 3) === 2 && !(btn & 96) ? '' : seq;
@@ -1013,7 +1019,7 @@ function TierTerminalImpl({
           for (let i = 0; i < chars.length; i++) colByStrIdx.push(col);
           text += chars;
         }
-        const links: any[] = [];
+        const links: ILink[] = [];
         let m;
         LINK_RE.lastIndex = 0;
         while ((m = LINK_RE.exec(text)) !== null) {
@@ -1139,10 +1145,10 @@ function TierTerminalImpl({
 
     const startPty = async () => {
       try {
-      let remoteConfig: any = {};
+      let remoteConfig: RemoteTerminalConfig = {};
       try {
-        if (tool === 'remote' && toolData) remoteConfig = JSON.parse(toolData);
-      } catch (e) {}
+        if (tool === 'remote' && toolData) remoteConfig = JSON.parse(toolData) as RemoteTerminalConfig;
+      } catch { /* Invalid remote configuration falls back to defaults. */ }
       let hasInjectedPassword = false;
 
       // Subscribe to PTY events via the singleton bus. One listen() call per
@@ -1212,9 +1218,9 @@ function TierTerminalImpl({
           // appending. xterm still gets the raw `data` with escapes
           // intact for rendering; only the scan buffer is normalised.
           const cleanData = data
-            .replace(/\x1b\[[0-9;?]*[@-~]/g, '')      // CSI (most common)
-            .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '') // OSC (title, hyperlink)
-            .replace(/\x1b[@-Z\\-_]/g, '');            // single-char escape
+            .replace(/\x1b\[[0-9;?]*[@-~]/g, '') // eslint-disable-line no-control-regex -- CSI contains ESC.
+            .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '') // eslint-disable-line no-control-regex -- OSC contains ESC/BEL.
+            .replace(/\x1b[@-Z\\-_]/g, ''); // eslint-disable-line no-control-regex -- Single-character ESC sequence.
           markerScanBufRef.current += cleanData;
 
           const MAX_BUF = 8192;
@@ -1267,14 +1273,14 @@ function TierTerminalImpl({
             }
           }
         },
-        onStatus: (running, _exitCode) => {
+        onStatus: (running) => {
           if (!mounted || running) return;
           setProcessExited(true);
           if (usesNativeStatus) {
             dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
           }
         },
-        onExit: (_exitCode) => {
+        onExit: () => {
           // Authoritative "process is actually dead" signal from the Rust
           // child-watcher thread. Critical for the lockup scenario where an
           // intermediate cmd.exe keeps the PTY slave open so reader never
@@ -1406,7 +1412,7 @@ function TierTerminalImpl({
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const runFit = () => {
       resizeTimer = null;
-      try { fit.fit(); } catch {}
+      try { fit.fit(); } catch { /* Best-effort operation; failure is non-fatal. */ }
       // Notify PTY backend of the new size so the CLI tool can redraw
       try {
         const cols = term.cols;
@@ -1414,7 +1420,7 @@ function TierTerminalImpl({
         if (cols > 0 && rows > 0) {
           commands.tierTerminalResize(sessionId, cols, rows).catch(() => {});
         }
-      } catch {}
+      } catch { /* Best-effort operation; failure is non-fatal. */ }
     };
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -1470,7 +1476,7 @@ function TierTerminalImpl({
     // path re-fits with the new font when a hidden tab is shown again.
     const el = termRef.current;
     if (el && el.clientWidth > 10 && el.clientHeight > 10) {
-      try { fitRef.current?.fit(); } catch {}
+      try { fitRef.current?.fit(); } catch { /* Best-effort operation; failure is non-fatal. */ }
     }
   }, [termFont]);
 
@@ -1666,7 +1672,7 @@ function TierTerminalImpl({
         // layout race — guard it (same as the ResizeObserver path) so a throw
         // never skips the onRender subscription + resize IPC below and strand
         // the resize. reveal() is still backstopped by the fallback regardless.
-        try { fitRef.current?.fit(); } catch {}
+        try { fitRef.current?.fit(); } catch { /* Best-effort operation; failure is non-fatal. */ }
         xtermRef.current?.focus();
         const term = xtermRef.current;
         if (!term || term.cols <= 0 || term.rows <= 0) { reveal(); return; }
@@ -1728,7 +1734,7 @@ function TierTerminalImpl({
         setCanvasHidden(false);
       };
       f1 = requestAnimationFrame(() => {
-        try { if (term.rows > 0) term.refresh(0, term.rows - 1); } catch {}
+        try { if (term.rows > 0) term.refresh(0, term.rows - 1); } catch { /* Best-effort operation; failure is non-fatal. */ }
         renderSub = term.onRender(() => reveal());
       });
       // Same safety-net rationale as the activation effect: never strand the
@@ -1817,7 +1823,7 @@ function TierTerminalImpl({
       }
     }, 150);
     return () => clearInterval(poll);
-  }, [showSplash, processExited, startFailed]);
+  }, [showSplash, processExited, startFailed, tool]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 

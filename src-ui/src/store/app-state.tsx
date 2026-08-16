@@ -371,13 +371,13 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_FOLDER':
       // Persist as the "last folder" so a fresh launch lands here instead
       // of the C-drive default. Read back in getInitialState().
-      try { localStorage.setItem('cc-folder', action.path); } catch {}
+      try { localStorage.setItem('cc-folder', action.path); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return {
         ...state,
         terminals: state.terminals.map(t => t.id === state.activeTerminalId ? { ...t, folderPath: action.path } : t)
       };
     case 'CLEAR_FOLDER':
-      try { localStorage.removeItem('cc-folder'); } catch {}
+      try { localStorage.removeItem('cc-folder'); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return {
         ...state,
         terminals: state.terminals.map(t => t.id === state.activeTerminalId ? { ...t, folderPath: null } : t)
@@ -594,20 +594,20 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'TOGGLE_LEFT_PANEL': {
       const next = !state.leftPanelHidden;
-      try { localStorage.setItem('cc-left-hidden', next ? '1' : '0'); } catch {}
+      try { localStorage.setItem('cc-left-hidden', next ? '1' : '0'); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return { ...state, leftPanelHidden: next };
     }
     case 'TOGGLE_RIGHT_PANEL': {
       const next = !state.rightPanelHidden;
-      try { localStorage.setItem('cc-right-hidden', next ? '1' : '0'); } catch {}
+      try { localStorage.setItem('cc-right-hidden', next ? '1' : '0'); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return { ...state, rightPanelHidden: next };
     }
     case 'SET_MULTI_AGENT_LAYOUT': {
-      try { localStorage.setItem('cc-ma-layout', action.layout); } catch {}
+      try { localStorage.setItem('cc-ma-layout', action.layout); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return { ...state, multiAgentLayout: action.layout };
     }
     case 'SET_TASK_VIEW_MODE': {
-      try { localStorage.setItem('cc-task-view', action.mode); } catch {}
+      try { localStorage.setItem('cc-task-view', action.mode); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return { ...state, taskViewMode: action.mode };
     }
     case 'SET_DIFF_SELECTION':
@@ -626,7 +626,7 @@ function reducer(state: AppState, action: Action): AppState {
       // the tab's close button and the overlay's close button.
       return { ...state, diffSelection: null, diffTabActive: false };
     case 'SET_DIFF_MODE': {
-      try { localStorage.setItem('cc-diff-mode', action.mode); } catch {}
+      try { localStorage.setItem('cc-diff-mode', action.mode); } catch { /* Best-effort operation; failure is non-fatal. */ }
       // Entering tab mode focuses the diff tab; leaving blurs it. Keeps the
       // active-surface tracking in lockstep with the surface the diff is on.
       return { ...state, diffMode: action.mode, diffTabActive: action.mode === 'tab' };
@@ -674,7 +674,7 @@ function getInitialState(): AppState {
   try {
     const savedTheme = localStorage.getItem('cc-theme') as ThemeColor | null;
     if (savedTheme && VALID_THEMES.includes(savedTheme)) theme = savedTheme;
-  } catch {}
+  } catch { /* Best-effort operation; failure is non-fatal. */ }
 
   try {
     const savedShape = localStorage.getItem('cc-shape');
@@ -690,19 +690,19 @@ function getInitialState(): AppState {
     } else if (savedShape && VALID_SHAPES.includes(savedShape as ThemeShape)) {
       shape = savedShape as ThemeShape;
     }
-  } catch {}
+  } catch { /* Best-effort operation; failure is non-fatal. */ }
 
   try {
     const savedIconTheme = localStorage.getItem('cc-icon-theme') as IconTheme | null;
     if (savedIconTheme && VALID_ICON_THEMES.includes(savedIconTheme)) iconTheme = savedIconTheme;
-  } catch {}
+  } catch { /* Best-effort operation; failure is non-fatal. */ }
 
-  try { folderPath = localStorage.getItem('cc-folder'); } catch {}
+  try { folderPath = localStorage.getItem('cc-folder'); } catch { /* Best-effort operation; failure is non-fatal. */ }
 
   try {
     const savedLang = localStorage.getItem('cc-lang');
     if (savedLang) lang = savedLang;
-  } catch {}
+  } catch { /* Best-effort operation; failure is non-fatal. */ }
 
   // No factory-default wallpaper — the bundled /wallpapers/default.png
   // didn't load reliably across platforms (Linux WebKit asset URL
@@ -739,7 +739,7 @@ function getInitialState(): AppState {
         localStorage.removeItem('cc-bg-path');
         localStorage.removeItem('cc-bg-type');
         localStorage.removeItem('cc-bg-init');
-      } catch {}
+      } catch { /* Best-effort operation; failure is non-fatal. */ }
     } else {
       bgPath = storedPath || '';
       bgType = storedType || 'none';
@@ -773,10 +773,10 @@ function getInitialState(): AppState {
         if (!Number.isNaN(n) && n >= 0 && n <= 80) {
           wallpaperOpacity = Math.max(0, Math.min(100, 100 - n));
         }
-        try { localStorage.removeItem('cc-wallpaper-dim'); } catch {}
+        try { localStorage.removeItem('cc-wallpaper-dim'); } catch { /* Best-effort operation; failure is non-fatal. */ }
       }
     }
-  } catch {}
+  } catch { /* Best-effort operation; failure is non-fatal. */ }
 
   const defaultTerminalId = crypto.randomUUID();
 
@@ -806,7 +806,7 @@ function getInitialState(): AppState {
     const savedDiffMode = localStorage.getItem('cc-diff-mode');
     if (savedDiffMode === 'tab' || savedDiffMode === 'overlay') diffMode = savedDiffMode;
     gambitOpen = localStorage.getItem('cc-gambit-open') !== '0';
-  } catch {}
+  } catch { /* Best-effort operation; failure is non-fatal. */ }
 
   return {
     currentTheme: theme,
