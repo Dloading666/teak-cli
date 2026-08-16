@@ -368,8 +368,11 @@ function mergeSessionSnapshot(
 
 function ToolRow({ message }: { message: ChatMessage }) {
   const status = message.toolStatus ?? 'running';
-  const [expanded, setExpanded] = useState(status === 'failed');
-  const open = expanded || status === 'failed';
+  // Success and failure rows share the same collapsed-by-default behavior.
+  // The red status dot is enough to surface an error; opening potentially
+  // large stderr output is an explicit user choice.
+  const [expanded, setExpanded] = useState(false);
+  const open = expanded;
   return (
     <details
       className="conversation-tool"
@@ -1079,11 +1082,13 @@ function ConversationViewImpl({
   const activeTurnStartIndex = pending
     ? pendingPromptIndex
     : messages.findLastIndex(message => message.role === 'user');
-  const lastRunningToolIndex = messages.findLastIndex(message =>
-    message.role === 'tool' && (message.toolStatus ?? 'running') === 'running'
-  );
-  const hasRunningTool = activeTurnStartIndex >= 0 && lastRunningToolIndex > activeTurnStartIndex;
-  const isExecuting = (Boolean(pending) || agentStatus === 'working') && hasRunningTool;
+  // A tool result changes its row from `running` to `done`/`failed` before the
+  // agent necessarily finishes the turn. Keep the execution label visible
+  // throughout that tool phase instead of dropping it between consecutive
+  // tool calls or while the agent processes the latest result.
+  const lastToolIndex = messages.findLastIndex(message => message.role === 'tool');
+  const hasToolInActiveTurn = activeTurnStartIndex >= 0 && lastToolIndex > activeTurnStartIndex;
+  const isExecuting = (Boolean(pending) || agentStatus === 'working') && hasToolInActiveTurn;
   const isThinking = !isExecuting && (pending
     ? !assistantAfterPending
     : agentStatus === 'working' && lastConversationalRole === 'user');
