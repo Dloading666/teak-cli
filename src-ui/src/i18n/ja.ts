@@ -1,3 +1,5 @@
+import type { I18nKey } from './en';
+
 export const ja = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': 'ワークスペース',
@@ -183,6 +185,7 @@ export const ja = {
 
   'conversation.reasoning': '思考プロセス',
   'conversation.thinking': '考え中…',
+  'conversation.executing': '実行中…',
   'conversation.copied': 'コピーしました',
   'conversation.copy_message': 'メッセージをコピー',
   'conversation.navigation': '会話ナビゲーション',
@@ -195,4 +198,4 @@ export const ja = {
   'heatmap.tooltip_one': '{date} · メッセージ 1 件',
   'heatmap.tooltip_none': '{date} · アクティビティなし',
 
-} as const;
+} as const satisfies Record<I18nKey, string>;

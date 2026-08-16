@@ -1,3 +1,5 @@
+import type { I18nKey } from './en';
+
 export const zhCN = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': '工作区',
@@ -185,6 +187,7 @@ export const zhCN = {
   // 贡献热力图（桌面 Launchpad 上的 6 张卡片上方）
   'conversation.reasoning': '思考过程',
   'conversation.thinking': '正在思考中…',
+  'conversation.executing': '正在执行中…',
   'conversation.copied': '已复制',
   'conversation.copy_message': '复制消息',
   'conversation.navigation': '对话快速定位',
@@ -197,4 +200,4 @@ export const zhCN = {
   'heatmap.tooltip_one': '{date} · 1 条消息',
   'heatmap.tooltip_none': '{date} · 没有活动',
 
-} as const;
+} as const satisfies Record<I18nKey, string>;

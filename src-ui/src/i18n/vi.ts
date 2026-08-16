@@ -1,3 +1,5 @@
+import type { I18nKey } from './en';
+
 export const vi = {
   'app.title': 'Coffee CLI',
   // Explorer
@@ -186,6 +188,7 @@ Xóa tờ ghi chú này khi bạn sẵn sàng và bắt đầu tác vụ đầu 
 
   'conversation.reasoning': 'Quá trình suy luận',
   'conversation.thinking': 'Đang suy nghĩ…',
+  'conversation.executing': 'Đang thực thi…',
   'conversation.copied': 'Đã sao chép',
   'conversation.copy_message': 'Sao chép tin nhắn',
   'conversation.navigation': 'Điều hướng cuộc trò chuyện',
@@ -197,4 +200,4 @@ Xóa tờ ghi chú này khi bạn sẵn sàng và bắt đầu tác vụ đầu 
   'heatmap.tooltip_some': '{count} tin nhắn vào {date}',
   'heatmap.tooltip_one': '1 tin nhắn vào {date}',
   'heatmap.tooltip_none': 'Không có hoạt động vào {date}',
-};
+} as const satisfies Record<I18nKey, string>;

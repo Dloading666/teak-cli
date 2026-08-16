@@ -1,3 +1,5 @@
+import type { I18nKey } from './en';
+
 export const pt = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': 'Área de trabalho',
@@ -174,12 +176,14 @@ Apague esta nota quando quiser e comece a sua primeira tarefa.`,
   'theme.color.teal': 'Turquesa',
   'theme.color.indigo': 'Índigo',
   'theme.color.fuchsia': 'Fúcsia',
-
-
+  'gambit.title': 'Gambito',
+  'gambit.placeholder': 'Planeje sua jogada... ({send} para enviar, {newline} para nova linha, cole imagens, Alt+↑↓ para o histórico)',
   'gambit.send_failed_hint': 'Abra primeiro uma sessão ativa',
+  'gambit.send_empty_hint': 'Digite uma mensagem ou cole uma imagem primeiro (Ctrl+V)',
 
   'conversation.reasoning': 'Processo de raciocínio',
   'conversation.thinking': 'Pensando…',
+  'conversation.executing': 'Executando…',
   'conversation.copied': 'Copiado',
   'conversation.copy_message': 'Copiar mensagem',
   'conversation.navigation': 'Navegação da conversa',
@@ -192,4 +196,4 @@ Apague esta nota quando quiser e comece a sua primeira tarefa.`,
   'heatmap.tooltip_one': '1 mensagem em {date}',
   'heatmap.tooltip_none': 'Sem atividade em {date}',
 
-} as const;
+} as const satisfies Record<I18nKey, string>;

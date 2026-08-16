@@ -1076,9 +1076,20 @@ function ConversationViewImpl({
   const lastConversationalRole = messages.findLast(message =>
     message.role === 'user' || message.role === 'assistant'
   )?.role;
-  const isThinking = pending
+  const activeTurnStartIndex = pending
+    ? pendingPromptIndex
+    : messages.findLastIndex(message => message.role === 'user');
+  const lastRunningToolIndex = messages.findLastIndex(message =>
+    message.role === 'tool' && (message.toolStatus ?? 'running') === 'running'
+  );
+  const hasRunningTool = activeTurnStartIndex >= 0 && lastRunningToolIndex > activeTurnStartIndex;
+  const isExecuting = (Boolean(pending) || agentStatus === 'working') && hasRunningTool;
+  const isThinking = !isExecuting && (pending
     ? !assistantAfterPending
-    : agentStatus === 'working' && lastConversationalRole === 'user';
+    : agentStatus === 'working' && lastConversationalRole === 'user');
+  const activityLabel = isExecuting
+    ? t('conversation.executing')
+    : isThinking ? t('conversation.thinking') : null;
   const virtual = useConversationVirtualizer(messages, scrollRef);
   const indexedNavigationMessages = useMemo(() => navigationRows.flatMap((row, rowIndex) => {
     const parsed = updateChatTranscript(row.data).messages;
@@ -1196,7 +1207,7 @@ function ConversationViewImpl({
       return;
     }
     if (pinnedRef.current) element.scrollTop = element.scrollHeight;
-  }, [messages, pending, isThinking, virtual.total]);
+  }, [messages, pending, activityLabel, virtual.total]);
 
   useLayoutEffect(() => {
     const target = pendingNavigationJumpRef.current;
@@ -1314,10 +1325,10 @@ function ConversationViewImpl({
           </article>
         )}
 
-        {isThinking && (
+        {activityLabel && (
           <div className="conversation-thinking" role="status" aria-live="polite">
             <span className="conversation-thinking-braille" aria-hidden="true" />
-            <span className="conversation-thinking-text">{t('conversation.thinking')}</span>
+            <span className="conversation-thinking-text">{activityLabel}</span>
           </div>
         )}
         </div>

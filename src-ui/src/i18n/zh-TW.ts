@@ -1,3 +1,5 @@
+import type { I18nKey } from './en';
+
 export const zhTW = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': '工作區',
@@ -184,6 +186,7 @@ export const zhTW = {
 
   'conversation.reasoning': '思考過程',
   'conversation.thinking': '正在思考中…',
+  'conversation.executing': '正在執行中…',
   'conversation.copied': '已複製',
   'conversation.copy_message': '複製訊息',
   'conversation.navigation': '對話快速定位',
@@ -196,4 +199,4 @@ export const zhTW = {
   'heatmap.tooltip_one': '{date} · 1 則訊息',
   'heatmap.tooltip_none': '{date} · 沒有活動',
 
-} as const;
+} as const satisfies Record<I18nKey, string>;

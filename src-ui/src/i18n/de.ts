@@ -1,3 +1,5 @@
+import type { I18nKey } from './en';
+
 export const de = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': 'Arbeitsbereich',
@@ -174,12 +176,14 @@ Lösch diesen Zettel, wann du willst, und starte deine erste Aufgabe.`,
   'theme.color.teal': 'Petrol',
   'theme.color.indigo': 'Indigo',
   'theme.color.fuchsia': 'Fuchsia',
-
-
+  'gambit.title': 'Gambit',
+  'gambit.placeholder': 'Plane deinen Zug... ({send} zum Senden, {newline} für eine neue Zeile, Bilder einfügen, Alt+↑↓ für den Verlauf)',
   'gambit.send_failed_hint': 'Öffne zuerst eine aktive Sitzung',
+  'gambit.send_empty_hint': 'Gib zuerst eine Nachricht ein oder füge ein Bild ein (Ctrl+V)',
 
   'conversation.reasoning': 'Denkprozess',
   'conversation.thinking': 'Denkt nach…',
+  'conversation.executing': 'Wird ausgeführt…',
   'conversation.copied': 'Kopiert',
   'conversation.copy_message': 'Nachricht kopieren',
   'conversation.navigation': 'Konversationsnavigation',
@@ -192,4 +196,4 @@ Lösch diesen Zettel, wann du willst, und starte deine erste Aufgabe.`,
   'heatmap.tooltip_one': '1 Nachricht am {date}',
   'heatmap.tooltip_none': 'Keine Aktivität am {date}',
 
-} as const;
+} as const satisfies Record<I18nKey, string>;
