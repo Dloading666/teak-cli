@@ -33,6 +33,21 @@ function basename(p: string): string {
   return parts[parts.length - 1] || trimmed;
 }
 
+// Remote sessions are cwd-agnostic from the local app's point of view. Their
+// connection host is a more useful (and stable) Send target label than the
+// folderPath inherited from the launchpad or later reported by the remote
+// shell. Keep parsing best-effort so legacy/malformed toolData simply hides the
+// label instead of breaking Gambit.
+function remoteHost(toolData: string | undefined): string {
+  if (!toolData) return '';
+  try {
+    const data = JSON.parse(toolData) as { host?: unknown };
+    return typeof data.host === 'string' ? data.host.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
 export function ActiveGambit() {
   const { state, dispatch } = useAppState();
   const activeId = state.activeTerminalId;
@@ -42,16 +57,17 @@ export function ActiveGambit() {
 
   const gambitOpen = state.gambitOpen;
   const gambitDraft = activeSession?.gambitDraft ?? '';
-  // Active tab's working-folder name — the footer label telling the user which
-  // workspace Send would land in. Recomputes on tab switch (activeSession
-  // changes), so a long-lived open Gambit can't misdirect a prompt. '' when the
-  // tab has no folder (blank terminal) → the label hides.
-  const workspaceName =
-    activeSession?.folderPath && activeSession.tool
+  // Footer label telling the user where Send will land. Local sessions show
+  // their working-folder name; SSH/WebSocket sessions show their connection
+  // host, since folderPath may still contain the launchpad's previous folder.
+  // Recomputes on tab switch so a long-lived open Gambit can't misdirect text.
+  const workspaceName = activeSession?.tool === 'remote'
+    ? remoteHost(activeSession.toolData)
+    : activeSession?.folderPath && activeSession.tool
       ? basename(activeSession.folderPath)
       : '';
   // The active tab's tool glyph — the same icon its chrome-tab shows, so the
-  // Gambit workspace chip reads as "tool + directory" (mirrors the tab's
+  // Gambit target chip reads as "tool + target" (mirrors the tab's
   // icon+name pairing). null session → undefined → Gambit hides the icon.
   const toolIcon = activeSession ? getToolIcon(activeSession.tool) : undefined;
   const canUseChat = supportsConversationTool(activeSession?.tool);

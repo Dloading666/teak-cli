@@ -40,12 +40,12 @@ interface GambitProps {
    *  to know which sides are absent to compute the inset offsets. */
   leftPanelHidden: boolean;
   rightPanelHidden: boolean;
-  /** The active tab's working-folder name (basename). Rendered in the footer,
-   *  opposite the send button, so the user always sees which workspace Send
-   *  would hit; switching tabs updates it. '' hides the label (no folder). */
+  /** The active tab's Send target label: working-folder basename for local
+   *  sessions, connection host for SSH/WebSocket. Rendered in the footer;
+   *  switching tabs updates it. '' hides the label. */
   workspaceName: string;
   /** The active tab's tool glyph — same icon its chrome-tab shows. Rendered
-   *  left of the workspace name so the chip reads as "tool + directory",
+   *  left of the target name so the chip reads as "tool + target",
    *  mirroring the tab's icon+name pairing. undefined hides the icon. */
   toolIcon?: React.ReactNode;
   canUseChat: boolean;
@@ -721,9 +721,9 @@ function GambitImpl({
 
       <div className="gambit-footer">
 
-        {/* Workspace label — leftmost footer item, symmetric to the send
-            button. Shows the active tab's working-folder name so a prompt
-            can't be sent into the wrong workspace; updates as tabs switch.
+        {/* Target label — leftmost footer item, symmetric to the send button.
+            Shows the active tab's folder or remote host so a prompt can't be
+            sent to the wrong target; updates as tabs switch.
             Deliberately no hover tooltip — the visible name is the info.
             No folder icon: every directory would get the same glyph, so it's
             pure noise (and read as a different brightness than the text). */}
