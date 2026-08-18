@@ -4,6 +4,7 @@ import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { tokenizeByLang, getShikiTheme, type LineTokens } from '../../lib/shiki';
 import { useDataAttr } from '../../lib/use-data-attr';
+import { commands } from '../../tauri';
 
 function CodeBlock({ code, lang }: { code: string; lang: string | null }) {
   const dataTheme = useDataAttr('data-theme');
@@ -44,7 +45,23 @@ const MARKDOWN_COMPONENTS: Components = {
     return <CodeBlock code={text} lang={fenced?.[1] ?? null} />;
   },
   a({ children, href, ...props }) {
-    return <a href={href} target="_blank" rel="noreferrer noopener" {...props}>{children}</a>;
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer noopener"
+        {...props}
+        onClick={(event) => {
+          if (!href) return;
+          event.preventDefault();
+          void commands.openUrl(href).catch(error => {
+            console.warn('[Markdown] failed to open link', href, error);
+          });
+        }}
+      >
+        {children}
+      </a>
+    );
   },
 };
 
