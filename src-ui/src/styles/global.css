@@ -1134,17 +1134,25 @@ html.is-macos .titlebar-left-slot.is-collapsed {
     pointer-events: none; /* clicks fall through to the button (toggle Gambit) */
 }
 
-/* Titlebar panel-toggle display mode (settings → 快捷键):
-   icon = icon only (hide the shortcut hint); hidden = hide the three panel
-   toggles entirely (keyboard-only — Alt+Q/W/E still work). The gear +
-   multi-agent picker stay (they're not .titlebar-btn--hinted). Specificity
-   (0,3,0) outranks the base .titlebar-btn / --hinted rules so display:none
-   wins. */
+/* Titlebar toggle display mode (settings → 快捷键):
+   icon = icon only (hide every label); hidden = hide the three panel toggles
+   entirely (keyboard-only — Alt+Q/W/E still work). Settings is the exception:
+   hidden degrades it to icon-only so the modal can never become unreachable.
+   The contextual multi-agent picker remains icon-only in every mode. */
 .titlebar-layout-toggles[data-toggle-display="icon"] .titlebar-hotkey-hint {
     display: none;
 }
-.titlebar-layout-toggles[data-toggle-display="hidden"] .titlebar-btn--hinted {
+.titlebar-layout-toggles[data-toggle-display="hidden"] .titlebar-btn--hinted:not(.titlebar-btn--settings) {
     display: none;
+}
+.titlebar-layout-toggles[data-toggle-display="hidden"] .titlebar-settings-label {
+    display: none;
+}
+.titlebar-layout-toggles[data-toggle-display="icon"] .titlebar-btn--hinted,
+.titlebar-layout-toggles[data-toggle-display="hidden"] .titlebar-btn--settings {
+    width: 36px;
+    gap: 0;
+    padding: 0;
 }
 .titlebar-controls {
     display: flex;
@@ -1184,12 +1192,88 @@ html.is-macos .titlebar-left-slot.is-collapsed {
    resizes on toggle — same model as VS Code / Cursor / Warp. */
 
 .app-layout {
+    position: relative;
     display: flex;
     flex: 1;           /* fills space below titlebar */
     min-height: 0;     /* WebView2: allows shrink */
     width: 100%;
     padding: 0; /* Fully edge-to-edge */
     gap: 0; /* Fully edge-to-edge */
+}
+
+/* Left/right pane resizers mirror Coffee Note's interaction: the 8px hit
+   target stays invisible at rest, reveals a short grip on hover, then grows
+   and deepens while dragging. Unlike Coffee Note's blue/yellow split, the
+   grip follows Coffee CLI's active theme accent. */
+.pane-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 12;
+    width: 8px;
+    padding: 0;
+    cursor: col-resize !important;
+    touch-action: none;
+    user-select: none;
+}
+.pane-resizer-left {
+    left: calc(var(--w-left) - 4px);
+    transition: left 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pane-resizer-right {
+    right: calc(var(--w-right) - 4px);
+    transition: right 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pane-resizer-left.is-collapsed {
+    left: -4px;
+    pointer-events: none;
+}
+.pane-resizer-right.is-collapsed {
+    right: -4px;
+    pointer-events: none;
+}
+.pane-resizer span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: block;
+    width: 4px;
+    height: 108px;
+    border-radius: 999px;
+    background: transparent;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: opacity 90ms ease-out, width 90ms ease-out, height 90ms ease-out,
+                background-color 90ms ease-out, box-shadow 90ms ease-out;
+}
+.pane-resizer:hover span,
+.panel-resizing-left .pane-resizer-left span,
+.panel-resizing-right .pane-resizer-right span {
+    opacity: 1;
+    background: color-mix(in srgb, var(--accent) 58%, transparent);
+}
+.panel-resizing-left .pane-resizer-left span,
+.panel-resizing-right .pane-resizer-right span {
+    width: 5px;
+    height: 144px;
+    background: var(--accent);
+}
+.panel-resizing-left .pane-resizer-right span,
+.panel-resizing-right .pane-resizer-left span {
+    opacity: 0;
+    background: transparent;
+}
+body.resizing-panels,
+body.resizing-panels * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+body.resizing-panels .panel-left,
+body.resizing-panels .panel-right,
+body.resizing-panels .titlebar-left-slot,
+body.resizing-panels .pane-resizer {
+    transition: none;
 }
 
 /* ─── Panels ─────────────────────────────────────────── */

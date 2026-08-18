@@ -12,11 +12,13 @@
 import { commands, isTauri } from '../../tauri';
 import { useAppState, useAppDispatch, schemeLabels } from '../../store/app-state';
 import { IS_MACOS } from '../../lib/platform';
+import { useT } from '../../i18n/useT';
 import './TitleBar.css';
 
 export function TitleBar() {
   const { state } = useAppState();
   const dispatch = useAppDispatch();
+  const t = useT();
 
   // The active scheme's three combos, shown as persistent hints on the left /
   // Gambit / right buttons — a deliberate memory hook for the product's
@@ -185,17 +187,20 @@ export function TitleBar() {
         )}
 
         {/* Personalization settings — gear opens the consolidated modal that
-            replaced the old left-panel theme/language popovers. */}
+            replaced the old left-panel theme/language popovers. It joins the
+            configured titlebar display mode, except "hidden" intentionally
+            degrades to icon-only so Settings always remains reachable. */}
         <button
-          className={`titlebar-btn titlebar-btn--layout${state.settingsOpen ? ' is-active' : ''}`}
+          className={`titlebar-btn titlebar-btn--layout titlebar-btn--hinted titlebar-btn--settings${state.settingsOpen ? ' is-active' : ''}`}
           onClick={() => dispatch({ type: 'TOGGLE_SETTINGS' })}
-          aria-label="Settings"
+          aria-label={t('settings.title')}
           aria-pressed={state.settingsOpen}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
+          <span className="titlebar-hotkey-hint titlebar-settings-label">{t('settings.title')}</span>
         </button>
       </div>
 

@@ -44,6 +44,7 @@
 
 .right-tab {
   flex: 1; /* 50% */
+  min-width: 0;
   padding: 6px 0;
   background: transparent;
   border: none;
@@ -56,6 +57,11 @@
   cursor: default;
   transition: color 0.15s ease;
   text-align: center;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap !important;
+  overflow-wrap: normal;
+  word-break: keep-all;
   outline: none;
   position: relative;
   z-index: 2;

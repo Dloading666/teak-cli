@@ -1,6 +1,6 @@
 // App.tsx — 3-panel IDE layout (frameless window)
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAppState } from './store/app-state';
 import { retryInvoke } from './tauri';
 import { initNotifySound } from './lib/notify-sound';
@@ -9,6 +9,7 @@ import { initHistoryAutoRefresh } from './lib/history-cache';
 import { isFrostShape } from './lib/personalization';
 import { TitleBar } from './components/common/TitleBar';
 import { ResizeEdges } from './components/common/ResizeEdges';
+import { PanelResizer, type PanelSide } from './components/common/PanelResizer';
 import { SettingsModal } from './components/common/SettingsModal';
 import { Explorer } from './components/left/Explorer';
 import { CenterPanel } from './components/center/CenterPanel';
@@ -21,6 +22,96 @@ import './styles/global.css';
 // Bumping this here = bump the matching --panel-slide-ms variable too,
 // otherwise React unmounts mid-animation and the panel snaps.
 const PANEL_SLIDE_MS = 250;
+
+interface PanelWidths {
+  left: number;
+  right: number;
+}
+
+const PANEL_WIDTHS_STORAGE_KEY = 'cc-panel-widths';
+const PANEL_CENTER_MIN = 400;
+const PANEL_LEFT_MIN = 210;
+const PANEL_LEFT_MAX = 380;
+const PANEL_RIGHT_MIN = 200;
+
+const clamp = (value: number, minimum: number, maximum: number) =>
+  Math.min(maximum, Math.max(minimum, value));
+
+function defaultPanelWidths(
+  viewportWidth: number,
+  leftHidden = false,
+  rightHidden = false,
+): PanelWidths {
+  const fluid = clamp(viewportWidth * 0.28, 240, 320);
+  return normalizePanelWidths({ left: fluid, right: fluid }, viewportWidth, leftHidden, rightHidden);
+}
+
+function normalizePanelWidths(
+  widths: PanelWidths,
+  viewportWidth: number,
+  leftHidden = false,
+  rightHidden = false,
+): PanelWidths {
+  const singlePanelAvailable = Math.max(
+    Math.max(PANEL_LEFT_MIN, PANEL_RIGHT_MIN),
+    viewportWidth - PANEL_CENTER_MIN,
+  );
+  const individualLeftMaximum = Math.max(
+    PANEL_LEFT_MIN,
+    Math.min(PANEL_LEFT_MAX, singlePanelAvailable),
+  );
+  const individualRightMaximum = Math.max(PANEL_RIGHT_MIN, singlePanelAvailable);
+  let left = clamp(widths.left, PANEL_LEFT_MIN, individualLeftMaximum);
+  let right = clamp(widths.right, PANEL_RIGHT_MIN, individualRightMaximum);
+
+  // Hidden panels keep an individually valid stored width, but do not consume
+  // the visible layout's width budget. When both sides are visible, reserve
+  // their minimums and keep the center workspace at or above its floor.
+  if (leftHidden || rightHidden) {
+    return { left: Math.round(left), right: Math.round(right) };
+  }
+
+  const available = Math.max(PANEL_LEFT_MIN + PANEL_RIGHT_MIN, viewportWidth - PANEL_CENTER_MIN);
+  const leftMaximum = Math.max(PANEL_LEFT_MIN, Math.min(PANEL_LEFT_MAX, available - PANEL_RIGHT_MIN));
+  left = clamp(left, PANEL_LEFT_MIN, leftMaximum);
+  const rightMaximum = Math.max(PANEL_RIGHT_MIN, available - left);
+  right = clamp(right, PANEL_RIGHT_MIN, rightMaximum);
+
+  if (left + right > available) {
+    right = Math.max(PANEL_RIGHT_MIN, available - left);
+    left = Math.max(PANEL_LEFT_MIN, available - right);
+  }
+  return { left: Math.round(left), right: Math.round(right) };
+}
+
+function loadPanelWidths(
+  viewportWidth: number,
+  leftHidden: boolean,
+  rightHidden: boolean,
+): PanelWidths {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PANEL_WIDTHS_STORAGE_KEY) || '') as Partial<PanelWidths>;
+    if (Number.isFinite(parsed.left) && Number.isFinite(parsed.right)) {
+      return normalizePanelWidths(
+        { left: parsed.left!, right: parsed.right! },
+        viewportWidth,
+        leftHidden,
+        rightHidden,
+      );
+    }
+  } catch { /* Missing/malformed preferences fall back to the fluid defaults. */ }
+  return defaultPanelWidths(viewportWidth, leftHidden, rightHidden);
+}
+
+function persistPanelWidths(widths: PanelWidths) {
+  try { localStorage.setItem(PANEL_WIDTHS_STORAGE_KEY, JSON.stringify(widths)); } catch { /* Best effort. */ }
+}
+
+function applyPanelWidths(widths: PanelWidths) {
+  const root = document.documentElement;
+  root.style.setProperty('--w-left', `${widths.left}px`);
+  root.style.setProperty('--w-right', `${widths.right}px`);
+}
 
 /**
  * Drive the slide-open / slide-closed animation for a single side panel.
@@ -96,8 +187,85 @@ function useSlidingPanel(hidden: boolean): { mounted: boolean; collapsed: boolea
 export function App() {
   const { state } = useAppState();
 
+  const [panelWidths, setPanelWidths] = useState<PanelWidths>(() => loadPanelWidths(
+    window.innerWidth,
+    state.leftPanelHidden,
+    state.rightPanelHidden,
+  ));
+  const panelWidthsRef = useRef(panelWidths);
+
   const leftPanel = useSlidingPanel(state.leftPanelHidden);
   const rightPanel = useSlidingPanel(state.rightPanelHidden);
+
+  useLayoutEffect(() => applyPanelWidths(panelWidths), [panelWidths]);
+
+  useEffect(() => {
+    let visibilityFrame: number | null = requestAnimationFrame(() => {
+      visibilityFrame = null;
+      syncWidths();
+    });
+    function syncWidths() {
+      const next = normalizePanelWidths(
+        panelWidthsRef.current,
+        window.innerWidth,
+        state.leftPanelHidden,
+        state.rightPanelHidden,
+      );
+      if (next.left === panelWidthsRef.current.left && next.right === panelWidthsRef.current.right) return;
+      panelWidthsRef.current = next;
+      applyPanelWidths(next);
+      persistPanelWidths(next);
+      setPanelWidths(next);
+    }
+    window.addEventListener('resize', syncWidths);
+    return () => {
+      window.removeEventListener('resize', syncWidths);
+      if (visibilityFrame !== null) cancelAnimationFrame(visibilityFrame);
+    };
+  }, [state.leftPanelHidden, state.rightPanelHidden]);
+
+  const resizePanel = (side: PanelSide, requestedSize: number) => {
+    const current = panelWidthsRef.current;
+    const available = Math.max(
+      side === 'left' ? PANEL_LEFT_MIN : PANEL_RIGHT_MIN,
+      window.innerWidth - PANEL_CENTER_MIN,
+    );
+    const otherPanelHidden = side === 'left' ? state.rightPanelHidden : state.leftPanelHidden;
+    const reservedByOtherPanel = otherPanelHidden ? 0 : side === 'left' ? current.right : current.left;
+    const maximum = side === 'left'
+      ? Math.max(PANEL_LEFT_MIN, Math.min(PANEL_LEFT_MAX, available - reservedByOtherPanel))
+      : Math.max(PANEL_RIGHT_MIN, available - reservedByOtherPanel);
+    const next = {
+      ...current,
+      [side]: Math.round(clamp(requestedSize, side === 'left' ? PANEL_LEFT_MIN : PANEL_RIGHT_MIN, maximum)),
+    };
+    panelWidthsRef.current = next;
+    applyPanelWidths(next);
+  };
+
+  const finishPanelResize = () => {
+    const next = panelWidthsRef.current;
+    setPanelWidths(next);
+    persistPanelWidths(next);
+  };
+
+  const resetPanelWidth = (side: PanelSide) => {
+    const defaults = defaultPanelWidths(
+      window.innerWidth,
+      state.leftPanelHidden,
+      state.rightPanelHidden,
+    );
+    const next = normalizePanelWidths(
+      { ...panelWidthsRef.current, [side]: defaults[side] },
+      window.innerWidth,
+      state.leftPanelHidden,
+      state.rightPanelHidden,
+    );
+    panelWidthsRef.current = next;
+    applyPanelWidths(next);
+    setPanelWidths(next);
+    persistPanelWidths(next);
+  };
 
   // Completion / permission chimes (Settings ▸ Sound). Reads the terminals
   // array (the same source the dynamic island reads via agentStatus) so chimes
@@ -258,11 +426,21 @@ export function App() {
       <GitStatusProvider>
         <div className="app-layout">
           {leftPanel.mounted && (
-            <aside
-              className={`panel panel-left${leftPanel.collapsed ? ' is-collapsed' : ''}`}
-            >
-              <Explorer />
-            </aside>
+            <>
+              <aside
+                className={`panel panel-left${leftPanel.collapsed ? ' is-collapsed' : ''}`}
+              >
+                <Explorer />
+              </aside>
+              <PanelResizer
+                side="left"
+                size={panelWidths.left}
+                collapsed={leftPanel.collapsed}
+                onResize={resizePanel}
+                onResizeEnd={finishPanelResize}
+                onReset={resetPanelWidth}
+              />
+            </>
           )}
 
           {/* Center: always mounted */}
@@ -271,11 +449,21 @@ export function App() {
           </main>
 
           {rightPanel.mounted && (
-            <aside
-              className={`panel panel-right${rightPanel.collapsed ? ' is-collapsed' : ''}`}
-            >
-              <RightPanel />
-            </aside>
+            <>
+              <PanelResizer
+                side="right"
+                size={panelWidths.right}
+                collapsed={rightPanel.collapsed}
+                onResize={resizePanel}
+                onResizeEnd={finishPanelResize}
+                onReset={resetPanelWidth}
+              />
+              <aside
+                className={`panel panel-right${rightPanel.collapsed ? ' is-collapsed' : ''}`}
+              >
+                <RightPanel />
+              </aside>
+            </>
           )}
         </div>
       </GitStatusProvider>
