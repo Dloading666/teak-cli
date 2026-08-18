@@ -289,8 +289,10 @@
   margin: 16px 0 8px;
   font-size: inherit;
   line-height: inherit;
-  font-weight: 700;
+  font-weight: 400;
 }
+.conversation-bubble .md-body :is(strong, b, th),
+.conversation-reasoning .md-body :is(strong, b, th) { font-weight: 400; }
 .conversation-bubble .md-body p { margin: 0 0 10px; }
 .conversation-bubble .md-body ul,
 .conversation-bubble .md-body ol { padding-left: 22px; }
