@@ -40,6 +40,23 @@ export function isCoveredByHistory(
   return saved.some((s) => s.tool === terminal.tool && s.session_token === token);
 }
 
+export function isGenericSessionName(name: string, fallbackName: string): boolean {
+  const a = name.trim().toLowerCase();
+  const b = fallbackName.trim().toLowerCase();
+  if (!a) return true;
+  if (a === b) return true;
+  if (a === `${b} session`) return true;
+  return false;
+}
+
+function pickSessionLabel(historyName: string | undefined, oscName: string, fallbackName: string): string {
+  const history = historyName?.trim() ?? '';
+  const osc = oscName.trim();
+  if (history && !isGenericSessionName(history, fallbackName)) return history;
+  if (osc && !isGenericSessionName(osc, fallbackName)) return osc;
+  return history || osc || fallbackName;
+}
+
 export function liveAsSaved(terminal: TerminalSession, fallbackName: string): SavedSession {
   const cwd = terminal.folderPath ?? '';
   return {
@@ -80,6 +97,7 @@ export function attachHistoryToLive(
     if (token) claimed.add(`${tool}:${token}`);
     return {
       ...base,
+      name: pickSessionLabel(row.name, base.name, fallbackName),
       session_token: row.session_token ?? base.session_token,
       file_path: row.file_path || base.file_path,
     };

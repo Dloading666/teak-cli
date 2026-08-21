@@ -3139,7 +3139,7 @@ fn find_grok_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
             .map(|s| {
                 let safe = s.replace('\n', " ");
                 let mut chars = safe.chars();
-                let chunk: String = chars.by_ref().take(40).collect();
+                let chunk: String = chars.by_ref().take(80).collect();
                 if chars.next().is_some() { format!("{}...", chunk) } else { chunk }
             })
             .unwrap_or_else(|| "Grok Build Session".to_string());
@@ -3171,6 +3171,74 @@ fn find_grok_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
             turn_count: None,
         });
     }
+}
+
+/// Write a user-chosen label into the upstream CLI's own session metadata so
+/// Teak's left rail and `grok --resume <title>` stay in sync.
+#[tauri::command]
+fn rename_native_session(tool: String, token: String, name: String) -> Result<(), String> {
+    let token = token.trim();
+    let name = name.trim();
+    if token.is_empty() {
+        return Err("missing session token".into());
+    }
+    if name.is_empty() {
+        return Err("empty session name".into());
+    }
+    match tool.as_str() {
+        "grok" => rename_grok_session(token, name),
+        _ => Ok(()),
+    }
+}
+
+fn rename_grok_session(token: &str, name: &str) -> Result<(), String> {
+    let home = dirs::home_dir().ok_or_else(|| "home directory not found".to_string())?;
+    let root = grok_root(&home).ok_or_else(|| "grok sessions directory not found".to_string())?;
+    let cwd_dirs = std::fs::read_dir(&root).map_err(|e| format!("read grok sessions: {e}"))?;
+    for cwd_entry in cwd_dirs.flatten() {
+        let cwd_path = cwd_entry.path();
+        if !cwd_path.is_dir() {
+            continue;
+        }
+        let Ok(session_dirs) = std::fs::read_dir(&cwd_path) else { continue };
+        for session_entry in session_dirs.flatten() {
+            let session_dir = session_entry.path();
+            if !session_dir.is_dir() {
+                continue;
+            }
+            let summary_path = session_dir.join("summary.json");
+            let Ok(raw) = std::fs::read_to_string(&summary_path) else { continue };
+            let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&raw) else { continue };
+            let id = value
+                .get("info")
+                .and_then(|info| info.get("id"))
+                .and_then(|id| id.as_str())
+                .unwrap_or("");
+            if id != token {
+                continue;
+            }
+            let obj = value
+                .as_object_mut()
+                .ok_or_else(|| "grok summary.json is not an object".to_string())?;
+            obj.insert(
+                "generated_title".into(),
+                serde_json::Value::String(name.to_string()),
+            );
+            obj.insert(
+                "session_summary".into(),
+                serde_json::Value::String(name.to_string()),
+            );
+            obj.insert("title_is_manual".into(), serde_json::Value::Bool(true));
+            let pretty = serde_json::to_string_pretty(&value)
+                .map_err(|e| format!("serialize grok summary: {e}"))?;
+            let tmp = summary_path.with_extension("json.tmp");
+            std::fs::write(&tmp, pretty).map_err(|e| format!("write grok summary: {e}"))?;
+            std::fs::rename(&tmp, &summary_path)
+                .map_err(|e| format!("replace grok summary: {e}"))?;
+            return Ok(());
+        }
+    }
+    Err(format!("grok session {token} not found"))
 }
 
 /// Grok Build heatmap second pass. For each session dir in the cutoff window,
@@ -5013,6 +5081,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             save_tasks,
             load_open_sessions,
             save_open_sessions,
+            rename_native_session,
             save_password,
             load_password,
             delete_password,

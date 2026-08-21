@@ -2,7 +2,7 @@ import {
   memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState,
   type ReactNode, type RefObject,
 } from 'react';
-import type { AgentStatus, TerminalSession, ToolType } from '../../store/app-state';
+import { supportsNativeAgentStatus, useAppDispatch, type AgentStatus, type TerminalSession, type ToolType } from '../../store/app-state';
 import type { ChatNavigationRow, ChatSessionRead, SavedSession } from '../../tauri';
 import { commands, isTauri } from '../../tauri';
 import { bindAutoHideScrollbar } from '../../lib/auto-hide-scrollbar';
@@ -601,6 +601,7 @@ function ConversationViewImpl({
   onPendingResolved, onPasteToDraft, hasBg, bgUrl, bgType, competingBindings = [],
 }: ConversationViewProps) {
   const t = useT();
+  const dispatch = useAppDispatch();
   const ownerKey = `${sessionId}:${tool ?? 'none'}:${resumeToken ?? 'fresh'}:${startedAt ?? 'unknown'}`;
   const cached = conversationCache.get(ownerKey);
   const initialTranscript = cached?.transcript ?? { messages: [], remainder: '', nextLineIndex: 0 };
@@ -1092,6 +1093,25 @@ function ConversationViewImpl({
   const isThinking = !isExecuting && (pending
     ? !assistantAfterPending
     : agentStatus === 'working' && lastConversationalRole === 'user');
+
+  // Chat transcript is the source of truth for "the turn is over". Grok's OSC
+  // title often keeps the last spinner frame and never sends idle — the left
+  // rail would spin forever. After the last conversational row is an assistant
+  // reply and nothing new arrives, force idle.
+  useEffect(() => {
+    if (!supportsNativeAgentStatus(tool)) return;
+    if (!isVisible) return;
+    if (pending) return;
+    if (agentStatus !== 'working') return;
+    if (lastConversationalRole !== 'assistant') return;
+    const timer = window.setTimeout(() => {
+      dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [
+    tool, isVisible, pending, agentStatus, lastConversationalRole,
+    messages.length, sessionId, dispatch,
+  ]);
   const activityLabel = isExecuting
     ? t('conversation.executing')
     : isThinking ? t('conversation.thinking') : null;

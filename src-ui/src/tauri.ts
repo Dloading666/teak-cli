@@ -270,6 +270,8 @@ export const commands = {
   // Left-rail session snapshot (~/.teak-cli/open-sessions.json)
   loadOpenSessions: () => invoke<string>('load_open_sessions'),
   saveOpenSessions: (data: string) => invoke<void>('save_open_sessions', { data }),
+  renameNativeSession: (tool: string, token: string, name: string) =>
+    invoke<void>('rename_native_session', { tool, token, name }),
 
   // Credential store — passwords live in OS keychain, never in localStorage
   savePassword: (host: string, username: string, password: string) =>

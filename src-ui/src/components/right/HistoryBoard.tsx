@@ -5,7 +5,7 @@ import { useAppState } from '../../store/app-state';
 import type { SavedSession } from '../../tauri';
 import { commands } from '../../tauri';
 import { getToolDisplayName } from '../../lib/tool-info';
-import { subscribeRenamed, getRenamedSnapshot, setCustomName } from '../../lib/renamed-sessions';
+import { subscribeRenamed, getRenamedSnapshot, setCustomName, lookupCustomName } from '../../lib/renamed-sessions';
 import {
   prefetchHistory,
   refreshHistory,
@@ -16,6 +16,7 @@ import { SessionContextMenu, type SessionCtxMenuState } from './SessionContextMe
 import {
   applySessionOrder,
   attachHistoryToLive,
+  isGenericSessionName,
   liveStatus,
   moveInOrder,
   normCwd,
@@ -219,17 +220,37 @@ export function HistoryBoard() {
     for (const group of groups) {
       for (const row of group.rows) {
         const token = row.saved.session_token?.trim();
-        if (!token || row.live.resumeToken === token) continue;
-        dispatch({ type: 'SET_RESUME_TOKEN', id: row.live.id, token });
+        if (token && row.live.resumeToken !== token) {
+          dispatch({ type: 'SET_RESUME_TOKEN', id: row.live.id, token });
+        }
+        const tool = row.saved.tool ?? '';
+        const native = row.saved.name?.trim();
+        if (!native) continue;
+        if (lookupCustomName(tool, row.live.id, token || row.live.resumeToken)) continue;
+        if (isGenericSessionName(native, getToolDisplayName(tool))) continue;
+        setCustomName(tool, row.live.id, native);
+        if (token) setCustomName(tool, token, native);
       }
     }
   }, [groups, dispatch]);
+
+  const saveLabel = (saved: SavedSession, value: string) => {
+    const trimmed = value.trim();
+    setCustomName(saved.tool ?? '', saved.id, trimmed);
+    const token = saved.session_token?.trim();
+    if (token) {
+      setCustomName(saved.tool ?? '', token, trimmed);
+      commands.renameNativeSession(saved.tool ?? '', token, trimmed).catch(() => {});
+    }
+    dispatch({ type: 'SET_TAB_TITLE', id: saved.id, title: trimmed });
+    refreshHistory();
+  };
 
   const startRename = (saved: SavedSession) => {
     const k = `${saved.tool ?? ''}:${saved.id}`;
     cancelRenameRef.current = false;
     setRenamingKey(k);
-    setRenameValue(renamed[k] ?? saved.name ?? '');
+    setRenameValue(lookupCustomName(saved.tool ?? '', saved.id, saved.session_token) ?? saved.name ?? '');
   };
 
   const openNewChat = (cwd?: string) => {
@@ -447,7 +468,11 @@ export function HistoryBoard() {
               {!isCollapsed && group.rows.map((row, rowIdx) => {
                 const session = row.saved;
                 const sessionKey = `${session.tool ?? ''}:${session.id}`;
-                const displayName = renamed[sessionKey] ?? session.name;
+                const displayName = lookupCustomName(
+                  session.tool ?? '',
+                  session.id,
+                  session.session_token ?? row.live.resumeToken,
+                ) ?? renamed[sessionKey] ?? session.name;
                 const isRenaming = renamingKey === sessionKey;
                 const active = row.live.id === state.activeTerminalId;
                 const status = liveStatus(row.live);
@@ -519,7 +544,7 @@ export function HistoryBoard() {
                             if (e.key === 'Enter') {
                               e.preventDefault();
                               cancelRenameRef.current = false;
-                              setCustomName(session.tool ?? '', session.id, renameValue);
+                              saveLabel(session, renameValue);
                               setRenamingKey(null);
                             } else if (e.key === 'Escape') {
                               cancelRenameRef.current = true;
@@ -528,7 +553,7 @@ export function HistoryBoard() {
                           }}
                           onBlur={() => {
                             if (!cancelRenameRef.current) {
-                              setCustomName(session.tool ?? '', session.id, renameValue);
+                              saveLabel(session, renameValue);
                             }
                             cancelRenameRef.current = false;
                             setRenamingKey(null);

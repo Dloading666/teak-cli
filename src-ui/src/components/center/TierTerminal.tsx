@@ -1095,6 +1095,22 @@ function TierTerminalImpl({
       grokStatus = status;
       dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status });
     };
+    // Grok often leaves the last spinner frame in the OSC title after the
+    // turn ends and never sends a follow-up idle title. If no working-class
+    // title arrives for a beat, drop back to idle so the left rail stops.
+    let lastWorkingOscAt = 0;
+    const grokMountedAt = Date.now();
+    const grokStaleTimer = window.setInterval(() => {
+      if (tool !== 'grok') return;
+      const live = appStateRef.current.terminals.find((item) => item.id === sessionId);
+      const reduxWorking = live?.agentStatus === 'working';
+      if (grokStatus !== 'working' && !reduxWorking) return;
+      const lastBeat = lastWorkingOscAt || grokMountedAt;
+      if (Date.now() - lastBeat < 2000) return;
+      grokStatus = 'idle';
+      dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
+    }, 400);
+    unlisteners.push(() => window.clearInterval(grokStaleTimer));
     const applyNativeTitle = (title: string) => {
       let displayTitle = title;
       if (tool === 'claude') {
@@ -1111,6 +1127,7 @@ function TierTerminalImpl({
       } else if (tool === 'grok') {
         const parsed = parseGrokTerminalTitle(title);
         displayTitle = parsed.displayTitle;
+        if (parsed.status === 'working') lastWorkingOscAt = Date.now();
 
         // When unfocused, Grok intentionally hides Action Required for half of
         // each one-second blink cycle. Hold blue briefly so that native blink

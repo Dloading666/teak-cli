@@ -57,6 +57,17 @@ export function getCustomName(tool: string, id: string): string | undefined {
   return names[key(tool, id)];
 }
 
+/** Prefer the tab's own rename, then a resume-token alias so a PTY restart
+ *  (new terminal id, same CLI session) keeps the label. */
+export function lookupCustomName(
+  tool: string,
+  id: string,
+  resumeToken?: string | null,
+): string | undefined {
+  return names[key(tool, id)]
+    ?? (resumeToken ? names[key(tool, resumeToken)] : undefined);
+}
+
 /** Set (or replace) a custom title. Empty / whitespace-only clears the
  *  override, reverting the card to the tool's auto title. */
 export function setCustomName(tool: string, id: string, name: string | null): void {
