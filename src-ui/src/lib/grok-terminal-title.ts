@@ -4,7 +4,7 @@ import type { AgentStatus } from '../store/app-state';
 // action-required, spinner, activity, session-name, grok.
 // These frames come directly from upstream's TitleManager.
 const GROK_ACTIVITY_FRAMES = new Set([
-  '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧',
+  '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏',
 ]);
 
 const ACTION_REQUIRED_RE = /^⚠(?:\uFE0F)?\s*Action Required$/i;
@@ -41,10 +41,12 @@ export function parseGrokTerminalTitle(title: string): GrokTerminalTitleState {
 }
 
 function isActivityLabel(part: string): boolean {
-  return /^(?:Thinking|Responding|Compacting|Waiting|Running tool)$/i.test(part)
-    || /^Running:\s+/i.test(part)
-    || /^Retrying\s*\(\d+\/\d+\)$/i.test(part)
-    || /^(?:Waiting for response|Waiting on subagent|Waiting on task output|Waiting on tasks|Sleeping)…?$/i.test(part)
-    // Tool descriptions and named waits are rendered as `<subject>…`.
-    || part.endsWith('…');
+  if (/^(?:Thinking|Responding|Compacting|Waiting|Running tool|Recording)$/i.test(part)) return true;
+  if (/^Running:\s+/i.test(part)) return true;
+  if (/^Retrying\s*\(\d+\/\d+\)$/i.test(part)) return true;
+  if (/^(?:Waiting for response|Waiting on subagent|Waiting on task output|Waiting on tasks|Waiting on plan approval|Sleeping)…?$/i.test(part)) return true;
+  // Tool descriptions (`Read foo.ts…`). A leftover ellipsis on the session
+  // name after the turn ends must not keep the rail spinning.
+  if (part.endsWith('…') && !/[/~]/.test(part) && !/^\d/.test(part)) return true;
+  return false;
 }

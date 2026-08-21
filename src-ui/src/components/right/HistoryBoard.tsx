@@ -452,7 +452,7 @@ export function HistoryBoard() {
                 const active = row.live.id === state.activeTerminalId;
                 const status = liveStatus(row.live);
                 const statusKey = status === 'wait_input' ? 'waiting' : (status ?? 'idle');
-                const isRunning = status === 'working' || Boolean(row.live.chatPending && status !== 'wait_input');
+                const isRunning = status === 'working';
                 const isDragging = rowDrag?.sessionId === row.live.id && rowDrag.groupKey === group.key;
                 let siblingShift = 0;
                 if (rowDrag && rowDrag.groupKey === group.key && !isDragging) {

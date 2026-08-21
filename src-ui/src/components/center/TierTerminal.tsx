@@ -24,6 +24,7 @@ import { registerFileDropTarget, formatPathsForInsert } from '../../lib/file-dro
 import { parseClaudeTerminalTitle } from '../../lib/claude-terminal-title';
 import { parseCodexTerminalTitle } from '../../lib/codex-terminal-title';
 import { parseGrokTerminalTitle } from '../../lib/grok-terminal-title';
+import { consumeOscTitles } from '../../lib/osc-title';
 import { markNotifySoundPromptSubmitted } from '../../lib/notify-sound';
 import { onWindowForeground } from '../../lib/window-focus-filter';
 import { commands } from '../../tauri';
@@ -405,7 +406,9 @@ function TierTerminalImpl({
   // mode xterm is intentionally non-intersecting, but its PTY is still the
   // visible conversation's event source and must remain at foreground speed.
   useEffect(() => {
-    commands.setSessionActive(sessionId, isActive || conversationActive).catch(() => {});
+    const live = isActive || conversationActive;
+    commands.setSessionActive(sessionId, live).catch(() => {});
+    outputScheduler.setActive(sessionId, live);
   }, [sessionId, isActive, conversationActive]);
 
   const termRef  = useRef<HTMLDivElement>(null);
@@ -1080,6 +1083,7 @@ function TierTerminalImpl({
     // working vs non-working; permission prompts share its static idle prefix.
     let lastTabTitle: string | undefined;
     let grokStatus: AgentStatus = 'idle';
+    let oscCarry = '';
     const clearGrokPermissionRelease = () => {
       if (grokPermissionReleaseTimerRef.current !== undefined) {
         window.clearTimeout(grokPermissionReleaseTimerRef.current);
@@ -1091,7 +1095,7 @@ function TierTerminalImpl({
       grokStatus = status;
       dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status });
     };
-    term.onTitleChange((title) => {
+    const applyNativeTitle = (title: string) => {
       let displayTitle = title;
       if (tool === 'claude') {
         const parsed = parseClaudeTerminalTitle(title);
@@ -1130,7 +1134,8 @@ function TierTerminalImpl({
         lastTabTitle = displayTitle;
         dispatch({ type: 'SET_TAB_TITLE', id: sessionId, title: displayTitle });
       }
-    });
+    };
+    term.onTitleChange((title) => { applyNativeTitle(title); });
 
     // Debug: track when cursor moves
     term.onCursorMove(() => {
@@ -1162,6 +1167,11 @@ function TierTerminalImpl({
           hasOutputRef.current = true;
           outputBytesRef.current += data.length;
           lastOutputAtRef.current = Date.now();
+          if (tool === 'claude' || tool === 'codex' || tool === 'grok') {
+            const consumed = consumeOscTitles(oscCarry + data);
+            oscCarry = consumed.rest;
+            for (const title of consumed.titles) applyNativeTitle(title);
+          }
           outputScheduler.enqueue(sessionId, data);
 
           // Handle SSH Auto-login via Password injection
@@ -1342,9 +1352,9 @@ function TierTerminalImpl({
             // the WebGL observer's discipline keeps this from firing at all.
             if (!mounted) return;
             const visible = entries.some((e) => e.isIntersecting);
-            const backendActive = visible || projectionActiveRef.current;
-            commands.setSessionActive(sessionId, backendActive).catch(() => {});
-            outputScheduler.setActive(sessionId, visible);
+            const live = visible || projectionActiveRef.current;
+            commands.setSessionActive(sessionId, live).catch(() => {});
+            outputScheduler.setActive(sessionId, live);
             // WebGL lifecycle (Orca suspendRendering pattern): release this
             // tab's GL context when hidden so it doesn't hold one of the ~16
             // active-context slots, and re-attach on reveal. The canvasHidden

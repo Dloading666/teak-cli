@@ -516,10 +516,22 @@ function reducer(state: AppState, action: Action): AppState {
       // Native-title tools emit frequent OSC activity frames. Their parsers
       // dispatch each frame, but equal states must not re-render the app.
       if (!state.terminals.some(t => t.id === action.id && supportsNativeAgentStatus(t.tool))) return state;
-      if (state.terminals.some(t => t.id === action.id && t.agentStatus === action.status)) return state;
+      if (state.terminals.some(t => t.id === action.id && t.agentStatus === action.status)) {
+        // Idle means the CLI is waiting for input — drop a leftover optimistic
+        // chatPending so the left-rail spinner cannot outlive the turn.
+        if (action.status === 'idle' && state.terminals.some(t => t.id === action.id && t.chatPending)) {
+          return {
+            ...state,
+            terminals: state.terminals.map(t => t.id === action.id ? { ...t, chatPending: undefined } : t),
+          };
+        }
+        return state;
+      }
       return {
         ...state,
-        terminals: state.terminals.map(t => t.id === action.id ? { ...t, agentStatus: action.status } : t)
+        terminals: state.terminals.map(t => t.id === action.id
+          ? { ...t, agentStatus: action.status, chatPending: action.status === 'idle' ? undefined : t.chatPending }
+          : t)
       };
     case 'SET_BG':
       return { ...state, bgPath: action.path, bgType: action.bgType };
