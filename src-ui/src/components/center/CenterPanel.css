@@ -299,7 +299,7 @@
   /* User-controlled image opacity (--wallpaper-opacity set on :root from
      app-state, 0.0–1.0). Replaces the prior black-overlay scheme so the
      image fades into the active theme's base color rather than being
-     washed black — important because most Coffee CLI themes have a
+     washed black — important because most Teak CLI themes have a
      non-black background that the old overlay clashed with. */
   opacity: var(--wallpaper-opacity, 0.7);
 }

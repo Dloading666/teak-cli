@@ -1,7 +1,7 @@
 import type { I18nKey } from './en';
 
 export const pt = {
-  'app.title': 'Coffee CLI',
+  'app.title': 'Teak CLI',
   'explorer.tab.workspace': 'Área de trabalho',
   'explorer.tab.history': 'Sessões',
   'nav.status.working': 'Em andamento',
@@ -152,7 +152,7 @@ export const pt = {
   'task.prompt.category_placeholder': 'Nome da categoria (escolha ou crie)',
   'task.prompt.body_placeholder': 'Escreva um prompt, envie à IA…',
   'task.note_placeholder': 'Anote algo e envie tudo ao seu agente…',
-  'task.welcome_note': `Bem-vindo ao Coffee CLI ☕
+  'task.welcome_note': `Bem-vindo ao Teak CLI
 
 Isto é uma nota adesiva: escreva o que quiser e toque em ▶ (canto superior direito) para enviar tudo à sua IA. Sem mais aquela caixinha de texto apertada.
 

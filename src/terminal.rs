@@ -13,7 +13,7 @@ use tauri::{AppHandle, Emitter};
 
 /// Set by the frontend on `document.visibilitychange`. When true, every
 /// per-session worker thread (ticker, emitter) widens its sleep / coalesce
-/// window so a Coffee CLI window left in the background drops to near-zero
+/// window so a Teak CLI window left in the background drops to near-zero
 /// CPU instead of paying full 8ms / 500ms cadence forever. Apple Silicon
 /// laptops in particular treat this as the difference between fan-on and
 /// idle thermal envelope.
@@ -22,9 +22,9 @@ pub static BACKGROUND_MODE: AtomicBool = AtomicBool::new(false);
 // ── Windows: kill-on-close Job Object for PTY children ─────────────────────
 // Every PTY child (cmd.exe → claude.exe → node.exe) gets assigned to a
 // process-lifetime Job Object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE.
-// When Coffee CLI's process dies — clean exit, crash, or task-manager kill —
+// When Teak CLI's process dies — clean exit, crash, or task-manager kill —
 // the kernel closes the job handle and terminates every descendant in the
-// job. Without this, orphan `claude.exe` survived past Coffee CLI shutdown
+// job. Without this, orphan `claude.exe` survived past Teak CLI shutdown
 // and held the session lock under `~/.claude/`, so the next launch's Claude
 // Code tab failed to start (issue #28).
 #[cfg(target_os = "windows")]
@@ -135,7 +135,7 @@ fn extract_osc7_cwd(data: &[u8]) -> Option<String> {
 //
 // Why: Claude Code's `/theme auto` queries the host terminal via OSC 11 and
 // renders light- or dark-theme based on the response. xterm.js answers OSC 11
-// with whatever we set on `theme.background`, which Coffee CLI flips between
+// with whatever we set on `theme.background`, which Teak CLI flips between
 // `#1a1917` (dark) and `#eeebe2` (light) when the user changes themes —
 // wiring is already in place. The only missing piece is that Claude Code
 // defaults to `theme: "dark"` when settings.json has no theme key, so users
@@ -165,9 +165,9 @@ fn ensure_claude_theme_auto() {
     if existing.trim().is_empty() {
         let body = "{\n  \"theme\": \"auto\"\n}\n";
         if let Err(e) = std::fs::write(&path, body) {
-            eprintln!("[Coffee] could not seed claude theme=auto: {}", e);
+            eprintln!("[Teak] could not seed claude theme=auto: {}", e);
         } else {
-            eprintln!("[Coffee] seeded ~/.claude/settings.json with theme=auto");
+            eprintln!("[Teak] seeded ~/.claude/settings.json with theme=auto");
         }
         return;
     }
@@ -192,9 +192,9 @@ fn ensure_claude_theme_auto() {
     match serde_json::to_string_pretty(&value) {
         Ok(s) => {
             if let Err(e) = std::fs::write(&path, format!("{}\n", s)) {
-                eprintln!("[Coffee] could not write claude theme=auto: {}", e);
+                eprintln!("[Teak] could not write claude theme=auto: {}", e);
             } else {
-                eprintln!("[Coffee] added theme=auto to ~/.claude/settings.json");
+                eprintln!("[Teak] added theme=auto to ~/.claude/settings.json");
             }
         }
         Err(_) => {}
@@ -353,7 +353,7 @@ pub const AGENT_PRESETS: &[AgentPreset] = &[
     // (`info.id`), sourced by find_grok_sessions (Grok doesn't echo the id to
     // stdout on launch, so session_id_pattern is None). Grok's native OSC title
     // provides spinner/activity/action-required/idle state; no hook or PTY
-    // status inference is needed. Coffee CLI launches grok raw (native OAuth
+    // status inference is needed. Teak CLI launches grok raw (native OAuth
     // via ~/.grok/auth.json, no auth injection).
     AgentPreset {
         tool_name: "grok",
@@ -456,7 +456,7 @@ pub struct TerminalSession {
     /// active. Flipped by `set_session_active`, called from a frontend
     /// IntersectionObserver on the terminal's DOM element. This is narrower
     /// than `BACKGROUND_MODE`: a tab can be backgrounded this way while the
-    /// Coffee CLI window itself is still focused and foreground. Defaults
+    /// Teak CLI window itself is still focused and foreground. Defaults
     /// FALSE so a freshly-spawned session throttles to the 200ms background
     /// cadence until the frontend's first visibility report lands — prevents
     /// a new tab (especially one opened in the background) from blasting
@@ -579,7 +579,7 @@ pub fn spawn(
         // Claude Code only: seed `theme: "auto"` in ~/.claude/settings.json
         // if no theme is set yet. xterm.js answers OSC 11 with our terminal
         // background, and Claude Code's `auto` preset uses that to follow
-        // Coffee CLI's light/dark switch automatically. A no-op once the user
+        // Teak CLI's light/dark switch automatically. A no-op once the user
         // has any `theme` value (including "auto" or a custom theme).
         if matches!(tool_name.as_deref(), Some("claude")) {
             ensure_claude_theme_auto();
@@ -679,14 +679,14 @@ pub fn spawn(
         }
     }
 
-    // Pass theme mode to Coffee Code so it knows dark vs light at startup
+    // Pass theme mode to the child CLI so it knows dark vs light at startup
     if let Some(ref mode) = theme_mode {
-        cmd.env("COFFEE_CODE_THEME_MODE", mode);
+        cmd.env("TEAK_CODE_THEME_MODE", mode);
     }
 
     // Pass locale to tool for i18n
     if let Some(ref loc) = locale {
-        cmd.env("COFFEE_CODE_LOCALE", loc);
+        cmd.env("TEAK_CODE_LOCALE", loc);
     }
 
     // Status integrations are read-only. Never inject Coffee hook routing
@@ -719,7 +719,7 @@ pub fn spawn(
         if path.exists() && path.is_dir() {
             eprintln!("[Tier Terminal] CWD: {}", dir);
             cmd.cwd(dir);
-            cmd.env("COFFEE_MODE_CWD", dir);
+            cmd.env("TEAK_MODE_CWD", dir);
         }
     }
 
@@ -728,7 +728,7 @@ pub fn spawn(
     // block, theme/locale, and OSC 7 PROMPT_COMMAND. The race-free path for
     // per-pane config when multiple panes spawn concurrently — each gets its
     // own env block (e.g. OPENCODE_CONFIG=<unique-pane-temp-path>) without
-    // mutating Coffee CLI's own process-wide env.
+    // mutating Teak CLI's own process-wide env.
     for (k, v) in &extra_env {
         cmd.env(k, v);
     }
@@ -744,7 +744,7 @@ pub fn spawn(
 
     // Spawn command into the PTY slave.
     // `child` is owned by a dedicated watcher thread (see below) which blocks
-    // on child.wait() to detect process death — Coffee CLI's long-standing
+    // on child.wait() to detect process death — Teak CLI's long-standing
     // "terminal looks frozen after a while" bug was caused by not monitoring
     // the child at all; if the child crashed but the PTY slave stayed open
     // (via an intermediate cmd.exe on Windows, or grandchild process on any
@@ -753,7 +753,7 @@ pub fn spawn(
     eprintln!("[Tier Terminal] PTY process spawned OK (portable-pty)");
 
     // Bind the new child to the kill-on-close Job Object so it can't outlive
-    // Coffee CLI's process. Belt-and-suspenders with the ExitRequested
+    // Teak CLI's process. Belt-and-suspenders with the ExitRequested
     // handler in server.rs: the handler does graceful kill_tx on clean
     // shutdown; the Job Object catches crashes / force-quits / OOMs.
     #[cfg(target_os = "windows")]
@@ -790,7 +790,7 @@ pub fn spawn(
     });
 
     // ── Child exit watcher ─────────────────────────────────────────────────
-    // Coffee CLI's primary "terminal locks up after a while" failure mode:
+    // Teak CLI's primary "terminal locks up after a while" failure mode:
     // the child process (claude / node.js / etc.) dies, but an intermediate
     // cmd.exe parent or grandchild process keeps the PTY slave open, so the
     // reader thread never sees EOF — it blocks on read() forever and the
@@ -964,7 +964,7 @@ pub fn spawn(
         // 8 ms is below human-perceptible latency (~16 ms frame) but large
         // enough to collapse a typical AI-CLI token-stream burst (hundreds of
         // small writes) into a single emit. Widen to 200 ms whenever nobody
-        // can see this output right now — either the whole Coffee CLI window
+        // can see this output right now — either the whole Teak CLI window
         // is hidden (BACKGROUND_MODE), or this session's own tab isn't the
         // one on screen (is_tab_active, e.g. a background tab while the
         // window itself stays focused). Both cases stop paying full 8 ms

@@ -46,7 +46,7 @@ function detectLanguage(filePath: string): string | null {
 export type LineTokens = ThemedToken[];
 
 /** Theme for the syntax tokens, picked by the app's `data-theme` attribute.
- *  Coffee CLI has 9 ThemeColor values (dark/light/cappuccino/sakura/...)
+ *  Teak CLI has 9 ThemeColor values (dark/light/cappuccino/sakura/...)
  *  but only `light` is a true light palette; the rest are dark accent
  *  variants — so a binary light/dark split is the right mapping. */
 export function getShikiTheme(dataTheme: string | null): 'github-light-default' | 'github-dark-default' {

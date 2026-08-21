@@ -7,6 +7,7 @@ import { initNotifySound } from './lib/notify-sound';
 import { routeFileDrop } from './lib/file-drop';
 import { initHistoryAutoRefresh } from './lib/history-cache';
 import { isFrostShape } from './lib/personalization';
+import { prefGet, prefSet } from './lib/prefs';
 import { TitleBar } from './components/common/TitleBar';
 import { ResizeEdges } from './components/common/ResizeEdges';
 import { PanelResizer, type PanelSide } from './components/common/PanelResizer';
@@ -28,7 +29,7 @@ interface PanelWidths {
   right: number;
 }
 
-const PANEL_WIDTHS_STORAGE_KEY = 'cc-panel-widths';
+const PANEL_WIDTHS_PREF = 'panel-widths';
 const PANEL_CENTER_MIN = 400;
 const PANEL_LEFT_MIN = 210;
 const PANEL_LEFT_MAX = 380;
@@ -90,7 +91,7 @@ function loadPanelWidths(
   rightHidden: boolean,
 ): PanelWidths {
   try {
-    const parsed = JSON.parse(localStorage.getItem(PANEL_WIDTHS_STORAGE_KEY) || '') as Partial<PanelWidths>;
+    const parsed = JSON.parse(prefGet(PANEL_WIDTHS_PREF) || '') as Partial<PanelWidths>;
     if (Number.isFinite(parsed.left) && Number.isFinite(parsed.right)) {
       return normalizePanelWidths(
         { left: parsed.left!, right: parsed.right! },
@@ -104,7 +105,7 @@ function loadPanelWidths(
 }
 
 function persistPanelWidths(widths: PanelWidths) {
-  try { localStorage.setItem(PANEL_WIDTHS_STORAGE_KEY, JSON.stringify(widths)); } catch { /* Best effort. */ }
+  prefSet(PANEL_WIDTHS_PREF, JSON.stringify(widths));
 }
 
 function applyPanelWidths(widths: PanelWidths) {
@@ -277,7 +278,7 @@ export function App() {
   // Apply theme + shape on mount and change — must sync with the inline script in index.html
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', state.currentTheme);
-    try { localStorage.setItem('cc-theme', state.currentTheme); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet('theme', state.currentTheme);
   }, [state.currentTheme]);
 
   useEffect(() => {
@@ -293,7 +294,7 @@ export function App() {
       el.setAttribute('data-shape', state.currentShape);
       el.removeAttribute('data-frost');
     }
-    try { localStorage.setItem('cc-shape', state.currentShape); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet('shape', state.currentShape);
 
     // Frost = OS/compositor blur under a CSS tint from the selected theme.
     // Windows uses DWM Acrylic, macOS NSVisualEffectView, and Linux requests
@@ -324,7 +325,7 @@ export function App() {
   // img+video elements. Larger value = more visible image.
   useEffect(() => {
     document.documentElement.style.setProperty('--wallpaper-opacity', String(state.wallpaperOpacity / 100));
-    try { localStorage.setItem('cc-wallpaper-opacity', String(state.wallpaperOpacity)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet('wallpaper-opacity', String(state.wallpaperOpacity));
   }, [state.wallpaperOpacity]);
 
   // Startup: resolve IPC
@@ -402,7 +403,7 @@ export function App() {
 
   // History list auto-refresh — install the window-foreground listener +
   // 60s background poll that keep the session-history cache live so users
-  // no longer have to restart Coffee CLI to see newly-created sessions
+  // no longer have to restart Teak CLI to see newly-created sessions
   // (issue: "会话记录列表始终是第一次打开软件时的,要重启才能看到新的").
   // refreshHistory no-ops until the user first opens the History tab
   // (prefetchHistory flips status to 'ready'), so users who never open it

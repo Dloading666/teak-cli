@@ -11,7 +11,7 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, Raw
 /// Enable or disable compositor blur for a Tauri window.
 ///
 /// Returns `true` when a native request was sent. A `false` result is not an
-/// error: it means the active compositor/backend has no protocol Coffee CLI
+/// error: it means the active compositor/backend has no protocol Teak CLI
 /// can use, so the transparent theme tint remains as the graceful fallback.
 pub fn set_blur(window: &tauri::WebviewWindow, on: bool) -> bool {
     let Ok(window_handle) = window.window_handle() else {

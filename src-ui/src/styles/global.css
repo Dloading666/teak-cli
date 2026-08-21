@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   Coffee CLI — 3-Panel IDE App Styling
+   Teak CLI — 3-Panel IDE App Styling
    Theme: Claude (Warm Dark) & Codex (Light Glass)
    ═══════════════════════════════════════════════════════ */
 
@@ -133,7 +133,7 @@ textarea,
     height: 0 !important;
 }
 
-.cc-scrollbar {
+.teak-scrollbar {
     position: fixed;
     /* Above the Gambit dock (z-index:200) so the slider stays visible over
        its panel, but below true overlays (preview 300, modals 2000, ctx menu
@@ -144,7 +144,7 @@ textarea,
     background: transparent;
     pointer-events: none;
 }
-.cc-scrollbar-slider {
+.teak-scrollbar-slider {
     position: absolute;
     top: 0;
     left: 2px;
@@ -158,20 +158,20 @@ textarea,
     will-change: opacity;
 }
 /* Only interactive while visible + non-empty; otherwise clicks pass through. */
-.cc-scrollbar.is-visible:not(.is-empty) {
+.teak-scrollbar.is-visible:not(.is-empty) {
     pointer-events: auto;
 }
-.cc-scrollbar.is-visible:not(.is-empty) .cc-scrollbar-slider {
+.teak-scrollbar.is-visible:not(.is-empty) .teak-scrollbar-slider {
     opacity: 0.28;
 }
-.cc-scrollbar.is-visible:hover .cc-scrollbar-slider,
-.cc-scrollbar.is-dragging .cc-scrollbar-slider {
+.teak-scrollbar.is-visible:hover .teak-scrollbar-slider,
+.teak-scrollbar.is-dragging .teak-scrollbar-slider {
     opacity: 0.56;
 }
-.cc-scrollbar-slim {
+.teak-scrollbar-slim {
     width: 7px;
 }
-.cc-scrollbar-slim .cc-scrollbar-slider {
+.teak-scrollbar-slim .teak-scrollbar-slider {
     left: 1.5px;
     width: 4px;
     min-height: 20px;
@@ -1204,7 +1204,7 @@ html.is-macos .titlebar-left-slot.is-collapsed {
 /* Left/right pane resizers mirror Coffee Note's interaction: the 8px hit
    target stays invisible at rest, reveals a short grip on hover, then grows
    and deepens while dragging. Unlike Coffee Note's blue/yellow split, the
-   grip follows Coffee CLI's active theme accent. */
+   grip follows Teak CLI's active theme accent. */
 .pane-resizer {
     position: absolute;
     top: 0;

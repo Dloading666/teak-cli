@@ -18,6 +18,7 @@ import { createPortal } from 'react-dom';
 import { clipboardRead, clipboardWrite } from '../../lib/clipboard';
 import { subscribeGambitHistory, getGambitHistorySnapshot, pushGambitHistory } from '../../lib/gambit-history';
 import { commands } from '../../tauri';
+import { prefGet, prefSet } from '../../lib/prefs';
 import { useT } from '../../i18n/useT';
 import { useAppState } from '../../store/app-state';
 import { registerFileDropTarget, formatPathsForInsert } from '../../lib/file-drop';
@@ -92,7 +93,7 @@ function wrapImagePathsForSend(text: string): string {
 const DOCK_DEFAULT_HEIGHT = 200;
 const DOCK_MIN_HEIGHT = 120;
 const DOCK_MAX_HEIGHT_RATIO = 0.7; // never let the dock eat more than 70% of viewport height
-const LS_DOCK_H = 'cc-gambit-dock-h';
+const LS_DOCK_H = 'gambit-dock-h';
 
 function GambitImpl({
   draft,
@@ -146,7 +147,7 @@ function GambitImpl({
   // Docked height (px), user-resizable via the top-edge handle. Persists.
   const [dockedH, setDockedH] = useState<number>(() => {
     try {
-      const raw = localStorage.getItem(LS_DOCK_H);
+      const raw = prefGet(LS_DOCK_H);
       const n = raw ? parseInt(raw, 10) : NaN;
       if (Number.isFinite(n) && n >= DOCK_MIN_HEIGHT) return n;
     } catch { /* optional preference */ }
@@ -192,7 +193,7 @@ function GambitImpl({
 
   // Persist dock height. Cheap to write — runs only on settle.
   useEffect(() => {
-    try { localStorage.setItem(LS_DOCK_H, String(dockedH)); } catch { /* optional preference */ }
+    prefSet(LS_DOCK_H, String(dockedH));
   }, [dockedH]);
 
   // Top-edge vertical drag to resize dock height (constrained to the Y axis).

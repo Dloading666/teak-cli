@@ -14,6 +14,8 @@ import { refreshHistory } from '../../lib/history-cache';
 import { commands, onSelfUpdateProgress } from '../../tauri';
 import type { DirEntryInfo } from '../../tauri';
 import { HistoryBoard } from '../right/HistoryBoard';
+import { TeakMark } from '../common/TeakMark';
+import { prefGet, prefSet } from '../../lib/prefs';
 import './Explorer.css';
 
 // Snapshot lifecycle and the `+N -M` map live in lib/file-stats.tsx so the
@@ -265,11 +267,12 @@ function formatBytes(b: number) {
 // etc.) live under /icons/tools/ and are unrelated to this subsystem.
 
 function getIconPath(theme: IconTheme, name: string): string {
-  return `/icons/themes/${theme}/${name}`;
+  const dir = theme === 'teak' ? 'coffee' : theme;
+  return `/icons/themes/${dir}/${name}`;
 }
 
 function getFileIconSrc(ext: string, theme: IconTheme): string {
-  return `/icons/themes/${theme}/${getFileIcon(ext)}`;
+  return getIconPath(theme, getFileIcon(ext));
 }
 
 /** Renders a theme icon. For mask-tint themes, uses a <span> with mask-image
@@ -598,28 +601,9 @@ export function Explorer() {
   // no need to relocate the brand to the centre). Slot resolves after mount.
   const [brandSlot, setBrandSlot] = useState<HTMLElement | null>(null);
   useEffect(() => { setBrandSlot(document.getElementById('titlebar-brand-slot')); }, []);
-  useEffect(() => {
-    const checkUpdate = async () => {
-      try {
-        const { getVersion } = await import('@tauri-apps/api/app');
-        const [local, remote] = await Promise.all([
-          getVersion(),
-          fetch('https://coffeecli.com/version.json').then(r => r.json()),
-        ]);
-        const isNewer = (r: string, l: string) => {
-          const rv = r.split('.').map(Number);
-          const lv = l.split('.').map(Number);
-          for (let i = 0; i < 3; i++) {
-            if ((rv[i] ?? 0) > (lv[i] ?? 0)) return true;
-            if ((rv[i] ?? 0) < (lv[i] ?? 0)) return false;
-          }
-          return false;
-        };
-        if (remote?.version && isNewer(remote.version, local)) setHasUpdate(true);
-      } catch { /* offline or fetch failed — silent */ }
-    };
-    checkUpdate();
-  }, []);
+  // Teak CLI is a fork: never consult coffeecli.com for updates, or a click
+  // would download upstream Teak CLI and overwrite this build.
+  useEffect(() => { setHasUpdate(false); }, []);
 
   // In-app self-update. Click the logo's update icon → a circular ring fills
   // as the installer downloads, then the wizard launches and the app exits.
@@ -632,7 +616,6 @@ export function Explorer() {
   const handleSelfUpdate = useCallback(async () => {
     if (installing) return;
     if (!navigator.userAgent.toLowerCase().includes('win')) {
-      commands.openUrl('https://coffeecli.com');
       return;
     }
     setInstalling(true);
@@ -648,7 +631,6 @@ export function Explorer() {
       // Success: installer launched and the app is about to exit — leave the
       // ring as-is until the window goes away.
     } catch {
-      commands.openUrl('https://coffeecli.com');
       setInstalling(false);
       setInstallPhase(null);
       setInstallPct(0);
@@ -660,13 +642,13 @@ export function Explorer() {
   // Persist last-selected left tab, same pattern as TaskBoard's right tab.
   const [activeTab, setActiveTab] = useState<'workspace' | 'history'>(() => {
     try {
-      const saved = localStorage.getItem('cc-left-tab');
+      const saved = prefGet('left-tab');
       if (saved === 'workspace' || saved === 'history') return saved;
     } catch { /* Best-effort operation; failure is non-fatal. */ }
     return 'history';
   });
   useEffect(() => {
-    try { localStorage.setItem('cc-left-tab', activeTab); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet('left-tab', activeTab);
   }, [activeTab]);
 
   const handleOpenFolder = async (e: React.MouseEvent) => {
@@ -740,51 +722,14 @@ export function Explorer() {
       {/* Brand + theme/lang controls */}
       {brandSlot && createPortal(
         <div className="brand">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" className="brand-icon">
-            <defs>
-              <mask id="brandIconMask">
-                {/* Steam (3 wavy lines). The `<animate>` is gated to non-Linux
-                    because WebKit2GTK has no GPU path for SMIL `path d` morphing
-                    inside a `<mask>`: every frame re-evaluates the bezier
-                    geometry, re-rasters the mask, and re-composites the masked
-                    full-viewport path on line ~1108. With the mask applied
-                    over the entire 24×24 brand icon and the indefinite loop
-                    running idle, the kompositor → IPC ack chain pegs Linux
-                    WebKitWebProcess + coffee-cli at ~1.2 cores combined even
-                    when nothing else is on screen (verified live: SSH 5s
-                    increments dropped from 37%/89% to ~0% the moment WebKit
-                    was killed; same coffee-cli on Windows WebView2 / macOS
-                    WKWebView is silent because both have hardware-accelerated
-                    SMIL). Static `d` on Linux means the steam stops drifting
-                    upward but the cup glyph itself is fully intact. */}
-                <path fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M12 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M16 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4">
-                  {!__IS_LINUX__ && (
-                    <animate attributeName="d" dur="3s" repeatCount="indefinite" values="M8 0c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M12 0c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M16 0c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4;M8 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M12 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M16 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4"/>
-                  )}
-                </path>
-                <path d="M4 7h16v0h-16v12h16v-32h-16Z">
-                  <animate fill="freeze" attributeName="d" begin="1s" dur="0.6s" to="M4 2h16v5h-16v12h16v-24h-16Z"/>
-                </path>
-              </mask>
-            </defs>
-            <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
-              <path fill="currentColor" fillOpacity="0" strokeDasharray="48" d="M17 9v9c0 1.66 -1.34 3 -3 3h-6c-1.66 0 -3 -1.34 -3 -3v-9Z">
-                <animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="48;0"/>
-                <animate fill="freeze" attributeName="fill-opacity" begin="1.6s" dur="0.4s" to="1"/>
-              </path>
-              <path fill="none" strokeDasharray="16" strokeDashoffset="16" d="M17 9h3c0.55 0 1 0.45 1 1v3c0 0.55 -0.45 1 -1 1h-3">
-                <animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.3s" to="0"/>
-              </path>
-            </g>
-            <path fill="currentColor" d="M0 0h24v24H0z" mask="url(#brandIconMask)"/>
-          </svg>
+          <TeakMark size={18} className="brand-icon" />
           <span>{t('app.title')}</span>
           {hasUpdate && (
             <button
               className={`icon-btn xs update-check-btn update-available${installing ? ' is-installing' : ''}`}
               onClick={handleSelfUpdate}
               disabled={installing}
-              aria-label="Update Coffee CLI"
+              aria-label="Update Teak CLI"
             >
               {installing ? (
                 <svg

@@ -1,6 +1,6 @@
 // fs_watcher.rs — Live file-system watcher for the left Explorer panel.
 //
-// Coffee CLI's brand promise is "beautified host for AI CLIs". That means
+// Teak CLI's brand promise is "beautified host for AI CLIs". That means
 // when a CLI tool (Claude / Codex / etc.) writes, renames, or deletes a
 // file in the workspace, the user expects the left tree to reflect it
 // *immediately*. Previously the tree only refreshed when the user hit
@@ -30,7 +30,7 @@ use tauri::{AppHandle, Emitter};
 
 /// Refuse to operate on paths that aren't real "project" folders.
 ///
-/// Coffee CLI's diff/snapshot is intended for source workspaces — the
+/// Teak CLI's diff/snapshot is intended for source workspaces — the
 /// places where a user actively edits files and wants to see what changed.
 /// Pointing it at system roots, OS-managed config/cache dirs, or the
 /// filesystem/drive root is never useful and ranges from "noisy badges"

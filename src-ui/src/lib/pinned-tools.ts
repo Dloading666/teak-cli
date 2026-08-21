@@ -1,4 +1,5 @@
 import type { ToolType } from '../store/app-state';
+import { prefGetWith } from './prefs';
 
 // ToolType includes `null` (an empty pane). A pane picker only ever offers a
 // concrete tool, so work in the non-null subset.
@@ -14,7 +15,7 @@ export const PANE_TOOL_KEYS: readonly PaneToolKey[] = [
 const PANE_TOOL_SET = new Set<string>(PANE_TOOL_KEYS as readonly string[]);
 
 // The user's pinned AI-CLI tools, in pinned order, read from the SAME
-// `coffee_pinned_items` localStorage the launchpad ("选择工具") reads/writes —
+// `teak-pinned-items` localStorage the launchpad ("选择工具") reads/writes —
 // so the split-pane picker shows exactly what the user pinned instead of a
 // hardcoded list. CenterPanel persists the pins (including the first-launch
 // defaults) on mount, and FourSplitGrid only ever renders inside CenterPanel,
@@ -22,7 +23,7 @@ const PANE_TOOL_SET = new Set<string>(PANE_TOOL_KEYS as readonly string[]);
 // AI-CLI set when the user has pinned none of them, so the picker is never empty.
 export function getPinnedPaneToolKeys(): PaneToolKey[] {
   try {
-    const raw = localStorage.getItem('coffee_pinned_items');
+    const raw = prefGetWith('pinned-items', 'coffee_pinned_items');
     if (raw) {
       const arr: unknown = JSON.parse(raw);
       if (Array.isArray(arr)) {

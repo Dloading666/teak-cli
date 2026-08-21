@@ -36,7 +36,7 @@
 use serde::Serialize;
 
 /// User-facing shell identity. Stored as a string id (the persisted form
-/// under `cc-default-shell`), resolved to a concrete program at spawn.
+/// under `teak-default-shell`), resolved to a concrete program at spawn.
 /// `Auto` keeps the historical fallback behavior (pwsh → powershell →
 /// cmd on Windows; `$SHELL` → bash on Unix).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,7 +62,7 @@ pub enum ShellId {
 
 impl ShellId {
     /// Parse the persisted string id. `None` / empty / unrecognized →
-    /// `Auto`, so a stale `cc-default-shell` from a removed shell falls
+    /// `Auto`, so a stale `teak-default-shell` from a removed shell falls
     /// back to the safe default instead of spawning something missing.
     pub fn from_opt(s: &Option<String>) -> Self {
         match s.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
@@ -600,7 +600,7 @@ fn auto_unix() -> (String, Vec<String>) {
     if basename == "fish" {
         args.push("-C".to_string());
         args.push(
-            r#"function __coffee_osc7 --on-variable PWD; printf '\033]7;file://%s%s\033\\' (hostname) "$PWD"; end; __coffee_osc7"#
+            r#"function __teak_osc7 --on-variable PWD; printf '\033]7;file://%s%s\033\\' (hostname) "$PWD"; end; __teak_osc7"#
                 .to_string(),
         );
     }

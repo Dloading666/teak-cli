@@ -5,7 +5,7 @@ name: Bump version.json on release publish
 # That click is the final "ship to users" confirmation: bumping
 # Web-Home/version.json triggers a CF Pages redeploy, after which the in-app
 # update check (src-ui/.../Explorer.tsx checkUpdate) sees the new version and
-# shows the red download icon next to "Coffee CLI".
+# shows the red download icon next to "Teak CLI".
 #
 # Until the release is published, users see the previous version and install
 # scripts resolve to the previous tag — gives the maintainer a window to

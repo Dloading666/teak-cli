@@ -2,7 +2,7 @@ name: Debug macOS
 
 # Manual-only diagnostic job for Apple Silicon issues we can't reproduce
 # on the maintainer's Windows machine. Spins up a GitHub-hosted M1 runner,
-# downloads the latest release DMG, attempts to launch Coffee CLI, then
+# downloads the latest release DMG, attempts to launch Teak CLI, then
 # either prints captured logs OR drops you into an SSH session via tmate
 # so you can poke around interactively.
 #
@@ -99,7 +99,7 @@ jobs:
 
       - name: Inspect app bundle
         run: |
-          APP_PATH="/Applications/Coffee CLI.app"
+          APP_PATH="/Applications/Teak CLI.app"
           echo "=== Info.plist ==="
           defaults read "$APP_PATH/Contents/Info" || true
           echo ""
@@ -118,7 +118,7 @@ jobs:
         # binary directly to see if it crashes on startup, hits a Rust
         # panic, or fails an asset load.
         run: |
-          APP_PATH="/Applications/Coffee CLI.app"
+          APP_PATH="/Applications/Teak CLI.app"
           BIN=$(find "$APP_PATH/Contents/MacOS" -type f -perm +111 | head -1)
           echo "Binary: $BIN"
           xattr -dr com.apple.quarantine "$APP_PATH" || true
@@ -164,7 +164,7 @@ jobs:
 
           echo ""
           echo "=== syslog (last 100 lines mentioning Coffee) ==="
-          log show --last 5m --predicate 'process == "Coffee CLI"' 2>/dev/null | tail -100 || true
+          log show --last 5m --predicate 'process == "Teak CLI"' 2>/dev/null | tail -100 || true
 
       - name: Upload artifacts
         if: always()

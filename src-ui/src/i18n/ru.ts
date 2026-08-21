@@ -1,7 +1,7 @@
 import type { I18nKey } from './en';
 
 export const ru = {
-  'app.title': 'Coffee CLI',
+  'app.title': 'Teak CLI',
   'explorer.tab.workspace': 'Рабочая область',
   'explorer.tab.history': 'Сессии',
   'nav.status.working': 'В работе',
@@ -152,7 +152,7 @@ export const ru = {
   'task.prompt.category_placeholder': 'Название категории (выбрать или ввести новое)',
   'task.prompt.body_placeholder': 'Напишите промпт, отправьте ИИ…',
   'task.note_placeholder': 'Запишите что-нибудь и отправьте целиком агенту…',
-  'task.welcome_note': `Добро пожаловать в Coffee CLI ☕
+  'task.welcome_note': `Добро пожаловать в Teak CLI
 
 Это стикер: запишите что угодно и нажмите ▶ (вверху справа), чтобы отправить всё целиком вашему ИИ. Больше никаких тесных полей ввода.
 

@@ -1,5 +1,5 @@
 export const en = {
-  'app.title': 'Coffee CLI',
+  'app.title': 'Teak CLI',
   // Explorer
   'explorer.tab.workspace': 'Workspace',
   'explorer.tab.history': 'Sessions',
@@ -154,7 +154,7 @@ export const en = {
   'task.prompt.body_placeholder': 'Write a prompt, send it to AI…',
   'task.note_placeholder': 'Jot something down, send it all to your agent…',
   // Seeded once for brand-new users as a roomy welcome note (sticky-note view).
-  'task.welcome_note': `Welcome to Coffee CLI ☕
+  'task.welcome_note': `Welcome to Teak CLI
 
 This is a sticky note — jot anything down, then hit ▶ (top-right) to send the whole thing to your AI. No more cramped little input box.
 

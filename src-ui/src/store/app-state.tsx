@@ -1,7 +1,8 @@
-// Coffee CLI — Global App State (React Context)
+// Teak CLI — Global App State (React Context)
 
 import { createContext, useContext, useReducer } from 'react';
 import type { ReactNode } from 'react';
+import { prefGet, prefSet, prefRemove } from '../lib/prefs';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,10 +44,10 @@ export type ThemeShape =
 // Icon theme: visual style for file/folder icons in the explorer.
 // 8 themes, each with genuinely distinct folder silhouette + file icon style.
 // Fetched upstream (6): material, vscode-icons, catppuccin-mocha, devicon, fluent, symbols
-// Self-authored (2): outline (line-frame), coffee (Coffee CLI brand)
+// Self-authored (2): outline (line-frame), teak (Teak CLI brand)
 export type IconTheme =
   | 'outline' | 'material' | 'vscode-icons' | 'catppuccin-mocha'
-  | 'devicon' | 'fluent' | 'symbols' | 'coffee';
+  | 'devicon' | 'fluent' | 'symbols' | 'teak';
 
 // Unified one-hand hotkey SCHEME for the three chrome toggles — left panel,
 // Gambit (妙手), right panel — on three adjacent keys. The user picks one of
@@ -253,7 +254,7 @@ export interface AppState {
   // surface. It is snapshotted from the active terminal tab's folderPath +
   // the clicked file row at selection time, because a diff tab is not a
   // terminal and has no own folderPath to dynamically resolveDiffContext.
-  // Persisted preference in `cc-diff-mode`; the selection itself is NOT
+  // Persisted preference in `teak-diff-mode`; the selection itself is NOT
   // persisted (it depends on files open at the time).
   diffSelection: DiffSelection | null;
   diffMode: 'overlay' | 'tab';
@@ -371,13 +372,13 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_FOLDER':
       // Persist as the "last folder" so a fresh launch lands here instead
       // of the C-drive default. Read back in getInitialState().
-      try { localStorage.setItem('cc-folder', action.path); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      prefSet('folder', action.path);
       return {
         ...state,
         terminals: state.terminals.map(t => t.id === state.activeTerminalId ? { ...t, folderPath: action.path } : t)
       };
     case 'CLEAR_FOLDER':
-      try { localStorage.removeItem('cc-folder'); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      prefRemove('folder');
       return {
         ...state,
         terminals: state.terminals.map(t => t.id === state.activeTerminalId ? { ...t, folderPath: null } : t)
@@ -594,20 +595,20 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'TOGGLE_LEFT_PANEL': {
       const next = !state.leftPanelHidden;
-      try { localStorage.setItem('cc-left-hidden', next ? '1' : '0'); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      prefSet('left-hidden', next ? '1' : '0');
       return { ...state, leftPanelHidden: next };
     }
     case 'TOGGLE_RIGHT_PANEL': {
       const next = !state.rightPanelHidden;
-      try { localStorage.setItem('cc-right-hidden', next ? '1' : '0'); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      prefSet('right-hidden', next ? '1' : '0');
       return { ...state, rightPanelHidden: next };
     }
     case 'SET_MULTI_AGENT_LAYOUT': {
-      try { localStorage.setItem('cc-ma-layout', action.layout); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      prefSet('ma-layout', action.layout);
       return { ...state, multiAgentLayout: action.layout };
     }
     case 'SET_TASK_VIEW_MODE': {
-      try { localStorage.setItem('cc-task-view', action.mode); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      prefSet('task-view', action.mode);
       return { ...state, taskViewMode: action.mode };
     }
     case 'SET_DIFF_SELECTION':
@@ -626,7 +627,7 @@ function reducer(state: AppState, action: Action): AppState {
       // the tab's close button and the overlay's close button.
       return { ...state, diffSelection: null, diffTabActive: false };
     case 'SET_DIFF_MODE': {
-      try { localStorage.setItem('cc-diff-mode', action.mode); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      prefSet('diff-mode', action.mode);
       // Entering tab mode focuses the diff tab; leaving blurs it. Keeps the
       // active-surface tracking in lockstep with the surface the diff is on.
       return { ...state, diffMode: action.mode, diffTabActive: action.mode === 'tab' };
@@ -652,7 +653,7 @@ const VALID_SHAPES: ThemeShape[] = [
 ];
 const VALID_ICON_THEMES: IconTheme[] = [
   'outline', 'material', 'vscode-icons', 'catppuccin-mocha',
-  'devicon', 'fluent', 'symbols', 'coffee',
+  'devicon', 'fluent', 'symbols', 'teak',
 ];
 
 function getInitialState(): AppState {
@@ -672,35 +673,38 @@ function getInitialState(): AppState {
   let folderPath: string | null = null;
 
   try {
-    const savedTheme = localStorage.getItem('cc-theme') as ThemeColor | null;
+    const savedTheme = prefGet('theme') as ThemeColor | null;
     if (savedTheme && VALID_THEMES.includes(savedTheme)) theme = savedTheme;
   } catch { /* Best-effort operation; failure is non-fatal. */ }
 
   try {
-    const savedShape = localStorage.getItem('cc-shape');
+    const savedShape = prefGet('shape');
     if (savedShape === 'flower') {
       shape = 'monogram';
-      localStorage.setItem('cc-shape', shape);
+      prefSet('shape', shape);
     } else if (savedShape === 'frost-deep' || savedShape === 'frost-ios') {
       // The 3 Frost variants were collapsed into a single 'frost' shape
       // (2026-08-05). Old picks migrate forward; the new one carries the
       // Apple-tuned frosted backdrop.
       shape = 'frost';
-      localStorage.setItem('cc-shape', shape);
+      prefSet('shape', shape);
     } else if (savedShape && VALID_SHAPES.includes(savedShape as ThemeShape)) {
       shape = savedShape as ThemeShape;
     }
   } catch { /* Best-effort operation; failure is non-fatal. */ }
 
   try {
-    const savedIconTheme = localStorage.getItem('cc-icon-theme') as IconTheme | null;
-    if (savedIconTheme && VALID_ICON_THEMES.includes(savedIconTheme)) iconTheme = savedIconTheme;
+    const savedIconTheme = prefGet('icon-theme');
+    if (savedIconTheme === 'coffee') iconTheme = 'teak';
+    else if (savedIconTheme && VALID_ICON_THEMES.includes(savedIconTheme as IconTheme)) {
+      iconTheme = savedIconTheme as IconTheme;
+    }
   } catch { /* Best-effort operation; failure is non-fatal. */ }
 
-  try { folderPath = localStorage.getItem('cc-folder'); } catch { /* Best-effort operation; failure is non-fatal. */ }
+  folderPath = prefGet('folder');
 
   try {
-    const savedLang = localStorage.getItem('cc-lang');
+    const savedLang = prefGet('lang');
     if (savedLang) lang = savedLang;
   } catch { /* Best-effort operation; failure is non-fatal. */ }
 
@@ -726,8 +730,8 @@ function getInitialState(): AppState {
   let hotkeyScheme: HotkeyScheme = 'alt-qwe';
   let titlebarToggleDisplay: TitlebarToggleDisplay = 'icon-hotkey';
   try {
-    const storedPath = localStorage.getItem('cc-bg-path');
-    const storedType = localStorage.getItem('cc-bg-type') as 'image' | 'video' | 'none' | null;
+    const storedPath = prefGet('bg-path');
+    const storedType = prefGet('bg-type') as 'image' | 'video' | 'none' | null;
 
     // Migration: clear legacy seeded /wallpapers/default.png from
     // existing installs so they don't keep trying to load a file we
@@ -736,24 +740,24 @@ function getInitialState(): AppState {
       bgPath = '';
       bgType = 'none';
       try {
-        localStorage.removeItem('cc-bg-path');
-        localStorage.removeItem('cc-bg-type');
-        localStorage.removeItem('cc-bg-init');
+        prefRemove('bg-path');
+        prefRemove('bg-type');
+        prefRemove('bg-init');
       } catch { /* Best-effort operation; failure is non-fatal. */ }
     } else {
       bgPath = storedPath || '';
       bgType = storedType || 'none';
     }
 
-    termColorScheme = localStorage.getItem('cc-term-scheme') || '';
-    termFont = localStorage.getItem('cc-term-font') || '';
-    defaultShell = localStorage.getItem('cc-default-shell') || '';
-    gambitEnterToSend = localStorage.getItem('cc-gambit-enter-send') !== 'false';
-    const storedScheme = localStorage.getItem('cc-hotkey-scheme');
+    termColorScheme = prefGet('term-scheme') || '';
+    termFont = prefGet('term-font') || '';
+    defaultShell = prefGet('default-shell') || '';
+    gambitEnterToSend = prefGet('gambit-enter-send') !== 'false';
+    const storedScheme = prefGet('hotkey-scheme');
     if (storedScheme && HOTKEY_SCHEMES.some(h => h.code === storedScheme)) {
       hotkeyScheme = storedScheme as HotkeyScheme;
     }
-    const storedTtd = localStorage.getItem('cc-titlebar-toggle-display');
+    const storedTtd = prefGet('titlebar-toggle-display');
     if (storedTtd === 'icon-hotkey' || storedTtd === 'icon' || storedTtd === 'hidden') {
       titlebarToggleDisplay = storedTtd;
     }
@@ -762,18 +766,18 @@ function getInitialState(): AppState {
     // overlay). On first load after upgrade, fall back to the legacy
     // key with `opacity ≈ 100 - dim` so the user's perceived brightness
     // stays close to what they had set, then write the new key.
-    const savedOpacity = localStorage.getItem('cc-wallpaper-opacity');
+    const savedOpacity = prefGet('wallpaper-opacity');
     if (savedOpacity !== null) {
       const n = parseInt(savedOpacity, 10);
       if (!Number.isNaN(n) && n >= 0 && n <= 100) wallpaperOpacity = n;
     } else {
-      const savedDim = localStorage.getItem('cc-wallpaper-dim');
+      const savedDim = prefGet('wallpaper-dim');
       if (savedDim !== null) {
         const n = parseInt(savedDim, 10);
         if (!Number.isNaN(n) && n >= 0 && n <= 80) {
           wallpaperOpacity = Math.max(0, Math.min(100, 100 - n));
         }
-        try { localStorage.removeItem('cc-wallpaper-dim'); } catch { /* Best-effort operation; failure is non-fatal. */ }
+        prefRemove('wallpaper-dim');
       }
     }
   } catch { /* Best-effort operation; failure is non-fatal. */ }
@@ -793,19 +797,19 @@ function getInitialState(): AppState {
   // change. Only flips to 'tab' if the user explicitly expanded-to-tab before.
   let diffMode: 'overlay' | 'tab' = 'overlay';
   // Gambit (compose box) opens by default on launch; the user's open/close
-  // choice persists via cc-gambit-open. NOT force-opened when an agent starts
+  // choice persists via teak-gambit-open. NOT force-opened when an agent starts
   // (that was a v3.3.9 mistake, reverted).
   let gambitOpen = true;
   try {
-    leftPanelHidden = localStorage.getItem('cc-left-hidden') === '1';
-    rightPanelHidden = localStorage.getItem('cc-right-hidden') === '1';
-    const savedLayout = localStorage.getItem('cc-ma-layout');
+    leftPanelHidden = prefGet('left-hidden') === '1';
+    rightPanelHidden = prefGet('right-hidden') === '1';
+    const savedLayout = prefGet('ma-layout');
     if (savedLayout === 'columns' || savedLayout === 'grid') multiAgentLayout = savedLayout;
-    const savedTaskView = localStorage.getItem('cc-task-view');
+    const savedTaskView = prefGet('task-view');
     if (savedTaskView === 'list' || savedTaskView === 'note' || savedTaskView === 'prompt') taskViewMode = savedTaskView;
-    const savedDiffMode = localStorage.getItem('cc-diff-mode');
+    const savedDiffMode = prefGet('diff-mode');
     if (savedDiffMode === 'tab' || savedDiffMode === 'overlay') diffMode = savedDiffMode;
-    gambitOpen = localStorage.getItem('cc-gambit-open') !== '0';
+    gambitOpen = prefGet('gambit-open') !== '0';
   } catch { /* Best-effort operation; failure is non-fatal. */ }
 
   return {

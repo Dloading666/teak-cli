@@ -1,6 +1,6 @@
 //! Per-tool user-configurable launch overrides.
 //!
-//! Lives at `~/.coffee-cli/tools.json`. Each entry overrides one or more
+//! Lives at `~/.teak-cli/tools.json`. Each entry overrides one or more
 //! pieces of the built-in defaults for spawning a CLI tool. Empty fields
 //! fall through to the built-in behavior — the user only specifies what
 //! they want different.
@@ -68,8 +68,23 @@ impl ToolConfigEntry {
 
 pub type ToolConfig = HashMap<String, ToolConfigEntry>;
 
+/// `~/.teak-cli`. If that directory does not exist yet and a Coffee CLI
+/// `~/.coffee-cli` tree is present, rename it once so sessions and tools.json
+/// survive the rebrand.
+pub fn config_dir() -> Option<PathBuf> {
+    let home = dirs::home_dir()?;
+    let teak = home.join(".teak-cli");
+    if !teak.exists() {
+        let coffee = home.join(".coffee-cli");
+        if coffee.exists() {
+            let _ = std::fs::rename(&coffee, &teak);
+        }
+    }
+    Some(teak)
+}
+
 fn config_path() -> Option<PathBuf> {
-    Some(dirs::home_dir()?.join(".coffee-cli").join("tools.json"))
+    Some(config_dir()?.join("tools.json"))
 }
 
 pub fn load() -> ToolConfig {

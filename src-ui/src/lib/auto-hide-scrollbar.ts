@@ -34,11 +34,11 @@ export function bindAutoHideScrollbar(
   element.classList.add('auto-hide-scrollbar');
 
   const rail = document.createElement('div');
-  rail.className = slim ? 'cc-scrollbar cc-scrollbar-slim' : 'cc-scrollbar';
+  rail.className = slim ? 'teak-scrollbar teak-scrollbar-slim' : 'teak-scrollbar';
   const railWidth = slim ? 7 : 10;
   rail.setAttribute('aria-hidden', 'true');
   const slider = document.createElement('div');
-  slider.className = 'cc-scrollbar-slider';
+  slider.className = 'teak-scrollbar-slider';
   rail.append(slider);
   document.body.append(rail);
 

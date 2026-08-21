@@ -1,6 +1,6 @@
 // Pinned sessions - localStorage-backed "置顶" marker table.
 //
-// Mirror of hidden-sessions.ts: Coffee only reads each CLI tool's session
+// Mirror of hidden-sessions.ts: Teak only reads each CLI tool's session
 // data for the 会话记录 list, so "pinning" is a local per-device marker,
 // not a write to the tool's own store. We keep a set of `${tool}:${id}`
 // keys the user has pinned; HistoryBoard sorts pinned sessions to the top
@@ -14,14 +14,17 @@
 // subscribes via useSyncExternalStore and re-renders the instant a pin
 // lands.
 
-const STORAGE_KEY = 'coffee:pinned-sessions';
+import { prefGetWith, prefSet } from './prefs';
+
+const STORAGE_KEY = 'pinned-sessions';
+const LEGACY_KEY = 'coffee:pinned-sessions';
 
 let pinned: Set<string> = load();
 const listeners = new Set<() => void>();
 
 function load(): Set<string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = prefGetWith(STORAGE_KEY, LEGACY_KEY);
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return new Set();
@@ -33,7 +36,7 @@ function load(): Set<string> {
 
 function persist(): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...pinned]));
+    prefSet(STORAGE_KEY, JSON.stringify([...pinned]));
   } catch {
     // quota exceeded / localStorage disabled - pin stays in-memory for this session
   }

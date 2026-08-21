@@ -3,7 +3,7 @@
 // Reached from the small gear on Library cards. Lets the user override
 // how a specific CLI tool is spawned: launch path (e.g. wsl claude),
 // extra args, default cwd, custom history scan path. All four fields
-// are optional — empty falls through to Coffee CLI's built-in default.
+// are optional — empty falls through to Teak CLI's built-in default.
 //
 // Stripped of explanatory text on purpose: anyone reaching this modal
 // is already comfortable with CLI args + paths. 4 field labels + 3
@@ -13,7 +13,7 @@
 // etc.) so dark and light themes are picked up automatically — no
 // hard-coded rgba values that go invisible on white.
 //
-// Persisted via Tauri command into ~/.coffee-cli/tools.json.
+// Persisted via Tauri command into ~/.teak-cli/tools.json.
 
 import { useEffect, useMemo, useState } from 'react';
 import { commands, type ToolConfigEntry } from '../../tauri';
@@ -66,7 +66,7 @@ const TOOL_DEFAULTS: Record<string, ToolConfigEntry> = {
   kimicode: { command: 'kimi', extra_args: [], default_cwd: '', history_path: '~/.kimi-code' },
 };
 
-// Tools whose session history Coffee CLI's history scanner actually reads
+// Tools whose session history Teak CLI's history scanner actually reads
 // (load_native_history_blocking in src/server.rs). For these we surface
 // the history_path field. For tools NOT in this set (only qwen now —
 // no Qwen scanner has been written), the field is hidden — letting the

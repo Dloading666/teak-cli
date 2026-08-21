@@ -17,6 +17,7 @@
 // text can't be misdirected to the wrong terminal.
 
 import { useCallback, useEffect } from 'react';
+import { prefSet } from '../../lib/prefs';
 import { useAppState, isSplitTool, paneSessionId, matchHotkeyScheme } from '../../store/app-state';
 import { getTabActions } from '../../lib/tab-actions';
 import { getFocusedPane } from '../../lib/pane-focus';
@@ -163,9 +164,9 @@ export function ActiveGambit() {
 
   // Persist the open/closed choice across restarts. Gambit defaults to open on
   // first launch (see app-state initializer) but the user's toggle sticks —
-  // cc-gambit-open is the single source that initializer reads back.
+  // teak-gambit-open is the single source that initializer reads back.
   useEffect(() => {
-    try { localStorage.setItem('cc-gambit-open', state.gambitOpen ? '1' : '0'); } catch { /* optional preference */ }
+    prefSet('gambit-open', state.gambitOpen ? '1' : '0');
   }, [state.gambitOpen]);
 
   if (!gambitOpen || !activeId) return null;

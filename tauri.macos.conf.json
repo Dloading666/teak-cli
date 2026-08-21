@@ -4,7 +4,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "Coffee CLI",
+        "title": "Teak CLI",
         "label": "main",
         "width": 1600,
         "height": 900,

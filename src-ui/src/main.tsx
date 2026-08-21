@@ -62,7 +62,7 @@ requestAnimationFrame(() => {
 });
 
 // ── Background-mode throttle ────────────────────────────────────────────
-// When the OS hides the Coffee CLI window (other Space, app switched
+// When the OS hides the Teak CLI window (other Space, app switched
 // away, minimized) tell the Rust backend to widen every per-session
 // worker's sleep / coalesce window. Without this, a backgrounded app
 // keeps paying the full 8ms emitter cadence per session forever — measurable

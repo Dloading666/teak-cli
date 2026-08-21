@@ -1,7 +1,7 @@
 // Hidden sessions - localStorage-backed "soft delete" marker table.
 //
 // Session data belongs to each CLI tool (Claude / Codex / OpenCode / MiMo …);
-// Coffee only reads it for the 会话记录 list, so we never touch the real
+// Teak only reads it for the 会话记录 list, so we never touch the real
 // files. Instead we keep a local set of `${tool}:${id}` keys the user has
 // hidden, and HistoryBoard filters them out. Reversible: drop the key and the
 // session reappears (no recovery UI for now; the marker data stays).
@@ -11,14 +11,17 @@
 // External-store shape mirrors history-cache.ts so HistoryBoard subscribes via
 // useSyncExternalStore and re-renders the instant a hide lands.
 
-const STORAGE_KEY = 'coffee:hidden-sessions';
+import { prefGetWith, prefSet } from './prefs';
+
+const STORAGE_KEY = 'hidden-sessions';
+const LEGACY_KEY = 'coffee:hidden-sessions';
 
 let hidden: Set<string> = load();
 const listeners = new Set<() => void>();
 
 function load(): Set<string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = prefGetWith(STORAGE_KEY, LEGACY_KEY);
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return new Set();
@@ -30,7 +33,7 @@ function load(): Set<string> {
 
 function persist(): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...hidden]));
+    prefSet(STORAGE_KEY, JSON.stringify([...hidden]));
   } catch {
     // quota exceeded / localStorage disabled - hide stays in-memory for this session
   }

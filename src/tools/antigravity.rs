@@ -1,7 +1,7 @@
 //! Antigravity CLI (Google) — `agy` binary.
 //!
 //! Successor to Gemini CLI as of 2026-05-19; Gemini CLI consumer access
-//! sunsets 2026-06-18. Coffee CLI swapped the slot wholesale rather than
+//! sunsets 2026-06-18. Teak CLI swapped the slot wholesale rather than
 //! shipping both since the consumer flow is what mass-market users hit.
 //! Enterprise users with Code Assist Standard/Enterprise still have
 //! Gemini CLI on PATH and can wire it up via `tool_config` as a custom
@@ -23,10 +23,10 @@
 //!   │                            awesome-skills` installer.
 //!   ├── global_workflows/      — global workflow files (Antigravity-
 //!   │                            specific concept, not currently
-//!   │                            consumed by Coffee CLI).
+//!   │                            consumed by Teak CLI).
 //!   ├── brain/, conversations/, code_tracker/, browser_recordings/,
 //!   │   daemon/, …             — Antigravity IDE runtime state.
-//!   │                            Coffee CLI doesn't read these.
+//!   │                            Teak CLI doesn't read these.
 //!
 //! **`~/.gemini/antigravity-cli/`** — agy CLI's own operational data:
 //!
@@ -57,7 +57,7 @@
 //!   - `~/.gemini/GEMINI.md`                — global rules file. Filename
 //!                                            sticky from the Gemini CLI
 //!                                            era; Antigravity still
-//!                                            reads it. Coffee CLI does
+//!                                            reads it. Teak CLI does
 //!                                            not write here.
 //!   - `~/.gemini/oauth_creds.json`          — shared Google auth.
 //!   - `~/.antigravitycli/` (dotdir at root) — STALE placeholder some
@@ -80,7 +80,7 @@
 //!     the .pb schema (reverse-engineered or upstream-published) or a
 //!     future feature that flushes the model side to .jsonl too.
 //!   - `agy plugin install <target>` (the persistent plugin registry)
-//!     is a separate richer mechanism than our skills dir. Coffee CLI
+//!     is a separate richer mechanism than our skills dir. Teak CLI
 //!     doesn't wire plugins through it yet — users wanting plugins
 //!     install them directly via the CLI.
 

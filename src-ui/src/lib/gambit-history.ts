@@ -22,7 +22,9 @@
 //     re-sending the same prompt three times doesn't clutter recall. A hard
 //     cap (MAX_ENTRIES) trims the oldest entries to keep localStorage bounded.
 
-const LS_KEY = 'cc-gambit-history';
+import { prefGet, prefSet } from './prefs';
+
+const LS_KEY = 'gambit-history';
 const MAX_ENTRIES = 200;
 
 let entries: string[] = load();
@@ -30,7 +32,7 @@ const listeners = new Set<() => void>();
 
 function load(): string[] {
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = prefGet(LS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -44,7 +46,7 @@ function load(): string[] {
 
 function persist(): void {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(entries));
+    prefSet(LS_KEY, JSON.stringify(entries));
   } catch {
     // Quota exceeded (rare — 200 prompts shouldn't approach the ~5MB cap).
     // Silently drop the persist; the in-memory list still works for the

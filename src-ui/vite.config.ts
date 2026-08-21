@@ -18,7 +18,7 @@ import { resolve } from 'path';
 // https://github.com/xtermjs/xterm.js/issues/4212 (xterm wontfix).
 function patchXtermWebglBgFlags(): Plugin {
   return {
-    name: 'coffee-cli:patch-xterm-webgl-bg-flags',
+    name: 'teak-cli:patch-xterm-webgl-bg-flags',
     enforce: 'pre',
     transform(code, id) {
       if (!id.includes('@xterm/addon-webgl')) return null;

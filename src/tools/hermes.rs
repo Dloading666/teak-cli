@@ -51,7 +51,7 @@ pub fn hermes_home() -> PathBuf {
                 return candidate;
             }
             // Relative HERMES_HOME would resolve against the current
-            // process CWD — and Coffee CLI changes CWD per tab via the
+            // process CWD — and Teak CLI changes CWD per tab via the
             // launchpad's directory picker, so different surfaces (history
             // scan, allowlist, plugin install) would silently
             // resolve to different dirs. Reject + fall through to defaults.

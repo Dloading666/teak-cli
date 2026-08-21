@@ -1,4 +1,7 @@
-# Coffee CLI 项目专属规则
+# Teak CLI 项目专属规则
+
+本树是 [Coffee CLI](https://github.com/edison7009/Coffee-CLI) 的独立 fork。
+不要把 tag 推到 `edison7009/Coffee-CLI`，那会以 Teak CLI 的名义污染上游 Release。
 
 跟随仓库 commit，随 branch 一起流转。补充 `~/.Codex/AGENTS.md` 的全局规则；冲突时以全局规则为准。
 
@@ -6,7 +9,7 @@
 
 ## 发版检查清单
 
-每次发 Coffee CLI 新版本严格按照这 5 步，一步都不能省：
+每次发 Teak CLI 新版本严格按照这 5 步，一步都不能省：
 
 1. **三处版本号同步**到同一个 SemVer 值：
    - `Cargo.toml` → `[package].version`
@@ -72,8 +75,7 @@ WebView2 对 `navigator.clipboard.*` 和 `document.execCommand('copy'|'paste')` 
 
 ## 项目基础设施参考
 
-- **分支策略**：只用 `main`，master 已删。install 脚本硬编码 `raw.githubusercontent.com/.../main/...`
-- **安装脚本双位置**：`install/` 和 `Web-Home/` 各一份，改动必须同步两处（CF Worker 路由根据路径分发）
-- **CF Worker 路由**：`coffeecli.com/version.json` 打到 Web-Home 静态；`coffeecli.com/download/<platform>` 走 Worker 重定向到 GitHub Releases
+- **本 fork 不要沿用 coffeecli.com 安装脚本**。`Web-Home/` 仍是上游站点资源；`install/` 改为从源码构建说明。
+- **不要走 coffeecli.com 发版/升级**：那是上游 Coffee CLI 的 Worker。本 fork 从源码编译；在线升级会装回 Coffee CLI。
 - **PTY 锁死根因 #1 已修**（v0.6.1）：child watcher 线程；若复现视为根因 #2（emit/channel backpressure），看 `src/terminal.rs` reader 线程
-- **Hook forwarder 纪律**（v3.2.5+）：`__hook` 全路径 exit 0；`argv[1]` 以 `__` 开头但不认识的子命令也 exit 0（不起 GUI），防止"新配置 + 旧 exe"时 hook 报 exit 1。Claude hook 条目按 Git Bash 是否可探测写两种形态（`claude_hook_entry`）：有 Git Bash → `"shell": "bash"` + 引号命令；没有 → `"shell": "powershell"` + `& "..." __hook`——Windows 上 Claude 检测不到 Git Bash 会 fallback PowerShell，而 PowerShell 把引号开头的命令串当表达式直接 ParserError exit 1。排查 hook 问题用 `COFFEE_HOOK_DEBUG=1`，日志在 `~/.coffee-cli/hooks/hook-debug.log`
+- **Hook forwarder 纪律**（v3.2.5+，来自上游）：`__hook` 全路径 exit 0；`argv[1]` 以 `__` 开头但不认识的子命令也 exit 0（不起 GUI）。排查 hook 问题用 `TEAK_HOOK_DEBUG=1`，日志在 `~/.teak-cli/hooks/hook-debug.log`。旧 Coffee CLI 钩子仍由 `src/hook_installer.rs` 按 `coffee-cli-*` 文件名清理。

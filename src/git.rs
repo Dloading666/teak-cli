@@ -20,7 +20,7 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-/// Per-repo session baseline: the HEAD captured when Coffee CLI first saw
+/// Per-repo session baseline: the HEAD captured when Teak CLI first saw
 /// this repo this process (via `git_capture_baseline`, called at app launch +
 /// tab switch). Scopes the "修改记录" session-commits list to commits made
 /// this window (`git log <baseline>..HEAD`). In-memory ⇒ cleared on app
@@ -96,13 +96,13 @@ pub enum GitChanges {
         /// Tracked files with uncommitted changes (staged OR unstaged, merged —
         /// numstat is HEAD↔worktree so the diff is "what changed since the last
         /// commit"). The staged/unstaged split was collapsed 2026-07-06 because
-        /// Coffee CLI's audience doesn't manually `git add`; the 3-way split
+        /// Teak CLI's audience doesn't manually `git add`; the 3-way split
         /// was git jargon ("未暂存") that read as black-box. Status letter
         /// prefers the staged state when both apply.
         uncommitted: Vec<GitFileEntry>,
         /// New files git isn't tracking yet.
         untracked: Vec<GitFileEntry>,
-        /// Commits made since this Coffee CLI window opened (baseline..HEAD),
+        /// Commits made since this Teak CLI window opened (baseline..HEAD),
         /// metadata only — files fetched lazily via `git_commit_files`.
         session_commits: Vec<CommitMeta>,
     },
@@ -378,7 +378,7 @@ pub fn git_changes(folder: String) -> GitChanges {
         }
     }
 
-    // Session commits: commits made since this Coffee CLI window opened
+    // Session commits: commits made since this Teak CLI window opened
     // (baseline = HEAD at first sight of this repo, captured by
     // `git_capture_baseline` at app launch + tab switch, in-memory ⇒ reset on
     // close). Push-agnostic — push doesn't move HEAD, so committed entries

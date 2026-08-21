@@ -11,6 +11,7 @@ import { ErrorBoundary } from '../common/ErrorBoundary';
 import { DiffPanel } from '../right/DiffPanel';
 import { supportsNativeAgentStatus, useAppState, type ToolType } from '../../store/app-state';
 import { isFrostShape } from '../../lib/personalization';
+import { prefGetWith, prefSet } from '../../lib/prefs';
 import { supportsConversationTool } from '../../lib/chat-tools';
 
 // Dropdown shown when a tool card's folder icon is clicked: the globally
@@ -271,7 +272,7 @@ const SvgOmp       = () => inlineSvgIcon(OMP_SVG);
 //
 // Component is named SvgInstaller (not SvgCoffee101) because the launchpad
 // card key is `'installer'` — kept that way to preserve users' existing
-// localStorage pin state (`coffee_pinned_items` may contain "agent:installer").
+// localStorage pin state (`teak-pinned-items` may contain "agent:installer").
 // The card itself is no longer a one-click installer (that approach was
 // abandoned, see the click handler comment); it now opens the Coffee 101
 // course on coffeecli.com.
@@ -461,7 +462,7 @@ const getToolIcon = (tool: ToolType): React.ReactNode => {
 export { getToolIcon };
 
 // Pin sanitizer: must mirror AGENT_CATALOG keys below. Used at init to
-// drop obsolete IDs from `coffee_pinned_items` (e.g. `agent:vibeid`
+// drop obsolete IDs from `teak-pinned-items` (e.g. `agent:vibeid`
 // from back when /vibeid was a launcher tool, before it became a
 // regular skill). Without this, retired pins inflate the
 // "Agents N/MAX_PINS" counter on the library tab — the stale cards
@@ -509,7 +510,7 @@ export function CenterPanel() {
     // because MAX_PINS is declared after this initializer runs.
     const CAP = 6;
     try {
-      const stored = localStorage.getItem('coffee_pinned_items');
+      const stored = prefGetWith('pinned-items', 'coffee_pinned_items');
       if (stored !== null) {
         let arr = JSON.parse(stored);
         if (!Array.isArray(arr)) return [];
@@ -532,7 +533,7 @@ export function CenterPanel() {
         // pushed past the limit) may have left > CAP items in storage.
         // Trim and persist back so the state stays consistent.
         if (arr.length > CAP) arr = arr.slice(0, CAP);
-        try { localStorage.setItem('coffee_pinned_items', JSON.stringify(arr)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+        try { prefSet('pinned-items', JSON.stringify(arr)); } catch { /* Best-effort operation; failure is non-fatal. */ }
         return arr;
       }
       // First launch: pre-pin 6 useful defaults so desktop shows a full MAX_PINS
@@ -546,7 +547,7 @@ export function CenterPanel() {
         'agent:four-split',
         'agent:terminal',
       ];
-      localStorage.setItem('coffee_pinned_items', JSON.stringify(defaults));
+      prefSet('pinned-items', JSON.stringify(defaults));
       return defaults;
     } catch { return []; }
   });
@@ -657,7 +658,7 @@ export function CenterPanel() {
         if (prev.length >= MAX_PINS) return prev;
         next = [...prev, id];
       }
-      try { localStorage.setItem('coffee_pinned_items', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      try { prefSet('pinned-items', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return next;
     });
   };
@@ -672,7 +673,7 @@ export function CenterPanel() {
   const lastToolsScanAt = useRef<number>(0);
   // Previous toolsInstalled snapshot — diffed against each new scan so
   // we can maintain its cleanup/theme integration exactly when a CLI flips from
-  // not-installed → installed during a Coffee CLI session. `null`
+  // not-installed → installed during a Teak CLI session. `null`
   // sentinel = "we haven't scanned yet"; the very first scan does not
   // trigger any install IPCs because startup's install_all() already
   // covered whatever was on PATH at launch — diffing against `null`
@@ -736,20 +737,20 @@ export function CenterPanel() {
   // Global recent project folders (across all folder-using tools) — backs the
   // folder-icon dropdown. Separate from the per-tool last-cwd above.
   const [recentFolders, setRecentFolders] = useState<string[]>(() => {
-    try { const r = localStorage.getItem('coffee:recent-folders'); return r ? JSON.parse(r) : []; } catch { return []; }
+    try { const r = prefGetWith('recent-folders', 'coffee:recent-folders'); return r ? JSON.parse(r) : []; } catch { return []; }
   });
   const [folderMenu, setFolderMenu] = useState<{ x: number; y: number; tool: ToolType } | null>(null);
   const pushRecentFolder = (folder: string) => {
     setRecentFolders(prev => {
       const next = [folder, ...prev.filter(f => f !== folder)].slice(0, 8);
-      try { localStorage.setItem('coffee:recent-folders', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      try { prefSet('recent-folders', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return next;
     });
   };
   const removeRecentFolder = (folder: string) => {
     setRecentFolders(prev => {
       const next = prev.filter(f => f !== folder);
-      try { localStorage.setItem('coffee:recent-folders', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+      try { prefSet('recent-folders', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
       return next;
     });
   };
@@ -790,7 +791,7 @@ export function CenterPanel() {
   // Load sticky config — non-sensitive fields from localStorage, password from OS keychain
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('coffee_remote_cfg');
+      const saved = prefGetWith('remote-cfg', 'coffee_remote_cfg');
       if (saved) {
         const c = JSON.parse(saved);
         if (c.protocol) setRemoteProtocol(c.protocol);
@@ -845,7 +846,7 @@ export function CenterPanel() {
         .then(applyToolsInstalled)
         .catch(() => {});
       try {
-        const raw = localStorage.getItem('coffee:last-cwd-by-tool');
+        const raw = prefGetWith('last-cwd-by-tool', 'coffee:last-cwd-by-tool');
         if (raw) setLastCwdByTool(JSON.parse(raw));
       } catch { /* Best-effort operation; failure is non-fatal. */ }
     }, 300);
@@ -853,7 +854,7 @@ export function CenterPanel() {
   }, [isLaunchpadMode, showLibrary]);
 
   // Window-focus rescan — picks up CLIs the user just installed in an
-  // external terminal without forcing them to restart Coffee CLI. The
+  // external terminal without forcing them to restart Teak CLI. The
   // launchpad-mode useEffect above only re-fires when isLaunchpadMode
   // / showLibrary actually change; sitting on the launchpad while
   // alt-tabbing out to install a CLI doesn't toggle either, so the
@@ -891,7 +892,7 @@ export function CenterPanel() {
 
 
 
-  // External launch (`coffee-cli launch --tool <id> [--cwd <dir>]`) — reached
+  // External launch (`teak-cli launch --tool <id> [--cwd <dir>]`) — reached
   // from the cold-start drain (takePendingLaunch) and the warm-start
   // single-instance forward ('launch-request' event). Reuses an idle
   // launchpad tab when one exists so the agent never hijacks a tab that
@@ -920,7 +921,7 @@ export function CenterPanel() {
       dispatch({ type: 'SET_FOLDER', path: cwd });
       setLastCwdByTool(prev => {
         const next = { ...prev, [tool as string]: cwd };
-        try { localStorage.setItem('coffee:last-cwd-by-tool', JSON.stringify(next)); } catch { /* storage full/blocked — non-fatal */ }
+        try { prefSet('last-cwd-by-tool', JSON.stringify(next)); } catch { /* storage full/blocked — non-fatal */ }
         return next;
       });
       pushRecentFolder(cwd);
@@ -1118,7 +1119,7 @@ export function CenterPanel() {
         dispatch({ type: 'SET_FOLDER', path: cwd });
         setLastCwdByTool(prev => {
           const next = { ...prev, [tool as string]: cwd };
-          try { localStorage.setItem('coffee:last-cwd-by-tool', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+          try { prefSet('last-cwd-by-tool', JSON.stringify(next)); } catch { /* Best-effort operation; failure is non-fatal. */ }
           return next;
         });
         pushRecentFolder(cwd);
@@ -1173,7 +1174,7 @@ export function CenterPanel() {
     };
 
     try {
-      localStorage.setItem('coffee_remote_cfg', JSON.stringify(connDataObj));
+      prefSet('remote-cfg', JSON.stringify(connDataObj));
     } catch { /* Best-effort operation; failure is non-fatal. */ }
 
     // Save password to OS keychain (Windows Credential Manager / macOS Keychain)
@@ -1835,7 +1836,7 @@ export function CenterPanel() {
                                     username: item.user || '',
                                     // password omitted from localStorage
                                   };
-                                  try { localStorage.setItem('coffee_remote_cfg', JSON.stringify(connDataObj)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+                                  try { prefSet('remote-cfg', JSON.stringify(connDataObj)); } catch { /* Best-effort operation; failure is non-fatal. */ }
                                   // Load password for this specific host from keychain, fall back to current sshPass state
                                   const doConnect = (pw: string) => {
                                     if (isTauri && pw) commands.savePassword(item.host.trim(), item.user || '', pw).catch(() => {});

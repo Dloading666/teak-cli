@@ -1,3 +1,22 @@
+Teak CLI
+Copyright (c) 2026 Teak CLI contributors
+
+Teak CLI is an independent fork. The product name, logo, and bundle
+identifier in this tree are Teak CLI's. The majority of the source code
+originated in Coffee CLI and remains under AGPL-3.0-or-later.
+
+Based on Coffee CLI by edison7009
+  https://github.com/edison7009/Coffee-CLI
+  https://coffeecli.com
+
+This fork is not affiliated with, endorsed by, or sponsored by the Coffee
+CLI project. See TRADEMARKS.md (kept from upstream) for Coffee CLI's
+brand policy.
+
+================================================================================
+UPSTREAM NOTICE (Coffee CLI)
+================================================================================
+
 Coffee CLI
 Copyright (c) 2025 edison7009 and Coffee CLI contributors
 
@@ -57,10 +76,10 @@ THIRD-PARTY ASSETS (ICONS / ARTWORK)
                https://github.com/cyberalien/line-md
       Author:  Vjacheslav Trushkin (cyberalien)
       License: Apache-2.0
-      Use:     The icon is used unmodified (or with minor color/size
-               adjustment) as the Coffee CLI application icon and brand
-               glyph. No trademark rights are claimed in the icon itself
-               — see TRADEMARKS.md for the scope of brand rights claimed.
+      Use:     Used by upstream Coffee CLI as the application icon.
+               Teak CLI replaced this glyph with its own T/table mark
+               (see brand/ and icons/). No trademark rights are claimed
+               in the line-md glyph itself — see TRADEMARKS.md.
 
   - File-icon themes under src-ui/public/icons/themes/
       Six upstream icon sets (material, vscode-icons, catppuccin-mocha,

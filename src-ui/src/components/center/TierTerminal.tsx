@@ -31,6 +31,7 @@ import { supportsNativeAgentStatus, useAppDispatch, useAppState, type AgentStatu
 import { useT } from '../../i18n/useT';
 import { getToolDisplayName } from '../../lib/tool-info';
 import { TermContextMenu, type TermContextMenuState } from './TermContextMenu';
+import { TeakMark } from '../common/TeakMark';
 import '@xterm/xterm/css/xterm.css';
 import './TierTerminal.css';
 
@@ -818,7 +819,7 @@ function TierTerminalImpl({
     // Forward keyboard input to Rust PTY backend.
     //
     // Strip right-button mouse press/release before the PTY ever sees them.
-    // Coffee CLI owns right-click itself (custom context menu: Copy / Paste /
+    // Teak CLI owns right-click itself (custom context menu: Copy / Paste /
     // Select All), but xterm still forwards the button events to the PTY
     // whenever the TUI has mouse reporting on. Claude Code ≥v2.1.143 acts on
     // that right-click by pasting the clipboard ITSELF — so the user got one
@@ -988,7 +989,7 @@ function TierTerminalImpl({
 
     // Clickable links: URLs only (http/https/file). Bare file/dir paths are
     // intentionally NOT matched — unquoted paths with spaces (e.g. Windows
-    // "Coffee CLI_3.0.3...exe") can't be reliably bounded by a regex (would
+    // "Teak CLI_3.0.3...exe") can't be reliably bounded by a regex (would
     // truncate → open a missing path → OS error dialog, or over-match → open
     // the wrong file). Users select+copy paths instead. URLs are unambiguous
     // — clear scheme prefix, no spaces.
@@ -1287,7 +1288,7 @@ function TierTerminalImpl({
           // sees EOF — without this, the terminal looked frozen forever.
           //
           // No banner written to the terminal on exit (tried this before —
-          // see git history — it read as Coffee CLI editorializing over the
+          // see git history — it read as Teak CLI editorializing over the
           // upstream tool's own output). The CLI's own exit text, if any,
           // already speaks for itself.
           if (!mounted) return;
@@ -2005,7 +2006,7 @@ function TierTerminalImpl({
           fallback overlay. If the tool isn't on PATH the OS prints its
           own command-not-found message into xterm; if it crashes mid-run
           the CLI's own stderr is already in the scrollback. Layering our
-          generic Coffee CLI verdict on top either echoes that message
+          generic Teak CLI verdict on top either echoes that message
           in vaguer wording or — worse — flags deliberate /exit and
           model-swap restarts as failures. The tool speaks for itself. */}
 
@@ -2015,38 +2016,10 @@ function TierTerminalImpl({
           className={`tier-loading-splash ${splashFading ? 'fade-out' : ''}`}
           style={{ background: solidBg }}
         >
-          {/* Animated coffee cup + label + dots — grouped as one visual unit */}
+          {/* Teak mark + label + dots — grouped as one visual unit */}
           <div className="splash-group">
             <div className="splash-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <mask id={`splashMask-${sessionId}`}>
-                    <path fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                      d="M8 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M12 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M16 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4">
-                      {/* Linux gate — see Explorer.tsx brand-icon for full rationale. */}
-                      {!__IS_LINUX__ && (
-                        <animate attributeName="d" dur="3s" repeatCount="indefinite"
-                          values="M8 0c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M12 0c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M16 0c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4;M8 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M12 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4M16 -8c0 2 -2 2 -2 4s2 2 2 4s-2 2 -2 4s2 2 2 4"/>
-                      )}
-                    </path>
-                    <path d="M4 7h16v0h-16v12h16v-32h-16Z">
-                      <animate fill="freeze" attributeName="d" begin="1s" dur="0.6s" to="M4 2h16v5h-16v12h16v-24h-16Z"/>
-                    </path>
-                  </mask>
-                </defs>
-                <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
-                  <path fill="currentColor" fillOpacity="0" strokeDasharray="48"
-                    d="M17 9v9c0 1.66 -1.34 3 -3 3h-6c-1.66 0 -3 -1.34 -3 -3v-9Z">
-                    <animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="48;0"/>
-                    <animate fill="freeze" attributeName="fill-opacity" begin="1.6s" dur="0.4s" to="1"/>
-                  </path>
-                  <path fill="none" strokeDasharray="16" strokeDashoffset="16"
-                    d="M17 9h3c0.55 0 1 0.45 1 1v3c0 0.55 -0.45 1 -1 1h-3">
-                    <animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.3s" to="0"/>
-                  </path>
-                </g>
-                <path fill="currentColor" d="M0 0h24v24H0z" mask={`url(#splashMask-${sessionId})`}/>
-              </svg>
+              <TeakMark size={48} />
             </div>
             {(() => {
               const splashText =

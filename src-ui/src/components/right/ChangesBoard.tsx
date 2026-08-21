@@ -24,6 +24,7 @@ import { ContextMenu } from '../left/Explorer';
 import type { CtxMenuState } from '../left/Explorer';
 import { beginExplorerDrag } from '../../lib/explorer-drag';
 import { DiffPanel } from './DiffPanel';
+import { prefGetWith, prefSet } from '../../lib/prefs';
 import './ChangesBoard.css';
 
 interface ChangesBoardProps {
@@ -31,14 +32,15 @@ interface ChangesBoardProps {
   diffMode: 'overlay' | 'tab';
 }
 
-const DIFF_HEIGHT_KEY = 'coffee:diff-half-height';
+const DIFF_HEIGHT_KEY = 'diff-half-height';
+const DIFF_HEIGHT_LEGACY = 'coffee:diff-half-height';
 const DIFF_HEIGHT_MIN = 20;
 const DIFF_HEIGHT_MAX = 90;
 const DIFF_HEIGHT_DEFAULT = 55;
 
 function loadStoredDiffHeight(): number {
   try {
-    const raw = localStorage.getItem(DIFF_HEIGHT_KEY);
+    const raw = prefGetWith(DIFF_HEIGHT_KEY, DIFF_HEIGHT_LEGACY);
     if (!raw) return DIFF_HEIGHT_DEFAULT;
     const n = parseFloat(raw);
     if (!Number.isFinite(n)) return DIFF_HEIGHT_DEFAULT;
@@ -135,7 +137,7 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
   };
 
   useEffect(() => {
-    try { localStorage.setItem(DIFF_HEIGHT_KEY, String(diffHeight)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet(DIFF_HEIGHT_KEY, String(diffHeight));
   }, [diffHeight]);
 
   const repoRoot = changes?.state === 'ok' ? changes.repo_root : null;

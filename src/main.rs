@@ -50,9 +50,9 @@ fn main() -> Result<()> {
     // X11 sessions). Older / undetectable → keep the safe X11
     // fallback so 22.04 / Debian stable users don't regress.
     //
-    // Escape hatch: COFFEE_FORCE_X11=1 forces X11 unconditionally,
-    // for users who hit a render bug on a specific driver/compositor
-    // combo on the modern path.
+    // Escape hatch: TEAK_FORCE_X11=1 (or legacy COFFEE_FORCE_X11=1) forces
+    // X11 unconditionally, for users who hit a render bug on a specific
+    // driver/compositor combo on the modern path.
     //
     // set_var is `unsafe` in recent Rust because of cross-thread
     // races; we're in single-threaded main() before any thread
@@ -60,7 +60,8 @@ fn main() -> Result<()> {
     #[cfg(target_os = "linux")]
     unsafe {
         if std::env::var_os("GDK_BACKEND").is_none() {
-            let force_x11 = std::env::var_os("COFFEE_FORCE_X11").is_some();
+            let force_x11 = std::env::var_os("TEAK_FORCE_X11").is_some()
+                || std::env::var_os("COFFEE_FORCE_X11").is_some();
             let needs_x11 = force_x11 || webkit_minor_version().map_or(true, |m| m < 46);
             if needs_x11 {
                 std::env::set_var("GDK_BACKEND", "x11");
@@ -101,7 +102,7 @@ fn main() -> Result<()> {
     //   2. Every OTHER variable exported in ~/.zshrc / ~/.bashrc is missing
     //      too — API keys (OPENAI_API_KEY / ANTHROPIC_API_KEY / KIMI_API_KEY),
     //      tool feature flags, proxy overrides. AI CLIs then behave
-    //      differently inside Coffee CLI than in Terminal.app: Kimi Code's
+    //      differently inside Teak CLI than in Terminal.app: Kimi Code's
     //      secondary-model experiment stayed disabled in PTY tabs even
     //      though the user had exported
     //      KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL=1 in ~/.zshrc — the
@@ -211,7 +212,7 @@ fn main() -> Result<()> {
 /// irrelevant; echo AFTER the marker can't be told apart from a multiline
 /// value, so we keep the LAST marker and parse only what follows it.
 #[cfg(not(target_os = "windows"))]
-const ENV_DUMP_MARKER: &str = "__COFFEE_ENV_DUMP_MARKER__";
+const ENV_DUMP_MARKER: &str = "__TEAK_ENV_DUMP_MARKER__";
 
 /// Parse raw probe stdout into (name, value) pairs.
 ///

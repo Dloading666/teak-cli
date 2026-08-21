@@ -226,7 +226,7 @@ pub(crate) fn check_tool_unix(bin: &str) -> bool {
 /// Re-run legacy cleanup and any non-hook presentation migration for one tool.
 /// Called from the launchpad's focus-rescan when `check_tools_installed`
 /// flips a CLI from not-installed → installed, so users who install a
-/// CLI while Coffee CLI is running also get the OpenCode-family transparent
+/// CLI while Teak CLI is running also get the OpenCode-family transparent
 /// theme migration without restarting. Idempotent.
 #[tauri::command]
 fn maintain_tool_integration(tool: String) {
@@ -362,7 +362,7 @@ fn stats_is_text(bytes: &[u8]) -> bool {
 /// Canonical form of a path used as a snapshot map key. Forward-slashes
 /// always; on Windows the drive letter is forced to uppercase. Reason:
 /// `start_folder_snapshot` walks the dir the user picked (typically
-/// uppercase `D:\…`) and writes keys like `D:/Coffee-CLI/…`, but
+/// uppercase `D:\…`) and writes keys like `D:/Teak-CLI/…`, but
 /// Claude Code's PostToolUse hook reports `tool_input.file_path` with
 /// whatever casing the model chose — often lowercase `d:\…`. HashMap
 /// is case-sensitive, so without this normalization every per-call
@@ -432,7 +432,7 @@ fn save_clipboard_image(data_base64: String, extension: String) -> Result<String
         ));
     }
 
-    let tmp_dir = std::env::temp_dir().join("coffee-cli").join("pasted-images");
+    let tmp_dir = std::env::temp_dir().join("teak-cli").join("pasted-images");
     std::fs::create_dir_all(&tmp_dir).map_err(|e| format!("mkdir: {}", e))?;
 
     static SEQ: AtomicU64 = AtomicU64::new(0);
@@ -499,7 +499,7 @@ async fn read_clipboard_image(app: tauri::AppHandle) -> Result<Option<String>, S
             ));
         }
 
-        let tmp_dir = std::env::temp_dir().join("coffee-cli").join("pasted-images");
+        let tmp_dir = std::env::temp_dir().join("teak-cli").join("pasted-images");
         std::fs::create_dir_all(&tmp_dir).map_err(|e| format!("mkdir: {}", e))?;
 
         static SEQ: AtomicU64 = AtomicU64::new(0);
@@ -707,9 +707,9 @@ fn tier_terminal_start_blocking(
 ) -> Result<(), String> {
     // CWD resolution order (first non-empty wins):
     //   1. cwd passed from the frontend (launchpad's folder picker / per-tab cwd)
-    //   2. tool_config.default_cwd from ~/.coffee-cli/tools.json (WSL-type users
+    //   2. tool_config.default_cwd from ~/.teak-cli/tools.json (WSL-type users
     //      who want a fixed launch dir regardless of launchpad selection)
-    //   3. empty → spawn process inherits Coffee CLI's own cwd
+    //   3. empty → spawn process inherits Teak CLI's own cwd
     //
     // The launchpad picker dominates because it's the per-launch user choice;
     // tool_config.default_cwd is the always-on fallback for users who don't
@@ -810,7 +810,7 @@ fn tier_terminal_start_blocking(
             // fails to spawn with ERROR_ACCESS_DENIED. shell_probe treats
             // aliases as not-installed, so the picker never offers a dead
             // shell. Power users can still override via `terminal` in
-            // ~/.coffee-cli/tools.json (applied just below, as final word).
+            // ~/.teak-cli/tools.json (applied just below, as final word).
             let id = crate::shell_probe::ShellId::from_opt(&shell);
             let caps = crate::shell_probe::detect_capabilities();
             crate::shell_probe::resolve_shell(id, &caps)
@@ -870,7 +870,7 @@ fn tier_terminal_start_blocking(
     };
 
     // ── User-configurable launch overrides ─────────────────────────────────
-    // ~/.coffee-cli/tools.json lets users say e.g. "always launch claude with
+    // ~/.teak-cli/tools.json lets users say e.g. "always launch claude with
     // --dangerously-skip-permissions" or "run codex through `docker exec mybox`".
     // `remote` is excluded by design: its argv is protocol-derived from
     // runtime tool_data, not configurable.
@@ -1018,7 +1018,7 @@ fn tier_terminal_raw_write(
 
 /// Toggle the global background-throttle flag. Called by the frontend
 /// from a `document.visibilitychange` listener: when the OS hides the
-/// Coffee CLI window (other Space, app switched away, minimized) we
+/// Teak CLI window (other Space, app switched away, minimized) we
 /// widen every per-session worker's polling cadence so the app drops
 /// to near-zero CPU instead of running its full foreground loop.
 #[tauri::command]
@@ -1029,7 +1029,7 @@ fn set_background_mode(hidden: bool) {
 
 /// Per-tab visibility flag, flipped by a frontend IntersectionObserver on
 /// each terminal's DOM element. Narrower than `set_background_mode`: a tab
-/// can be inactive this way while the Coffee CLI window itself is still
+/// can be inactive this way while the Teak CLI window itself is still
 /// focused and foreground (e.g. one of several open AI-CLI tabs that isn't
 /// the one currently shown). Widens that single session's emitter coalesce
 /// window instead of parsing/emitting output nobody can see at full cadence.
@@ -1149,14 +1149,14 @@ const SYSTEM_INJECTION_TAGS: &[&str] = &[
     "<command-message>",
     "<command-name>",
     // Codex injects the contents of `AGENTS.md` (project) and any
-    // pre-v1.5 Coffee-CLI workspace pointer as a synthetic user
+    // pre-v1.5 workspace pointer as a synthetic user
     // message at session start.
     "# AGENTS.md",
     // Retained for orphan Gemini CLI sessions (see
     // parse_gemini_session_jsonl) — Gemini's IDE integration injected
     // the contents of `GEMINI.md` as a synthetic user message at
     // session start, and we still filter those out when extracting
-    // titles for the history list. Coffee CLI no longer ships a
+    // titles for the history list. Teak CLI no longer ships a
     // Gemini tool tile, but legacy session files keep this constant
     // relevant.
     "# GEMINI.md",
@@ -1196,7 +1196,7 @@ fn is_system_injected(text: &str) -> bool {
 ///   • fixes the worktree case on every OS (both `\` and `/` separators);
 ///   • never over-collapses a legitimate hidden-dir cwd (important on
 ///     Linux/macOS where editing dotfiles with an agent is a real workflow);
-///   • covers any tool Coffee CLI launched inside such a worktree (they all
+///   • covers any tool Teak CLI launched inside such a worktree (they all
 ///     record the same `.claude/worktrees` path), without a per-tool branch.
 /// Any cwd without that exact segment (a normal project dir, a real subdir, a
 /// plain non-hidden `worktrees/` folder) is returned unchanged. Guaranteed to
@@ -1233,15 +1233,15 @@ fn project_root_from_cwd(cwd: &str) -> String {
 /// Claude Code mangles a project's absolute path into its `~/.claude/projects/`
 /// folder name by replacing every non-alphanumeric ASCII character with a
 /// single `-` (verified against live folder names on disk, e.g.
-/// `D:\Coffee-CLI\.claude\worktrees\foo` -> `D--Coffee-CLI--claude-worktrees-foo`).
+/// `D:\Teak-CLI\.claude\worktrees\foo` -> `D--Teak-CLI--claude-worktrees-foo`).
 /// That mapping is **not reversible**: a literal `-` already inside a path
-/// segment (extremely common — "Coffee-CLI", any kebab-case folder) is
+/// segment (extremely common — "Teak-CLI", any kebab-case folder) is
 /// indistinguishable from an encoded separator once collapsed. A previous
 /// version of this function tried to reverse it by splitting the folder name
 /// on "--", which silently produced a plausible-but-wrong path for any
 /// project whose name contained a hyphen — the wrong path would fail the
 /// `path.exists()` guard in `terminal::spawn`, so the CWD override was
-/// silently dropped and `claude --resume <token>` launched from Coffee
+/// silently dropped and `claude --resume <token>` launched from Teak
 /// CLI's own process directory instead of the session's real project.
 ///
 /// Fixed by going the other direction: `~/.claude.json`'s top-level
@@ -2280,7 +2280,7 @@ fn read_opencode_session(session_id: String) -> Result<String, String> {
     let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
 
     // Honor user-configured OpenCode history path from
-    // ~/.coffee-cli/tools.json (same source the listing pass uses
+    // ~/.teak-cli/tools.json (same source the listing pass uses
     // at line ~2129). Falls through to the platform default
     // ~/.local/share/opencode when the user hasn't customized it.
     let opencode_root = crate::tool_config::history_path_for(
@@ -2342,7 +2342,7 @@ fn mimocode_db(home: &std::path::Path) -> Option<std::path::PathBuf> {
 /// Resolve Kilo Code's SQLite db (an OpenCode fork — identical Drizzle
 /// schema). XDG data root is `~/.local/share/kilo/kilo.db` (`app = "kilo"` in
 /// the fork's packages/core/src/global.ts; the fork also honors a `KILO_DB`
-/// env override that Coffee CLI does not read). None when absent.
+/// env override that Teak CLI does not read). None when absent.
 fn kilo_db(home: &std::path::Path) -> Option<std::path::PathBuf> {
     let primary_root = crate::tools::find("kilo")
         .and_then(|tool| {
@@ -4009,7 +4009,7 @@ fn collect_registry_history_candidates(
 }
 
 /// Resolve OpenCode's session-store root (under the user's home,
-/// or wherever `~/.coffee-cli/tools.json` redirects). `None` if
+/// or wherever `~/.teak-cli/tools.json` redirects). `None` if
 /// OpenCode isn't in the registry — should never happen in
 /// practice, but keeps the call sites total.
 fn opencode_root(home: &std::path::Path) -> Option<std::path::PathBuf> {
@@ -4029,7 +4029,7 @@ struct HeatmapEntry {
 }
 
 /// Persisted line-count cache for the heatmap scanner. One JSON file at
-/// `~/.coffee-cli/cache/heatmap-counts.json`. Best-effort across the board:
+/// `~/.teak-cli/cache/heatmap-counts.json`. Best-effort across the board:
 /// any I/O / parse error returns an empty map and the scanner just recounts
 /// from disk. The mtime stored is seconds-since-epoch (matches the i64 `ts`
 /// field on HeatmapEntry) so a single integer comparison decides cache hit.
@@ -4040,8 +4040,7 @@ struct CachedCount {
 }
 
 fn count_cache_path() -> Option<std::path::PathBuf> {
-    let home = dirs::home_dir()?;
-    Some(home.join(".coffee-cli").join("cache").join("heatmap-counts.json"))
+    Some(crate::tool_config::config_dir()?.join("cache").join("heatmap-counts.json"))
 }
 
 fn read_count_cache() -> std::collections::HashMap<String, CachedCount> {
@@ -4333,9 +4332,7 @@ fn count_hermes_messages(path: &std::path::Path) -> u32 {
 // ─── Task Board Persistence ──────────────────────────────────────────────────
 
 fn tasks_file_path() -> PathBuf {
-    let dir = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".coffee-cli");
+    let dir = crate::tool_config::config_dir().unwrap_or_else(|| PathBuf::from(".teak-cli"));
     let _ = std::fs::create_dir_all(&dir);
     dir.join("tasks.json")
 }
@@ -4366,7 +4363,8 @@ fn save_tasks(data: String, app: tauri::AppHandle) -> Result<(), String> {
 
 // ─── Credential Store (OS Keychain) ──────────────────────────────────────────
 
-const KEYRING_SERVICE: &str = "coffee-cli";
+const KEYRING_SERVICE: &str = "teak-cli";
+const LEGACY_KEYRING_SERVICE: &str = "coffee-cli";
 
 /// Persist a remote password in the OS keychain (Windows Credential Manager /
 /// macOS Keychain / Linux Secret Service). The key is `username@host`.
@@ -4389,7 +4387,16 @@ fn load_password(host: String, username: String) -> Result<Option<String>, Strin
         .get_password()
     {
         Ok(pw) => Ok(Some(pw)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring::Error::NoEntry) => {
+            match keyring::Entry::new(LEGACY_KEYRING_SERVICE, &account)
+                .map_err(|e| e.to_string())?
+                .get_password()
+            {
+                Ok(pw) => Ok(Some(pw)),
+                Err(keyring::Error::NoEntry) => Ok(None),
+                Err(e) => Err(e.to_string()),
+            }
+        }
         Err(e) => Err(e.to_string()),
     }
 }
@@ -4471,12 +4478,14 @@ fn open_url(url: String) -> Result<(), String> {
 // can replace our running files. ureq is blocking + rustls, so the whole
 // thing runs on a spawn_blocking thread; `app.emit` works from any thread.
 
+#[allow(dead_code)]
 #[derive(serde::Serialize, Clone)]
 struct SelfUpdateProgress {
     status: String, // "speed_test" | "downloading" | "launching" | "error"
     percent: u32,
 }
 
+#[allow(dead_code)]
 fn emit_self_update(app: &tauri::AppHandle, status: &str, percent: u32) {
     let _ = app.emit(
         "self-update-progress",
@@ -4485,21 +4494,13 @@ fn emit_self_update(app: &tauri::AppHandle, status: &str, percent: u32) {
 }
 
 #[tauri::command]
-async fn download_and_install_update(app: tauri::AppHandle) -> Result<(), String> {
-    let os = if cfg!(target_os = "windows") {
-        "windows"
-    } else if cfg!(target_os = "macos") {
-        "macos"
-    } else {
-        "linux"
-    };
-    let url = format!("https://coffeecli.com/download/{os}");
-    let app2 = app.clone();
-    tauri::async_runtime::spawn_blocking(move || run_self_update(&app2, &url))
-        .await
-        .map_err(|e| format!("self-update task join failed: {e}"))?
+async fn download_and_install_update(_app: tauri::AppHandle) -> Result<(), String> {
+    // Do not download from coffeecli.com — that installer is upstream Coffee CLI
+    // and would overwrite this fork.
+    Err("Teak CLI is a Coffee CLI fork and does not install updates from coffeecli.com. Build from source.".into())
 }
 
+#[allow(dead_code)]
 fn run_self_update(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     use std::io::{Read, Write};
 
@@ -4524,7 +4525,7 @@ fn run_self_update(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     } else {
         "bin"
     };
-    let out_path = std::env::temp_dir().join(format!("coffee-cli-update-setup.{ext}"));
+    let out_path = std::env::temp_dir().join(format!("teak-cli-update-setup.{ext}"));
 
     let mut reader = resp.into_reader();
     let mut file = std::fs::File::create(&out_path).map_err(|e| {
@@ -4590,9 +4591,9 @@ fn run_self_update(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
 //
 // Tauri commands here are all the frontend needs to know about.
 
-// ─── Per-tool launch overrides (~/.coffee-cli/tools.json) ────────────────
+// ─── Per-tool launch overrides (~/.teak-cli/tools.json) ────────────────
 //
-// Lets users tell Coffee CLI things like "my claude is at
+// Lets users tell Teak CLI things like "my claude is at
 // `/opt/coffee/bin/claude`, not on PATH" or "always launch claude with
 // --dangerously-skip-permissions". Replaces what the abandoned in-app
 // installer was supposed to handle by auto-detection — defer to the
@@ -4624,7 +4625,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
 
     // Single-instance plugin MUST be the first plugin registered (per
     // Tauri docs) so its argv-forwarding hook runs before any other
-    // plugin's init touches state. When a user double-launches Coffee CLI,
+    // plugin's init touches state. When a user double-launches Teak CLI,
     // the second process sends its argv+cwd to this callback in the first
     // process and exits — the first process then refocuses the main window.
     // Side effect we want: only ever one WebView2 instance, which kills
@@ -4632,7 +4633,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
     //
     // Release-only: in debug builds we skip the lock so a dev `cargo tauri
     // dev` window can run side-by-side with an installed production build
-    // (devs working on Coffee CLI inside Coffee CLI). Both builds otherwise
+    // (devs working on Teak CLI inside Teak CLI). Both builds otherwise
     // share the bundle identifier, and the lock would silently redirect the
     // dev launch to the production process and exit.
     #[cfg(not(debug_assertions))]
@@ -4818,7 +4819,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
         .map_err(|e| anyhow::anyhow!("Error while building tauri application: {}", e))?
         .run(|app_handle, event| {
             // ── Graceful PTY-child cleanup on app exit ─────────────────
-            // Issue #28: closing Coffee CLI without first killing tabs
+            // Issue #28: closing Teak CLI without first killing tabs
             // left orphan `claude.exe` / `node.exe` alive on Windows
             // (they don't share a job with the parent by default), which
             // held `~/.claude/` session locks and broke the NEXT launch's
@@ -4879,29 +4880,29 @@ mod resume_cwd_tests {
     #[test]
     fn strips_windows_worktree_cwd_to_project_root() {
         assert_eq!(
-            project_root_from_cwd(r"D:\Coffee-CLI\.claude\worktrees\intelligent-heyrovsky-b3d421"),
-            r"D:\Coffee-CLI"
+            project_root_from_cwd(r"D:\Teak-CLI\.claude\worktrees\intelligent-heyrovsky-b3d421"),
+            r"D:\Teak-CLI"
         );
     }
 
     #[test]
     fn strips_unix_worktree_cwd_to_project_root() {
         assert_eq!(
-            project_root_from_cwd("/home/eben/coffee-cli/.claude/worktrees/foo"),
-            "/home/eben/coffee-cli"
+            project_root_from_cwd("/home/eben/teak-cli/.claude/worktrees/foo"),
+            "/home/eben/teak-cli"
         );
     }
 
     #[test]
     fn leaves_a_plain_project_dir_unchanged() {
-        assert_eq!(project_root_from_cwd(r"D:\Coffee-CLI"), r"D:\Coffee-CLI");
-        assert_eq!(project_root_from_cwd("/home/eben/coffee-cli"), "/home/eben/coffee-cli");
+        assert_eq!(project_root_from_cwd(r"D:\Teak-CLI"), r"D:\Teak-CLI");
+        assert_eq!(project_root_from_cwd("/home/eben/teak-cli"), "/home/eben/teak-cli");
     }
 
     #[test]
     fn leaves_a_real_subdir_unchanged() {
         // A genuine working subdir must NOT be collapsed — only worktrees.
-        assert_eq!(project_root_from_cwd(r"D:\Coffee-CLI\src\ui"), r"D:\Coffee-CLI\src\ui");
+        assert_eq!(project_root_from_cwd(r"D:\Teak-CLI\src\ui"), r"D:\Teak-CLI\src\ui");
     }
 
     #[test]
@@ -4922,8 +4923,8 @@ mod resume_cwd_tests {
         assert_eq!(project_root_from_cwd("/home/eben/.dotfiles"), "/home/eben/.dotfiles");
         assert_eq!(project_root_from_cwd(r"D:\proj\.vscode"), r"D:\proj\.vscode");
         // `.claude` itself, without a worktrees child, is a real (if unusual) dir.
-        assert_eq!(project_root_from_cwd(r"D:\Coffee-CLI\.claude"), r"D:\Coffee-CLI\.claude");
-        assert_eq!(project_root_from_cwd(r"D:\Coffee-CLI\.claude\settings"), r"D:\Coffee-CLI\.claude\settings");
+        assert_eq!(project_root_from_cwd(r"D:\Teak-CLI\.claude"), r"D:\Teak-CLI\.claude");
+        assert_eq!(project_root_from_cwd(r"D:\Teak-CLI\.claude\settings"), r"D:\Teak-CLI\.claude\settings");
     }
 
     #[test]
@@ -4941,7 +4942,7 @@ mod resume_cwd_tests {
     fn handles_mixed_separators_and_non_ascii() {
         // Windows sometimes emits mixed separators; a Chinese project name must
         // not panic the byte-slice (all slice indices land on ASCII separators).
-        assert_eq!(project_root_from_cwd(r"D:/Coffee-CLI\.claude/worktrees\x"), r"D:/Coffee-CLI");
+        assert_eq!(project_root_from_cwd(r"D:/Teak-CLI\.claude/worktrees\x"), r"D:/Teak-CLI");
         assert_eq!(project_root_from_cwd(r"D:\项目名\.claude\worktrees\x"), r"D:\项目名");
     }
 
@@ -4956,7 +4957,7 @@ mod resume_cwd_tests {
     // the real ~/.claude.json and avoids tests racing each other on a
     // shared path (each test gets a name-derived subfolder).
     fn temp_home(test_name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("coffee-cli-test-{}", test_name));
+        let dir = std::env::temp_dir().join(format!("teak-cli-test-{}", test_name));
         let _ = std::fs::remove_dir_all(&dir); // clean slate if a prior run left it behind
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -4975,19 +4976,19 @@ mod resume_cwd_tests {
 
     // Real folder name observed on disk, verified by hand against the known
     // real path — the exact case that motivated the fix (a project name
-    // containing a hyphen, "Coffee-CLI", made the old split("--") fallback
+    // containing a hyphen, "Teak-CLI", made the old split("--") fallback
     // reconstruct a nonexistent path). load_claude_project_map forward-encodes
     // the real key so the mangled folder name maps back exactly.
     #[test]
     fn map_resolves_real_world_hyphenated_project_path() {
         let home = temp_home("hyphenated-project");
-        let real_path = r"D:\Coffee-CLI\.claude\worktrees\exciting-swanson-f7e8be";
+        let real_path = r"D:\Teak-CLI\.claude\worktrees\exciting-swanson-f7e8be";
         write_claude_json(&home, &[real_path]);
 
         let map = load_claude_project_map(&home);
 
         assert_eq!(
-            map.get("D--Coffee-CLI--claude-worktrees-exciting-swanson-f7e8be").map(String::as_str),
+            map.get("D--Teak-CLI--claude-worktrees-exciting-swanson-f7e8be").map(String::as_str),
             Some(real_path)
         );
         let _ = std::fs::remove_dir_all(&home);
@@ -5012,7 +5013,7 @@ mod resume_cwd_tests {
 
         let map = load_claude_project_map(&home);
 
-        assert_eq!(map.get("D--Coffee-CLI--claude-worktrees-foo"), None);
+        assert_eq!(map.get("D--Teak-CLI--claude-worktrees-foo"), None);
         let _ = std::fs::remove_dir_all(&home);
     }
 
@@ -5031,7 +5032,7 @@ mod resume_cwd_tests {
         // or reconstruct the old broken split("--") guess.
         let home = temp_home("malformed-config");
         let mut f = std::fs::File::create(home.join(".claude.json")).unwrap();
-        f.write_all(br#"{"projects": {"D:\Coffee-CLI": {"#).unwrap(); // truncated
+        f.write_all(br#"{"projects": {"D:\Teak-CLI": {"#).unwrap(); // truncated
         drop(f);
 
         let map = load_claude_project_map(&home);
@@ -5084,7 +5085,7 @@ mod tests {
     fn jsonl_window_skips_one_oversized_row_without_stalling_history() {
         use std::io::Write;
         let path = std::env::temp_dir().join(format!(
-            "coffee-cli-chat-window-{}.jsonl",
+            "teak-cli-chat-window-{}.jsonl",
             std::process::id(),
         ));
         let mut file = std::fs::File::create(&path).expect("create window fixture");
@@ -5111,7 +5112,7 @@ mod tests {
     /// the columns the scanner touches are created.
     fn seed_drizzle_db(test_name: &str) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(format!(
-            "coffee-cli-drizzle-test-{}-{}.db",
+            "teak-cli-drizzle-test-{}-{}.db",
             std::process::id(),
             test_name,
         ));
@@ -5246,7 +5247,7 @@ mod tests {
     #[test]
     fn hermes_revision_changes_when_a_message_is_appended() {
         let db = std::env::temp_dir().join(format!(
-            "coffee-cli-hermes-revision-test-{}.db",
+            "teak-cli-hermes-revision-test-{}.db",
             std::process::id(),
         ));
         let _ = std::fs::remove_file(&db);
@@ -5318,7 +5319,7 @@ mod tests {
             },
         });
         let path = std::env::temp_dir().join(format!(
-            "coffee-cli-codex-test-{}-{}.jsonl",
+            "teak-cli-codex-test-{}-{}.jsonl",
             std::process::id(),
             case
         ));
@@ -5448,7 +5449,7 @@ mod tests {
 
     #[test]
     fn drops_pure_compaction_subtask_session() {
-        let dir = std::env::temp_dir().join(format!("coffee-cli-compact-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("teak-cli-compact-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("30d442fb-fake-compaction.jsonl");
@@ -5464,7 +5465,7 @@ mod tests {
 
     #[test]
     fn keeps_real_session_with_real_user_message() {
-        let dir = std::env::temp_dir().join(format!("coffee-cli-real-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("teak-cli-real-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("dadf2990-fake-real.jsonl");
@@ -5482,7 +5483,7 @@ mod tests {
         // The live-session case: compaction injected as the FIRST user line,
         // but the user kept chatting in the same session file. Must survive —
         // filtering on "first user line is injected" would wrongly drop this.
-        let dir = std::env::temp_dir().join(format!("coffee-cli-cont-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("teak-cli-cont-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("43b57955-fake-continued.jsonl");
@@ -5505,7 +5506,7 @@ mod tests {
         // counter must count this as ONE real user message (.any() semantics)
         // — not zero (which would drop a live session) and not >1. Covers the
         // array branch of the counter that the string-content tests don't.
-        let dir = std::env::temp_dir().join(format!("coffee-cli-arr-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("teak-cli-arr-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("a3f2c910-fake-array.jsonl");

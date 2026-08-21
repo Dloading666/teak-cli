@@ -10,10 +10,12 @@ import { TaskPromptView } from './TaskPromptView';
 import { TaskEmptyState } from './TaskEmptyState';
 import { makeWelcomeNote, makePromptItem, NEXT_STATUS, STATUS_ORDER, type TaskItem, type TaskStatus } from './task-types';
 import { useTextContextMenu } from '../../lib/use-text-context-menu';
+import { prefGet, prefSet } from '../../lib/prefs';
 
 // ─── Persistence (Rust file backend with localStorage fallback) ──────────────
 
-const LEGACY_STORAGE_KEY = 'coffee-tasks';
+const LEGACY_STORAGE_KEY = 'teak-tasks';
+const COFFEE_TASKS_KEY = 'coffee-tasks';
 
 async function loadTasksFromBackend(): Promise<TaskItem[]> {
   if (isTauri) {
@@ -24,12 +26,14 @@ async function loadTasksFromBackend(): Promise<TaskItem[]> {
       // Auto-migrate: if Rust file is empty but localStorage has data, migrate it
       if (tasks.length === 0) {
         try {
-          const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+          const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
+            ?? localStorage.getItem(COFFEE_TASKS_KEY);
           if (legacy) {
             const legacyTasks: TaskItem[] = JSON.parse(legacy);
             if (legacyTasks.length > 0) {
               await commands.saveTasks(JSON.stringify(legacyTasks));
-              localStorage.removeItem(LEGACY_STORAGE_KEY); // Clean up
+              localStorage.removeItem(LEGACY_STORAGE_KEY);
+              localStorage.removeItem(COFFEE_TASKS_KEY);
               return legacyTasks;
             }
           }
@@ -44,7 +48,8 @@ async function loadTasksFromBackend(): Promise<TaskItem[]> {
 
   // Non-Tauri fallback (dev mode in browser)
   try {
-    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY)
+      ?? localStorage.getItem(COFFEE_TASKS_KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* Best-effort operation; failure is non-fatal. */ }
   return [];
@@ -87,13 +92,13 @@ export function TaskBoard() {
   // the left Explorer panel) collapses to Tasks default.
   const [activeTab, setActiveTab] = useState<'tasks' | 'changes'>(() => {
     try {
-      const saved = localStorage.getItem('cc-right-tab');
+      const saved = prefGet('right-tab');
       if (saved === 'tasks' || saved === 'changes') return saved;
     } catch { /* Best-effort operation; failure is non-fatal. */ }
     return 'tasks';
   });
   useEffect(() => {
-    try { localStorage.setItem('cc-right-tab', activeTab); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet('right-tab', activeTab);
   }, [activeTab]);
 
   // Selection lives at the AppState tier now (diffSelection), so a detour to
@@ -146,16 +151,16 @@ export function TaskBoard() {
     loadTasksFromBackend().then(data => {
       isLoadedRef.current = true;
       let seeded = false;
-      try { seeded = localStorage.getItem('cc-tasks-seeded') === '1'; } catch { /* Best-effort operation; failure is non-fatal. */ }
+      try { seeded = prefGet('tasks-seeded') === '1'; } catch { /* Best-effort operation; failure is non-fatal. */ }
 
       if (data.length === 0 && !seeded) {
-        try { localStorage.setItem('cc-tasks-seeded', '1'); } catch { /* Best-effort operation; failure is non-fatal. */ }
+        prefSet('tasks-seeded', '1');
         dispatch({ type: 'SET_TASK_VIEW_MODE', mode: 'note' }); // remembers the view too
         setTasks([makeWelcomeNote(t('task.welcome_note'))]);
         return;
       }
 
-      if (!seeded) { try { localStorage.setItem('cc-tasks-seeded', '1'); } catch { /* Best-effort operation; failure is non-fatal. */ } }
+      if (!seeded) { prefSet('tasks-seeded', '1'); }
       skipNextSyncRef.current = true; // Prevent saving the initialized data purely due to React effect
       setTasks(data);
     });

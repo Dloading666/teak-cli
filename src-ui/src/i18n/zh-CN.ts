@@ -1,7 +1,7 @@
 import type { I18nKey } from './en';
 
 export const zhCN = {
-  'app.title': 'Coffee CLI',
+  'app.title': 'Teak CLI',
   'explorer.tab.workspace': '工作区',
   'explorer.tab.history': '会话',
   'nav.status.working': '进行中',
@@ -152,7 +152,7 @@ export const zhCN = {
   'task.prompt.category_placeholder': '分类名（选已有或输入新的）',
   'task.prompt.body_placeholder': '写提示词，整段发给 AI…',
   'task.note_placeholder': '写点什么，整段发给 AI…',
-  'task.welcome_note': `欢迎来到 Coffee CLI ☕
+  'task.welcome_note': `欢迎来到 Teak CLI
 
 这张就是「便签」——随手写，写完点右上角 ▶ 整段发给 AI，不用再挤小输入框。
 

@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Coffee CLI — Your Multi-Agent AI Terminal Companion." />
-    <title>Coffee CLI</title>
+    <meta name="description" content="Teak CLI — a native desktop workspace for AI CLIs. Based on Teak CLI." />
+    <title>Teak CLI</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- Preload bundled Inter weights so the browser warms its font cache during
          startup. Without this, Inter loads lazily the first time a glyph in its
@@ -24,8 +24,8 @@
       (function() {
         var theme = 'obsidian';
         var shape = 'panel';
-        try { theme = localStorage.getItem('cc-theme') || 'obsidian'; } catch(e) {}
-        try { shape = localStorage.getItem('cc-shape') || 'panel'; } catch(e) {}
+        try { theme = localStorage.getItem('teak-theme') || localStorage.getItem('cc-theme') || 'obsidian'; } catch(e) {}
+        try { shape = localStorage.getItem('teak-shape') || localStorage.getItem('cc-shape') || 'panel'; } catch(e) {}
         document.documentElement.setAttribute('data-theme', theme);
         // Frost renders as glass chrome + a data-frost backdrop variant
         // (mirrors App.tsx's shape effect) — pre-paint so no first-render flash.

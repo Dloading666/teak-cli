@@ -1,6 +1,6 @@
-//! External launch requests — `coffee-cli launch --tool <id> [--cwd <dir>]`.
+//! External launch requests — `teak-cli launch --tool <id> [--cwd <dir>]`.
 //!
-//! Lets launchers, context menus, and scripts open Coffee CLI directly
+//! Lets launchers, context menus, and scripts open Teak CLI directly
 //! into a fresh agent tab at a chosen folder, instead of landing on the
 //! launchpad and making the user pick the tool + folder by hand.
 //!
@@ -16,9 +16,9 @@
 //!   first process keeps running, so nothing is restarted).
 //!
 //! Examples:
-//!   macOS:   open -a "Coffee CLI" --args launch --tool kimicode --cwd /work/proj
-//!   Windows: coffee-cli.exe launch --tool claude --cwd "C:\work\proj"
-//!   Linux:   coffee-cli launch --tool codex --cwd ~/work/proj
+//!   macOS:   open -a "Teak CLI" --args launch --tool kimicode --cwd /work/proj
+//!   Windows: teak-cli.exe launch --tool claude --cwd "C:\work\proj"
+//!   Linux:   teak-cli launch --tool codex --cwd ~/work/proj
 //!
 //! `--tool` must be a registered tool id (`claude`, `codex`, `kimicode`,
 //! `hermes`, …). Unknown tools and non-existent `--cwd` values are
@@ -100,15 +100,15 @@ mod tests {
 
     #[test]
     fn ignores_non_launch_argv() {
-        assert!(parse_launch_args(&argv(&["coffee-cli"])).is_none());
-        assert!(parse_launch_args(&argv(&["coffee-cli", "--help"])).is_none());
+        assert!(parse_launch_args(&argv(&["teak-cli"])).is_none());
+        assert!(parse_launch_args(&argv(&["teak-cli", "--help"])).is_none());
         assert!(parse_launch_args(&argv(&["launch"])).is_none()); // missing --tool
     }
 
     #[test]
     fn parses_tool_with_and_without_argv0() {
         let id = first_tool_id();
-        let with0 = parse_launch_args(&argv(&["/usr/bin/coffee-cli", "launch", "--tool", id]));
+        let with0 = parse_launch_args(&argv(&["/usr/bin/teak-cli", "launch", "--tool", id]));
         let without0 = parse_launch_args(&argv(&["launch", "--tool", id]));
         assert_eq!(with0.as_ref().map(|r| r.tool.as_str()), Some(id));
         assert_eq!(without0.as_ref().map(|r| r.tool.as_str()), Some(id));
@@ -119,7 +119,7 @@ mod tests {
     fn parses_equals_form_and_validates_cwd() {
         let id = first_tool_id();
         let ok = parse_launch_args(&argv(&[
-            "coffee-cli",
+            "teak-cli",
             "launch",
             &format!("--tool={}", id),
             "--cwd=/tmp",
@@ -127,7 +127,7 @@ mod tests {
         assert_eq!(ok.as_ref().and_then(|r| r.cwd.as_deref()), Some("/tmp"));
 
         let bad = parse_launch_args(&argv(&[
-            "coffee-cli",
+            "teak-cli",
             "launch",
             "--tool",
             id,
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn rejects_unknown_tool() {
         assert!(parse_launch_args(&argv(&[
-            "coffee-cli",
+            "teak-cli",
             "launch",
             "--tool",
             "not-a-real-tool"

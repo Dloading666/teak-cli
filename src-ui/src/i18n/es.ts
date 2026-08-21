@@ -1,7 +1,7 @@
 import type { I18nKey } from './en';
 
 export const es = {
-  'app.title': 'Coffee CLI',
+  'app.title': 'Teak CLI',
   'explorer.tab.workspace': 'Espacio de trabajo',
   'explorer.tab.history': 'Sesiones',
   'nav.status.working': 'En curso',
@@ -151,7 +151,7 @@ export const es = {
   'task.prompt.category_placeholder': 'Nombre de categoría (elige o crea una)',
   'task.prompt.body_placeholder': 'Escribe un prompt, envíalo a la IA…',
   'task.note_placeholder': 'Anota algo y envíalo entero a tu agente…',
-  'task.welcome_note': `Te damos la bienvenida a Coffee CLI ☕
+  'task.welcome_note': `Te damos la bienvenida a Teak CLI
 
 Esto es una nota adhesiva: escribe lo que quieras y pulsa ▶ (arriba a la derecha) para enviarlo entero a tu IA. Se acabó la casilla de texto diminuta.
 

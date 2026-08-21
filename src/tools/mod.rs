@@ -1,5 +1,5 @@
 //! Per-tool integration registry — single source of truth for the
-//! per-CLI facts Coffee CLI needs (binary name, history
+//! per-CLI facts Teak CLI needs (binary name, history
 //! shape, legacy-hook cleanup, launch argv). Iterate `TOOLS` instead of
 //! hardcoding lists in callers.
 //!
@@ -9,10 +9,10 @@
 use std::path::{Path, PathBuf};
 
 /// Where this tool stores its session history on disk and what
-/// shape it lives in. Coffee CLI's history scanner (`server.rs`)
+/// shape it lives in. Teak CLI's history scanner (`server.rs`)
 /// and message heatmap both consume this. Defaults are relative
 /// to `$HOME` (`$USERPROFILE` on Windows); users override per-tool
-/// via `~/.coffee-cli/tools.json` (`tool_config.history_path`).
+/// via `~/.teak-cli/tools.json` (`tool_config.history_path`).
 ///
 /// Each variant maps to a different scanner / parser combination
 /// in `server.rs`. New tool families (e.g. another SQLite-backed

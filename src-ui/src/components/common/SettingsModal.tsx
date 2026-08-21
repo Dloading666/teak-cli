@@ -21,6 +21,7 @@ import { TERM_COLOR_SCHEMES } from '../center/TierTerminal';
 import { commands, type FontInfo } from '../../tauri';
 import { FontPicker } from './FontPicker';
 import { THEME_COLORS, THEME_SHAPES, ICON_ART_THEMES, LANGUAGES, TASK_VIEW_MODES, isMaskTintTheme } from '../../lib/personalization';
+import { prefGet, prefSet, prefRemove } from '../../lib/prefs';
 import './SettingsModal.css';
 
 type Section = 'appearance' | 'wallpaper' | 'terminal' | 'gambit' | 'sound' | 'tasks' | 'language' | 'feedback';
@@ -32,13 +33,9 @@ const ExternalLinkArrow = () => (
   </svg>
 );
 
-// Read a `cc-*` boolean localStorage preference. Module-level
-// so the SettingsModal sound toggles can seed their useState initializers.
-// Both sound prefs default to ON (absent = true).
+// Boolean preference. Both sound prefs default to ON (absent = true).
 function readSoundPref(key: string): boolean {
-  try {
-    return localStorage.getItem(key) !== 'false';
-  } catch { return true; }
+  return prefGet(key) !== 'false';
 }
 
 // Per-mode preview glyphs for the Tasks section (checklist vs sticky note).
@@ -137,8 +134,8 @@ export function SettingsModal() {
 
   // Sound notification toggles (Settings ▸ Sound). State must live above the
   // `if (!open) return null` early-return — hooks can't run conditionally.
-  const [soundDone, setSoundDone] = useState(() => readSoundPref('cc-sound-done'));
-  const [soundWait, setSoundWait] = useState(() => readSoundPref('cc-sound-wait'));
+  const [soundDone, setSoundDone] = useState(() => readSoundPref('sound-done'));
+  const [soundWait, setSoundWait] = useState(() => readSoundPref('sound-wait'));
 
   const open = state.settingsOpen;
   const close = () => dispatch({ type: 'SET_SETTINGS_OPEN', open: false });
@@ -178,13 +175,13 @@ export function SettingsModal() {
   const setShape = (s: ThemeShape) => dispatch({ type: 'SET_SHAPE', shape: s });
   const setIconTheme = (th: IconTheme) => {
     dispatch({ type: 'SET_ICON_THEME', theme: th });
-    try { localStorage.setItem('cc-icon-theme', th); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet('icon-theme', th);
   };
   const setLang = (code: string) => {
     dispatch({ type: 'SET_LANG', lang: code });
     try {
-      localStorage.setItem('cc-lang', code);
-      if (code !== 'en') localStorage.setItem('cc-native-lang', code);
+      prefSet('lang', code);
+      if (code !== 'en') prefSet('native-lang', code);
     } catch { /* Best-effort operation; failure is non-fatal. */ }
   };
   const pickBg = async () => {
@@ -196,19 +193,19 @@ export function SettingsModal() {
       if (selected && typeof selected === 'string') {
         const ext = selected.split('.').pop()?.toLowerCase() || '';
         const bgType = ['mp4', 'webm'].includes(ext) ? 'video' : 'image';
-        try { localStorage.setItem('cc-bg-path', selected); localStorage.setItem('cc-bg-type', bgType); } catch { /* Best-effort operation; failure is non-fatal. */ }
+        prefSet('bg-path', selected); prefSet('bg-type', bgType);
         dispatch({ type: 'SET_BG', path: selected, bgType });
       }
     } catch (err) { console.error('[Settings] background picker failed:', err); }
   };
   const clearBg = () => {
-    try { localStorage.removeItem('cc-bg-path'); localStorage.removeItem('cc-bg-type'); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefRemove('bg-path'); prefRemove('bg-type');
     dispatch({ type: 'CLEAR_BG' });
   };
   const setScheme = (id: string) => {
     try {
-      if (id) localStorage.setItem('cc-term-scheme', id);
-      else localStorage.removeItem('cc-term-scheme');
+      if (id) prefSet('term-scheme', id);
+      else prefRemove('term-scheme');
     } catch { /* Best-effort operation; failure is non-fatal. */ }
     dispatch({ type: 'SET_TERM_SCHEME', scheme: id });
   };
@@ -217,15 +214,15 @@ export function SettingsModal() {
     // fontFamily string, so don't let a stray quote break out of it.
     const clean = family.replace(/["\\]/g, '');
     try {
-      if (clean) localStorage.setItem('cc-term-font', clean);
-      else localStorage.removeItem('cc-term-font');
+      if (clean) prefSet('term-font', clean);
+      else prefRemove('term-font');
     } catch { /* Best-effort operation; failure is non-fatal. */ }
     dispatch({ type: 'SET_TERM_FONT', font: clean });
   };
   const setDefaultShell = (shell: string) => {
     try {
-      if (shell) localStorage.setItem('cc-default-shell', shell);
-      else localStorage.removeItem('cc-default-shell');
+      if (shell) prefSet('default-shell', shell);
+      else prefRemove('default-shell');
     } catch { /* Best-effort operation; failure is non-fatal. */ }
     dispatch({ type: 'SET_DEFAULT_SHELL', shell });
   };
@@ -233,15 +230,15 @@ export function SettingsModal() {
   const setTaskView = (mode: 'list' | 'note' | 'prompt') => dispatch({ type: 'SET_TASK_VIEW_MODE', mode });
   const setEnterToSend = (value: boolean) => {
     dispatch({ type: 'SET_GAMBIT_ENTER_TO_SEND', value });
-    try { localStorage.setItem('cc-gambit-enter-send', String(value)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet('gambit-enter-send', String(value));
   };
   const setHotkeyScheme = (value: HotkeyScheme) => {
     dispatch({ type: 'SET_HOTKEY_SCHEME', value });
-    try { localStorage.setItem('cc-hotkey-scheme', value); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet('hotkey-scheme', value);
   };
   const setTitlebarToggleDisplay = (value: TitlebarToggleDisplay) => {
     dispatch({ type: 'SET_TITLEBAR_TOGGLE_DISPLAY', value });
-    try { localStorage.setItem('cc-titlebar-toggle-display', value); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet('titlebar-toggle-display', value);
   };
 
   // Sound notification toggles — local state + localStorage only. The
@@ -249,10 +246,10 @@ export function SettingsModal() {
   // so no app-state wiring is needed. Both default to ON.
   const writeSoundPref = (key: string, setter: (v: boolean) => void) => (v: boolean) => {
     setter(v);
-    try { localStorage.setItem(key, String(v)); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet(key, String(v));
   };
-  const setSoundDonePref = writeSoundPref('cc-sound-done', setSoundDone);
-  const setSoundWaitPref = writeSoundPref('cc-sound-wait', setSoundWait);
+  const setSoundDonePref = writeSoundPref('sound-done', setSoundDone);
+  const setSoundWaitPref = writeSoundPref('sound-wait', setSoundWait);
 
   const hasBg = state.bgType !== 'none' && state.bgPath !== '';
   const modKey = IS_MACOS ? '⌘' : 'Ctrl';
@@ -295,9 +292,9 @@ export function SettingsModal() {
               <button
                 type="button"
                 className="settings-rail-version-link"
-                onClick={() => commands.openUrl('https://coffeecli.com').catch(() => {})}
+                onClick={() => commands.openUrl('https://github.com/edison7009/Coffee-CLI').catch(() => {})}
               >
-                CoffeeCLI.com
+                Based on Coffee CLI
               </button>
             </div>
           )}
@@ -436,7 +433,7 @@ export function SettingsModal() {
                   className="settings-font-preview"
                   style={{ fontFamily: state.termFont ? `"${state.termFont}", monospace` : 'monospace' }}
                 >
-                  {'Coffee CLI · AaBb 0123 {}=>'}
+                  {'Teak CLI · AaBb 0123 {}=>'}
                 </div>
 
                 {/* Default shell picker. Shell NAMES are not translated

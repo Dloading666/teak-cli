@@ -1,7 +1,7 @@
 # Icon Theme Attributions
 
-Coffee CLI ships **8** distinct file-icon themes. Six are fetched verbatim
-from upstream VS Code icon projects; two are self-authored Coffee CLI art.
+Teak CLI ships **8** distinct file-icon themes. Six are fetched verbatim
+from upstream VS Code icon projects; two are self-authored Teak CLI art.
 
 ## Fetched upstream (MIT licence)
 
@@ -29,7 +29,7 @@ See `scripts/fetch-icon-themes.mjs` for the complete URL map.
 | Theme     | Style                                                      |
 | --------- | ---------------------------------------------------------- |
 | `outline` | Minimalist line-frame with coloured letter stamps          |
-| `coffee`  | Coffee CLI brand — coffee-cup folder silhouette with steam lines; espresso-tile file stamps in each language's canonical brand hue |
+| `coffee`  | Teak CLI brand — coffee-cup folder silhouette with steam lines; espresso-tile file stamps in each language's canonical brand hue |
 
 See `scripts/generate-icon-themes.mjs` for the coffee renderer.
 

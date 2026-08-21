@@ -13,7 +13,7 @@
 //! `collect_grok_heatmap_entries`), mirroring the Kimi index second pass.
 //!
 //! Resume: `grok --resume <uuid>` (UUIDv7). The token is sourced from the
-//! history scanner (summary.json `info.id`), not PTY scraping. Coffee CLI
+//! history scanner (summary.json `info.id`), not PTY scraping. Teak CLI
 //! launches grok raw - no auth injection, no hook config; grok authenticates
 //! itself via `~/.grok/auth.json` (native OAuth, verified working standalone).
 

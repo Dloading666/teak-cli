@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Coffee CLI — Icon Pipeline (PNG-based, platform-split)
+from __future__ import annotations
+# Teak CLI — Icon Pipeline (PNG-based, platform-split)
 #
 # The brand ships two source artworks with the SAME glyph, differing only in
 # how the outer corners are handled:

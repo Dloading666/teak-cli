@@ -74,7 +74,7 @@ export const ICON_ART_THEMES: { id: IconTheme; folderSrc: string }[] = [
   { id: 'devicon',          folderSrc: '/icons/themes/devicon/folder-closed.svg'          },
   { id: 'fluent',           folderSrc: '/icons/themes/fluent/folder-closed.svg'           },
   { id: 'symbols',          folderSrc: '/icons/themes/symbols/folder-closed.svg'          },
-  { id: 'coffee',           folderSrc: '/icons/themes/coffee/folder-closed.svg'           },
+  { id: 'teak',             folderSrc: '/icons/themes/coffee/folder-closed.svg'           },
 ];
 
 // Themes whose SVGs use fill="currentColor" and should be tinted by the active

@@ -16,9 +16,9 @@
 //   done — "Generation complete": rising E6 → G6 → C7 triad
 //   wait — "Awaiting response": A6 → E6 descending fifth
 //
-// User controls (Settings ▸ Sound, localStorage `cc-*` keys, both default ON):
-//   cc-sound-done  — chime when a turn completes
-//   cc-sound-wait  — chime on permission / input prompts
+// User controls (Settings ▸ Sound, teak-* keys with cc-* fallback, both default ON):
+//   sound-done  — chime when a turn completes
+//   sound-wait  — chime on permission / input prompts
 // (A "only when window unfocused" toggle was removed — it silently muted all
 // chimes for single-window users, who are always focused on their one tab.)
 
@@ -27,6 +27,7 @@ import {
   type AgentStatus,
   type ToolType,
 } from '../store/app-state';
+import { prefGet } from './prefs';
 
 export type NotifyKind = 'done' | 'wait';
 
@@ -110,9 +111,7 @@ export function playNotifySound(kind: NotifyKind) {
 }
 
 function enabled(key: string): boolean {
-  try {
-    return localStorage.getItem(key) !== 'false';
-  } catch { return true; }
+  return prefGet(key) !== 'false';
 }
 
 /** Watch agentStatus changes and chime on meaningful transitions.
@@ -161,7 +160,7 @@ export function initNotifySound(
     if (!becameIdle && !becameWaiting) continue;
 
     const kind: NotifyKind = becameIdle ? 'done' : 'wait';
-    if (!enabled(kind === 'done' ? 'cc-sound-done' : 'cc-sound-wait')) continue;
+    if (!enabled(kind === 'done' ? 'sound-done' : 'sound-wait')) continue;
 
     playNotifySound(kind);
   }

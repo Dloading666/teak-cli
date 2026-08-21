@@ -1,8 +1,17 @@
 # Changelog
 
-All notable changes to Coffee CLI are documented in this file.
+Teak CLI is a fork of [Coffee CLI](https://github.com/edison7009/Coffee-CLI).
+Entries below this notice are upstream Coffee CLI history unless marked otherwise.
+
+## Unreleased — Teak CLI fork
+
+- Rebranded the product to **Teak CLI** (name, icon, bundle id `com.teakcli.desktop`,
+  binary `teak-cli`, config dir `~/.teak-cli`).
+- README and NOTICE credit Coffee CLI as upstream:
+  https://github.com/edison7009/Coffee-CLI
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Historical entries below describe Coffee CLI until this fork.
 For releases prior to v1.5.5, see the
 [GitHub Releases page](https://github.com/edison7009/Coffee-CLI/releases)
 and `git tag --list "v*"`.

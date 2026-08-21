@@ -91,7 +91,7 @@ jobs:
             label: macOS Apple Silicon
           # GitHub Actions exposed a dedicated x86_64 macOS runner
           # (`macos-15-intel`) in May 2026, after the `macos-13` Intel runner
-          # was deprecated. Without it, Intel Mac users had to run Coffee CLI
+          # was deprecated. Without it, Intel Mac users had to run Teak CLI
           # under Rosetta from the arm64 DMG. Now we ship a native x64 DMG too.
           - platform: macos-15-intel
             args: '--target x86_64-apple-darwin'
@@ -210,7 +210,7 @@ jobs:
         run: cargo tauri build ${{ matrix.args }}
 
       # ── Stage + rename artifacts to platform-labelled format ──
-      # Tauri's bundler emits names like `Coffee CLI_1.9.2_amd64.deb` which
+      # Tauri's bundler emits names like `Teak CLI_1.9.2_amd64.deb` which
       # don't tell the end user which OS they're for and use inconsistent
       # arch slugs (amd64/x86_64/x64 across formats, plus rpm's `-1` release
       # suffix). We rename to the EchoBird-style convention:
@@ -315,14 +315,14 @@ jobs:
             if [ -f "$NOTES_FILE" ]; then
               gh release create "$TAG" --repo "${{ github.repository }}" \
                 --draft \
-                --title "Coffee CLI $TAG" \
+                --title "Teak CLI $TAG" \
                 --notes-file "$NOTES_FILE" \
                 || echo "Release already exists (created by sibling matrix job)"
             else
               gh release create "$TAG" --repo "${{ github.repository }}" \
                 --draft \
-                --title "Coffee CLI $TAG" \
-                --notes "Coffee CLI $TAG. See README for install instructions." \
+                --title "Teak CLI $TAG" \
+                --notes "Teak CLI $TAG. See README for install instructions." \
                 || echo "Release already exists (created by sibling matrix job)"
             fi
           fi

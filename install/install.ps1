@@ -1,126 +1,21 @@
-# Coffee CLI - Windows Installer / Updater
-# Usage:   irm https://coffeecli.com/install.ps1 | iex
-# License: AGPL-3.0-or-later (https://github.com/edison7009/Coffee-CLI/blob/main/LICENSE)
-
-$ErrorActionPreference = "Stop"
-
-Write-Host ""
-Write-Host "  Coffee CLI Installer" -ForegroundColor Cyan
-Write-Host "  --------------------" -ForegroundColor DarkGray
-
-# Resolve version and binary via coffeecli.com (CF-hosted, China-accessible).
-# /version.json?platform=windows returns the latest release tag ONLY when
-# the Windows installer has been uploaded to GitHub Releases. If CI is
-# still mid-build, the endpoint returns an empty version, which we treat
-# as "no upgrade available yet" — preventing the earlier race where the
-# version bumped instantly but the .exe took another 15 min to appear.
-# /download/windows is a CF Worker route that proxies the matching GitHub
-# Release asset. This keeps the install path off api.github.com so the
-# script doesn't stall on a blocked or slow GitHub API from mainland
-# networks.
-Write-Host "  Fetching latest version..." -ForegroundColor Gray
-# Try coffeecli.com first (CF-cached, China-accessible). If the Worker
-# is down or rate-limited on its shared GitHub API quota, fall back to
-# api.github.com directly — the user's own IP has its own anonymous
-# quota and won't share that pool, so this is meaningfully more
-# reliable for the single-user case.
-$latestVer = $null
-$fallbackUrl = $null
-try {
-    $latestVer = (Invoke-RestMethod "https://coffeecli.com/version.json?platform=windows" -TimeoutSec 10).version
-} catch {
-    Write-Host "  Trying GitHub directly..." -ForegroundColor Gray
-}
-if (-not $latestVer) {
-    try {
-        $release = Invoke-RestMethod "https://api.github.com/repos/edison7009/Coffee-CLI/releases/latest" `
-            -Headers @{ "User-Agent" = "CoffeeCLI-Install" } -TimeoutSec 15
-        # Match the Windows asset matcher in Web-Home/_worker.js — keep in sync.
-        $winAsset = $release.assets | Where-Object { $_.name -like "*x64-setup.exe" } | Select-Object -First 1
-        if ($winAsset) {
-            $latestVer = $release.tag_name -replace '^v',''
-            $fallbackUrl = $winAsset.browser_download_url
-        }
-    } catch {}
-}
-
-# Detect currently installed version from Windows registry
-$installedVer = $null
-$regPaths = @(
-    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
-    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
-    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
-)
-foreach ($path in $regPaths) {
-    $entry = Get-ItemProperty $path -ErrorAction SilentlyContinue |
-             Where-Object { $_.DisplayName -like "Coffee CLI*" } |
-             Select-Object -First 1
-    if ($entry) {
-        $installedVer = $entry.DisplayVersion
-        break
-    }
-}
-
-# Empty `version` = the Windows build isn't out yet (CI probably still
-# running for a just-tagged release). Show an explicit "come back later"
-# message and pause so the window doesn't auto-close on the user before
-# they read it (some launch flows spawn a fresh PowerShell that closes
-# the moment the script returns).
-if (-not $latestVer) {
-    Write-Host ""
-    Write-Host "  A new version of Coffee CLI was just released." -ForegroundColor Yellow
-    Write-Host "  The server is currently redeploying." -ForegroundColor Yellow
-    Write-Host "  Please try again in about 10 minutes." -ForegroundColor Yellow
-    Write-Host ""
-    if ($installedVer) {
-        Write-Host "  Your current v$installedVer stays installed." -ForegroundColor Gray
-        Write-Host ""
-    }
-    Write-Host "  Press any key to close..." -ForegroundColor DarkGray
-    # ReadKey reads from the console keyboard buffer directly, so it works
-    # even when stdin is consumed by `irm | iex`. The try/catch swallows
-    # the case where there is no interactive console (CI / redirected).
-    try { [void][System.Console]::ReadKey($true) } catch {}
-    exit 0
-}
-
-Write-Host "  Latest : v$latestVer" -ForegroundColor Green
-
-if ($installedVer) {
-    Write-Host "  Installed: v$installedVer" -ForegroundColor Gray
-    if ($installedVer -eq $latestVer) {
-        Write-Host ""
-        Write-Host "  Coffee CLI is already up to date (v$installedVer)." -ForegroundColor Green
-        Write-Host ""
-        exit 0
-    }
-    Write-Host "  Upgrading v$installedVer -> v$latestVer ..." -ForegroundColor Yellow
-} else {
-    Write-Host "  Not installed - performing fresh install..." -ForegroundColor Gray
-}
-
-$url = if ($fallbackUrl) { $fallbackUrl } else { "https://coffeecli.com/download/windows" }
-$out = "$env:TEMP\coffee-cli-setup.exe"
-
-Write-Host "  Downloading..." -ForegroundColor Gray
-# Wrap in try/catch so a transient 404 (CI edge case: version.json says
-# ready but GitHub asset not yet consistent) surfaces as a friendly
-# message instead of a raw WebException stack.
-try {
-    Invoke-WebRequest $url -OutFile $out -UseBasicParsing
-} catch {
-    Write-Host ""
-    Write-Host "  Download failed: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "  The Windows installer may still be uploading to GitHub." -ForegroundColor DarkYellow
-    Write-Host "  Please wait ~5 minutes and run this command again." -ForegroundColor DarkYellow
-    Write-Host ""
-    exit 1
-}
-
-Write-Host "  Installing..." -ForegroundColor Gray
-Start-Process $out -Wait
+# Teak CLI — build from source. This fork is not distributed via coffeecli.com.
+#
+# Upstream Coffee CLI (different product):
+#   https://github.com/edison7009/Coffee-CLI
+#   https://coffeecli.com
 
 Write-Host ""
-Write-Host "  Done! Coffee CLI v$latestVer installed." -ForegroundColor Green
-Write-Host "  Launch it from the Start Menu." -ForegroundColor Gray
+Write-Host "  Teak CLI" -ForegroundColor Cyan
+Write-Host "  Fork of Coffee CLI — https://github.com/edison7009/Coffee-CLI"
+Write-Host ""
+Write-Host "  There is no coffeecli.com installer for this tree." -ForegroundColor Yellow
+Write-Host "  Downloading from coffeecli.com would install upstream Coffee CLI."
+Write-Host ""
+Write-Host "  Build from source:"
+Write-Host ""
+Write-Host "    cd src-ui; npm ci; npm run build; cd .."
+Write-Host "    cargo build --release"
+Write-Host ""
+Write-Host "  Binary: target/release/teak-cli.exe"
+Write-Host "  Config: ~/.teak-cli/"
 Write-Host ""

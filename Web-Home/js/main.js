@@ -46,24 +46,24 @@ if (savedLang && LANG_LIST[savedLang]) {
 
 const I18N_DICT = {
   en: {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "Enjoy life while you work.",
-    "hero-title-2": "Coffee CLI for",
+    "hero-title-2": "Teak CLI for",
     "hero-subtitle": "Off the games and dating. <span class=\"accent\">Something more interesting…</span>",
     "opc-link": "Coffee 101",
     "feedback": "Feedback",
     "downloads-title": "Or download the desktop app",
     "enterprise": "Enterprise",
     "enterprise-title": "Enterprise &amp; commercial licensing",
-    "enterprise-body": "The open-source edition is <strong>free, forever</strong> (AGPL-3.0) — companies are welcome to use it as-is. You only need a paid commercial license to step outside AGPL's copyleft: to <strong>customize Coffee CLI and keep your changes closed-source</strong>, <strong>ship it under your own brand / white-label</strong>, or <strong>embed it in a proprietary product you distribute</strong>. <strong>Custom development, priority support, and SLAs</strong> are available too. Tell us what you're building and we'll tailor a quote.",
+    "enterprise-body": "The open-source edition is <strong>free, forever</strong> (AGPL-3.0) — companies are welcome to use it as-is. You only need a paid commercial license to step outside AGPL's copyleft: to <strong>customize Teak CLI and keep your changes closed-source</strong>, <strong>ship it under your own brand / white-label</strong>, or <strong>embed it in a proprietary product you distribute</strong>. <strong>Custom development, priority support, and SLAs</strong> are available too. Tell us what you're building and we'll tailor a quote.",
     "enterprise-contact": "Contact us: hi@coffeecli.com",
-    "downloads-note": "<strong>macOS:</strong> if it won't open on first launch, run <code>xattr -cr '/Applications/Coffee CLI.app'</code> in Terminal, then reopen. <strong>Linux:</strong> may need extra terminal steps after download.",
+    "downloads-note": "<strong>macOS:</strong> if it won't open on first launch, run <code>xattr -cr '/Applications/Teak CLI.app'</code> in Terminal, then reopen. <strong>Linux:</strong> may need extra terminal steps after download.",
     "downloads-other": "Other variants (Intel Mac · ARM Linux · AppImage) →"
   },
   zh: {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "一边享受生活 一边工作",
-    "hero-title-2": "Coffee CLI 适合",
+    "hero-title-2": "Teak CLI 适合",
     "hero-subtitle": "游戏和恋爱之外，<span class=\"accent\">更有趣的事……</span>",
     "opc-link": "Coffee 101",
     "feedback": "问题反馈",
@@ -72,7 +72,7 @@ const I18N_DICT = {
     "enterprise-title": "企业采购 / 商业授权",
     "enterprise-body": "开源版<strong>永久免费</strong>(AGPL-3.0),企业可原样使用。仅当需要跳出 AGPL 开源义务时才需付费商业授权:<strong>定制并保持改动闭源</strong>、<strong>以自有品牌 / 白标对外分发</strong>,或<strong>嵌入贵司要分发的商业产品</strong>。也提供<strong>定制开发、优先支持与 SLA</strong>。告诉我们贵司的用途与需求,我们按需出方案与报价。",
     "enterprise-contact": "联系采购：hi@coffeecli.com",
-    "downloads-note": "<strong>macOS：</strong>首次打开若无反应或提示「已损坏」，在「终端」运行 <code>xattr -cr '/Applications/Coffee CLI.app'</code> 后重新打开即可。<strong>Linux：</strong>下载后可能需要额外终端步骤。",
+    "downloads-note": "<strong>macOS：</strong>首次打开若无反应或提示「已损坏」，在「终端」运行 <code>xattr -cr '/Applications/Teak CLI.app'</code> 后重新打开即可。<strong>Linux：</strong>下载后可能需要额外终端步骤。",
     "downloads-other": "其他版本（Intel Mac · ARM Linux · AppImage）→",
     "cn-mirrors-title": "其他下载渠道：",
     "cn-mirrors-baidu": "百度网盘",
@@ -81,9 +81,9 @@ const I18N_DICT = {
     "cn-mirrors-feedback": "国内用户问题反馈"
   },
   "zh-TW": {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "一邊享受生活 一邊工作",
-    "hero-title-2": "Coffee CLI 適用於",
+    "hero-title-2": "Teak CLI 適用於",
     "hero-subtitle": "遊戲和戀愛之外，<span class=\"accent\">更有趣的事……</span>",
     "opc-link": "Coffee 101",
     "feedback": "問題回饋",
@@ -92,7 +92,7 @@ const I18N_DICT = {
     "enterprise-title": "企業採購 / 商業授權",
     "enterprise-body": "開源版<strong>永久免費</strong>(AGPL-3.0),企業可原樣使用。僅當需要跳出 AGPL 開源義務時才需付費商業授權:<strong>定制並保持改動閉源</strong>、<strong>以自有品牌 / 白標對外分發</strong>,或<strong>嵌入貴司要分發的商業產品</strong>。也提供<strong>定制開發、優先支援與 SLA</strong>。告訴我們貴司的用途與需求,我們按需出方案與報價。",
     "enterprise-contact": "聯絡採購：hi@coffeecli.com",
-    "downloads-note": "<strong>macOS：</strong>首次開啟若無反應或提示「已損壞」，在「終端機」執行 <code>xattr -cr '/Applications/Coffee CLI.app'</code> 後重新開啟即可。<strong>Linux：</strong>下載後可能需要額外終端步驟。",
+    "downloads-note": "<strong>macOS：</strong>首次開啟若無反應或提示「已損壞」，在「終端機」執行 <code>xattr -cr '/Applications/Teak CLI.app'</code> 後重新開啟即可。<strong>Linux：</strong>下載後可能需要額外終端步驟。",
     "downloads-other": "其他版本（Intel Mac · ARM Linux · AppImage）→",
     "cn-mirrors-title": "其他下載渠道：",
     "cn-mirrors-baidu": "百度網盤",
@@ -101,9 +101,9 @@ const I18N_DICT = {
     "cn-mirrors-feedback": "國內用戶問題回饋"
   },
   ja: {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "生活を楽しみながら働く",
-    "hero-title-2": "Coffee CLIは以下の方に",
+    "hero-title-2": "Teak CLIは以下の方に",
     "hero-subtitle": "ゲームや恋愛から離れて。<span class=\"accent\">もっと面白いこと……</span>",
     "opc-link": "Coffee 101",
     "feedback": "フィードバック",
@@ -112,13 +112,13 @@ const I18N_DICT = {
     "enterprise-title": "法人購入 / 商用ライセンス",
     "enterprise-body": "オープンソース版は<strong>ずっと無料</strong>(AGPL-3.0)で、そのまま業務利用いただけます。AGPL のコピーレフトを外れる場合のみ有償の商用ライセンスが必要です:<strong>カスタマイズしてソースを非公開にする</strong>、<strong>自社ブランド / ホワイトラベルで配布する</strong>、<strong>配布する自社製品に組み込む</strong>場合など。<strong>受託開発・優先サポート・SLA</strong> もご用意。用途をお知らせいただければお見積りします。",
     "enterprise-contact": "お問い合わせ：hi@coffeecli.com",
-    "downloads-note": "<strong>macOS：</strong>初回起動で開かない場合は、ターミナルで <code>xattr -cr '/Applications/Coffee CLI.app'</code> を実行してから開き直してください。<strong>Linux：</strong>ダウンロード後にターミナル操作が必要な場合があります。",
+    "downloads-note": "<strong>macOS：</strong>初回起動で開かない場合は、ターミナルで <code>xattr -cr '/Applications/Teak CLI.app'</code> を実行してから開き直してください。<strong>Linux：</strong>ダウンロード後にターミナル操作が必要な場合があります。",
     "downloads-other": "その他のバリアント（Intel Mac · ARM Linux · AppImage）→"
   },
   ko: {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "삶을 즐기며 일하다",
-    "hero-title-2": "Coffee CLI는 이런 분께",
+    "hero-title-2": "Teak CLI는 이런 분께",
     "hero-subtitle": "게임과 연애에서 벗어나, <span class=\"accent\">더 흥미로운 것을…</span>",
     "opc-link": "Coffee 101",
     "feedback": "피드백",
@@ -127,82 +127,82 @@ const I18N_DICT = {
     "enterprise-title": "기업 구매 / 상용 라이선스",
     "enterprise-body": "오픈소스 에디션은 <strong>영구 무료</strong>(AGPL-3.0)이며 기업도 그대로 사용할 수 있습니다. AGPL 카피레프트를 벗어나려는 경우에만 유료 상용 라이선스가 필요합니다: <strong>커스터마이즈하고 변경 사항을 비공개로 유지</strong>, <strong>자체 브랜드 / 화이트라벨로 배포</strong>, 또는 <strong>배포하는 자사 제품에 내장</strong>. <strong>맞춤 개발·우선 지원·SLA</strong>도 제공합니다. 용도를 알려주시면 견적을 드립니다.",
     "enterprise-contact": "문의하기: hi@coffeecli.com",
-    "downloads-note": "<strong>macOS:</strong> 처음 실행 시 열리지 않으면 터미널에서 <code>xattr -cr '/Applications/Coffee CLI.app'</code> 를 실행한 뒤 다시 여세요. <strong>Linux:</strong> 다운로드 후 추가 터미널 작업이 필요할 수 있습니다.",
+    "downloads-note": "<strong>macOS:</strong> 처음 실행 시 열리지 않으면 터미널에서 <code>xattr -cr '/Applications/Teak CLI.app'</code> 를 실행한 뒤 다시 여세요. <strong>Linux:</strong> 다운로드 후 추가 터미널 작업이 필요할 수 있습니다.",
     "downloads-other": "기타 버전 (Intel Mac · ARM Linux · AppImage) →"
   },
   es: {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "Disfruta la vida mientras trabajas",
-    "hero-title-2": "Coffee CLI para",
+    "hero-title-2": "Teak CLI para",
     "hero-subtitle": "Más allá de los juegos y las citas. <span class=\"accent\">Algo más interesante…</span>",
     "opc-link": "Coffee 101",
     "feedback": "Comentarios",
     "downloads-title": "O descarga la app de escritorio",
     "enterprise": "Empresas",
     "enterprise-title": "Empresas y licencia comercial",
-    "enterprise-body": "La edición de código abierto es <strong>gratis, para siempre</strong> (AGPL-3.0); las empresas pueden usarla tal cual. Solo necesitas una licencia comercial de pago para salir del copyleft de AGPL: <strong>personalizar Coffee CLI y mantener tus cambios cerrados</strong>, <strong>distribuirlo con tu propia marca / marca blanca</strong> o <strong>integrarlo en un producto propietario que distribuyas</strong>. También ofrecemos <strong>desarrollo a medida, soporte prioritario y SLA</strong>. Cuéntanos tu caso y te preparamos un presupuesto.",
+    "enterprise-body": "La edición de código abierto es <strong>gratis, para siempre</strong> (AGPL-3.0); las empresas pueden usarla tal cual. Solo necesitas una licencia comercial de pago para salir del copyleft de AGPL: <strong>personalizar Teak CLI y mantener tus cambios cerrados</strong>, <strong>distribuirlo con tu propia marca / marca blanca</strong> o <strong>integrarlo en un producto propietario que distribuyas</strong>. También ofrecemos <strong>desarrollo a medida, soporte prioritario y SLA</strong>. Cuéntanos tu caso y te preparamos un presupuesto.",
     "enterprise-contact": "Contáctanos: hi@coffeecli.com",
-    "downloads-note": "<strong>macOS:</strong> si no abre en el primer intento, ejecuta <code>xattr -cr '/Applications/Coffee CLI.app'</code> en la Terminal y vuelve a abrirla. <strong>Linux:</strong> puede requerir pasos extra en terminal tras descargar.",
+    "downloads-note": "<strong>macOS:</strong> si no abre en el primer intento, ejecuta <code>xattr -cr '/Applications/Teak CLI.app'</code> en la Terminal y vuelve a abrirla. <strong>Linux:</strong> puede requerir pasos extra en terminal tras descargar.",
     "downloads-other": "Otras variantes (Intel Mac · ARM Linux · AppImage) →"
   },
   fr: {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "Profitez de la vie tout en travaillant",
-    "hero-title-2": "Coffee CLI pour",
+    "hero-title-2": "Teak CLI pour",
     "hero-subtitle": "Au-delà des jeux et des rencontres. <span class=\"accent\">Quelque chose de plus intéressant…</span>",
     "opc-link": "Coffee 101",
     "feedback": "Retour",
     "downloads-title": "Ou téléchargez l'application bureau",
     "enterprise": "Entreprises",
     "enterprise-title": "Entreprises et licence commerciale",
-    "enterprise-body": "L'édition open source est <strong>gratuite, pour toujours</strong> (AGPL-3.0) ; les entreprises peuvent l'utiliser telle quelle. Une licence commerciale payante n'est nécessaire que pour sortir du copyleft d'AGPL : <strong>personnaliser Coffee CLI en gardant vos modifications fermées</strong>, <strong>le distribuer sous votre propre marque / marque blanche</strong>, ou <strong>l'intégrer à un produit propriétaire que vous distribuez</strong>. Nous proposons aussi <strong>développement sur mesure, support prioritaire et SLA</strong>. Décrivez-nous votre besoin et nous établirons un devis.",
+    "enterprise-body": "L'édition open source est <strong>gratuite, pour toujours</strong> (AGPL-3.0) ; les entreprises peuvent l'utiliser telle quelle. Une licence commerciale payante n'est nécessaire que pour sortir du copyleft d'AGPL : <strong>personnaliser Teak CLI en gardant vos modifications fermées</strong>, <strong>le distribuer sous votre propre marque / marque blanche</strong>, ou <strong>l'intégrer à un produit propriétaire que vous distribuez</strong>. Nous proposons aussi <strong>développement sur mesure, support prioritaire et SLA</strong>. Décrivez-nous votre besoin et nous établirons un devis.",
     "enterprise-contact": "Contactez-nous : hi@coffeecli.com",
-    "downloads-note": "<strong>macOS :</strong> si l'app ne s'ouvre pas au premier lancement, exécutez <code>xattr -cr '/Applications/Coffee CLI.app'</code> dans le Terminal, puis rouvrez-la. <strong>Linux :</strong> peut nécessiter des étapes supplémentaires en terminal après téléchargement.",
+    "downloads-note": "<strong>macOS :</strong> si l'app ne s'ouvre pas au premier lancement, exécutez <code>xattr -cr '/Applications/Teak CLI.app'</code> dans le Terminal, puis rouvrez-la. <strong>Linux :</strong> peut nécessiter des étapes supplémentaires en terminal après téléchargement.",
     "downloads-other": "Autres variantes (Intel Mac · ARM Linux · AppImage) →"
   },
   de: {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "Genieße das Leben, während du arbeitest",
-    "hero-title-2": "Coffee CLI für",
+    "hero-title-2": "Teak CLI für",
     "hero-subtitle": "Jenseits von Games und Dating. <span class=\"accent\">Etwas Interessanteres…</span>",
     "opc-link": "Coffee 101",
     "feedback": "Feedback",
     "downloads-title": "Oder lade die Desktop-App herunter",
     "enterprise": "Unternehmen",
     "enterprise-title": "Unternehmen & kommerzielle Lizenz",
-    "enterprise-body": "Die Open-Source-Edition ist <strong>für immer kostenlos</strong> (AGPL-3.0) — Unternehmen dürfen sie unverändert nutzen. Eine kostenpflichtige kommerzielle Lizenz brauchst du nur, um das Copyleft der AGPL zu verlassen: <strong>Coffee CLI anpassen und Änderungen geschlossen halten</strong>, <strong>unter eigener Marke / White-Label vertreiben</strong> oder <strong>in ein proprietäres Produkt einbetten, das du vertreibst</strong>. Auch <strong>Individualentwicklung, priorisierter Support und SLAs</strong> sind möglich. Schildere uns dein Vorhaben, wir erstellen ein Angebot.",
+    "enterprise-body": "Die Open-Source-Edition ist <strong>für immer kostenlos</strong> (AGPL-3.0) — Unternehmen dürfen sie unverändert nutzen. Eine kostenpflichtige kommerzielle Lizenz brauchst du nur, um das Copyleft der AGPL zu verlassen: <strong>Teak CLI anpassen und Änderungen geschlossen halten</strong>, <strong>unter eigener Marke / White-Label vertreiben</strong> oder <strong>in ein proprietäres Produkt einbetten, das du vertreibst</strong>. Auch <strong>Individualentwicklung, priorisierter Support und SLAs</strong> sind möglich. Schildere uns dein Vorhaben, wir erstellen ein Angebot.",
     "enterprise-contact": "Kontakt: hi@coffeecli.com",
-    "downloads-note": "<strong>macOS:</strong> Öffnet sie sich beim ersten Start nicht, führe <code>xattr -cr '/Applications/Coffee CLI.app'</code> im Terminal aus und öffne sie erneut. <strong>Linux:</strong> braucht nach dem Download eventuell zusätzliche Terminal-Schritte.",
+    "downloads-note": "<strong>macOS:</strong> Öffnet sie sich beim ersten Start nicht, führe <code>xattr -cr '/Applications/Teak CLI.app'</code> im Terminal aus und öffne sie erneut. <strong>Linux:</strong> braucht nach dem Download eventuell zusätzliche Terminal-Schritte.",
     "downloads-other": "Andere Varianten (Intel Mac · ARM Linux · AppImage) →"
   },
   pt: {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "Aproveite a vida enquanto trabalha",
-    "hero-title-2": "Coffee CLI para",
+    "hero-title-2": "Teak CLI para",
     "hero-subtitle": "Além dos jogos e dos encontros. <span class=\"accent\">Algo mais interessante…</span>",
     "opc-link": "Coffee 101",
     "feedback": "Feedback",
     "downloads-title": "Ou baixe o app desktop",
     "enterprise": "Empresas",
     "enterprise-title": "Empresas e licença comercial",
-    "enterprise-body": "A edição open source é <strong>gratuita, para sempre</strong> (AGPL-3.0); empresas podem usá-la como está. Você só precisa de uma licença comercial paga para sair do copyleft da AGPL: <strong>personalizar o Coffee CLI e manter suas mudanças fechadas</strong>, <strong>distribuí-lo sob sua própria marca / white-label</strong> ou <strong>incorporá-lo a um produto proprietário que você distribui</strong>. Também oferecemos <strong>desenvolvimento sob medida, suporte prioritário e SLA</strong>. Conte seu caso e preparamos um orçamento.",
+    "enterprise-body": "A edição open source é <strong>gratuita, para sempre</strong> (AGPL-3.0); empresas podem usá-la como está. Você só precisa de uma licença comercial paga para sair do copyleft da AGPL: <strong>personalizar o Teak CLI e manter suas mudanças fechadas</strong>, <strong>distribuí-lo sob sua própria marca / white-label</strong> ou <strong>incorporá-lo a um produto proprietário que você distribui</strong>. Também oferecemos <strong>desenvolvimento sob medida, suporte prioritário e SLA</strong>. Conte seu caso e preparamos um orçamento.",
     "enterprise-contact": "Fale conosco: hi@coffeecli.com",
-    "downloads-note": "<strong>macOS:</strong> se não abrir na primeira vez, execute <code>xattr -cr '/Applications/Coffee CLI.app'</code> no Terminal e abra novamente. <strong>Linux:</strong> pode exigir etapas extras no terminal após o download.",
+    "downloads-note": "<strong>macOS:</strong> se não abrir na primeira vez, execute <code>xattr -cr '/Applications/Teak CLI.app'</code> no Terminal e abra novamente. <strong>Linux:</strong> pode exigir etapas extras no terminal após o download.",
     "downloads-other": "Outras variantes (Intel Mac · ARM Linux · AppImage) →"
   },
   ru: {
-    "logo-text": "Coffee CLI",
+    "logo-text": "Teak CLI",
     "hero-title-1": "Наслаждайтесь жизнью, работая",
-    "hero-title-2": "Coffee CLI для",
+    "hero-title-2": "Teak CLI для",
     "hero-subtitle": "Помимо игр и свиданий — <span class=\"accent\">кое-что поинтереснее…</span>",
     "opc-link": "Coffee 101",
     "feedback": "Обратная связь",
     "downloads-title": "Или скачайте десктоп-приложение",
     "enterprise": "Для бизнеса",
     "enterprise-title": "Для бизнеса и коммерческая лицензия",
-    "enterprise-body": "Открытая редакция <strong>бесплатна навсегда</strong> (AGPL-3.0) — компании могут использовать её как есть. Платная коммерческая лицензия нужна только чтобы выйти за рамки копилефта AGPL: <strong>доработать Coffee CLI и оставить изменения закрытыми</strong>, <strong>распространять под своим брендом / white-label</strong> или <strong>встроить в проприетарный продукт, который вы распространяете</strong>. Также доступны <strong>индивидуальная разработка, приоритетная поддержка и SLA</strong>. Опишите задачу — подготовим предложение.",
+    "enterprise-body": "Открытая редакция <strong>бесплатна навсегда</strong> (AGPL-3.0) — компании могут использовать её как есть. Платная коммерческая лицензия нужна только чтобы выйти за рамки копилефта AGPL: <strong>доработать Teak CLI и оставить изменения закрытыми</strong>, <strong>распространять под своим брендом / white-label</strong> или <strong>встроить в проприетарный продукт, который вы распространяете</strong>. Также доступны <strong>индивидуальная разработка, приоритетная поддержка и SLA</strong>. Опишите задачу — подготовим предложение.",
     "enterprise-contact": "Связаться: hi@coffeecli.com",
-    "downloads-note": "<strong>macOS:</strong> если не открывается при первом запуске, выполните <code>xattr -cr '/Applications/Coffee CLI.app'</code> в Терминале и откройте снова. <strong>Linux:</strong> после скачивания могут потребоваться дополнительные шаги в терминале.",
+    "downloads-note": "<strong>macOS:</strong> если не открывается при первом запуске, выполните <code>xattr -cr '/Applications/Teak CLI.app'</code> в Терминале и откройте снова. <strong>Linux:</strong> после скачивания могут потребоваться дополнительные шаги в терминале.",
     "downloads-other": "Другие варианты (Intel Mac · ARM Linux · AppImage) →"
   }
 };
@@ -826,80 +826,80 @@ const DEMO_DATA = {
     { label: "Task Board", title: "Task Board",          desc: "Keep track of everything your agent is doing. Organize work into To-Do, In Progress, and Done — right in the sidebar, while the agent runs." },
     { label: "History",    title: "Session History",     desc: "Every agent session is automatically saved. Scroll back, search, and resume any past conversation exactly where you left off." },
     { label: "Multi-Tab",  title: "Multi-Tab Sessions",  desc: "Run multiple agents and terminals in parallel, each fully isolated. Vibe-code in one tab, run a game in another — zero interference." },
-    { label: "Languages",  title: "11 Languages",        desc: "Coffee CLI speaks your language — literally. Switch the entire interface to English, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский, or Tiếng Việt. No English required." },
-    { label: "Wallpaper",  title: "Custom Wallpapers",   desc: "Make Coffee CLI yours. Drop in any image or animated video as your background — your workspace, your vibe." }
+    { label: "Languages",  title: "11 Languages",        desc: "Teak CLI speaks your language — literally. Switch the entire interface to English, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский, or Tiếng Việt. No English required." },
+    { label: "Wallpaper",  title: "Custom Wallpapers",   desc: "Make Teak CLI yours. Drop in any image or animated video as your background — your workspace, your vibe." }
   ],
   zh: [
     { label: "主题",     title: "主题切换",       desc: "一键切换内置主题，整个界面——包括活跃的终端会话——实时更新，无需重启，不会闪烁。" },
     { label: "任务看板", title: "任务看板",       desc: "追踪 Agent 正在做的一切。在侧边栏将任务整理为待办、进行中、已完成——Agent 工作时一目了然。" },
     { label: "历史记录", title: "会话历史",       desc: "每次 Agent 会话都自动保存。滚动回溯、搜索关键词，随时从上次中断的地方继续。" },
     { label: "多 Tab",   title: "多 Tab 会话",   desc: "同时运行多个 Agent 和终端，每个完全独立。一个 Tab 做 Vibe Coding，另一个跑游戏——互不干扰。" },
-    { label: "多语言",   title: "11 种语言",     desc: "Coffee CLI 真正说你的语言。一键将整个界面切换为英语、简体中文、繁體中文、日本語、한국어、Español、Français、Deutsch、Português、Русский 或 Tiếng Việt。不需要懂英语。" },
-    { label: "壁纸",     title: "自定义壁纸",     desc: "让 Coffee CLI 属于你。任意图片或动态视频都能作为背景——你的工作台，你的氛围。" }
+    { label: "多语言",   title: "11 种语言",     desc: "Teak CLI 真正说你的语言。一键将整个界面切换为英语、简体中文、繁體中文、日本語、한국어、Español、Français、Deutsch、Português、Русский 或 Tiếng Việt。不需要懂英语。" },
+    { label: "壁纸",     title: "自定义壁纸",     desc: "让 Teak CLI 属于你。任意图片或动态视频都能作为背景——你的工作台，你的氛围。" }
   ],
   "zh-TW": [
     { label: "主題",       title: "主題切換",         desc: "一鍵切換內建主題，整個介面——包括活躍的終端工作階段——即時更新，無需重啟，不會閃爍。" },
     { label: "任務看板",   title: "任務看板",         desc: "追蹤 Agent 正在做的一切。在側邊欄將任務整理為待辦、進行中、已完成——Agent 工作時一目了然。" },
     { label: "歷史記錄",   title: "工作階段歷史",     desc: "每次 Agent 工作階段都自動儲存。捲動回顧、搜尋關鍵字，隨時從上次中斷的地方繼續。" },
     { label: "多 Tab",     title: "多 Tab 工作階段", desc: "同時執行多個 Agent 和終端機，每個完全獨立。一個 Tab 做 Vibe Coding，另一個跑遊戲——互不干擾。" },
-    { label: "多語言",     title: "11 種語言",       desc: "Coffee CLI 真正說你的語言。一鍵將整個介面切換為英語、简体中文、繁體中文、日本語、한국어、Español、Français、Deutsch、Português、Русский 或 Tiếng Việt。不需要懂英語。" },
-    { label: "桌布",       title: "自訂桌布",         desc: "讓 Coffee CLI 成為你的。任意圖片或動態影片都能作為背景——你的工作台，你的氛圍。" }
+    { label: "多語言",     title: "11 種語言",       desc: "Teak CLI 真正說你的語言。一鍵將整個介面切換為英語、简体中文、繁體中文、日本語、한국어、Español、Français、Deutsch、Português、Русский 或 Tiếng Việt。不需要懂英語。" },
+    { label: "桌布",       title: "自訂桌布",         desc: "讓 Teak CLI 成為你的。任意圖片或動態影片都能作為背景——你的工作台，你的氛圍。" }
   ],
   ja: [
     { label: "テーマ",       title: "テーマ切替",           desc: "内蔵テーマをワンクリックで切り替え。アクティブなターミナルセッションを含むインターフェース全体がリアルタイムで更新されます。" },
     { label: "タスクボード", title: "タスクボード",         desc: "エージェントの作業をすべて把握。サイドバーでタスクをTODO・進行中・完了に整理できます。エージェントが動いている間も常に見通せます。" },
     { label: "履歴",         title: "セッション履歴",       desc: "すべてのエージェントセッションが自動保存されます。スクロールして過去を振り返り、検索し、中断した場所から再開できます。" },
     { label: "マルチタブ",   title: "マルチタブセッション", desc: "複数のエージェントとターミナルを並列で実行。各タブは完全独立。一方でバイブコーディング、もう一方でゲーム実行——相互干渉ゼロ。" },
-    { label: "多言語",       title: "11言語対応",           desc: "Coffee CLI はあなたの言語を話します。インターフェース全体を英語、简体中文、繁體中文、日本語、한국어、Español、Français、Deutsch、Português、Русский、Tiếng Việt に切り替え可能。英語不要。" },
-    { label: "壁紙",         title: "カスタム壁紙",         desc: "Coffee CLI をあなた色に。画像でも動画でも、お好きなものを背景に——あなたの作業空間、あなたのムード。" }
+    { label: "多言語",       title: "11言語対応",           desc: "Teak CLI はあなたの言語を話します。インターフェース全体を英語、简体中文、繁體中文、日本語、한국어、Español、Français、Deutsch、Português、Русский、Tiếng Việt に切り替え可能。英語不要。" },
+    { label: "壁紙",         title: "カスタム壁紙",         desc: "Teak CLI をあなた色に。画像でも動画でも、お好きなものを背景に——あなたの作業空間、あなたのムード。" }
   ],
   ko: [
     { label: "테마",     title: "테마 전환",       desc: "내장 테마를 즉시 전환하세요. 활성 터미널 세션을 포함한 전체 인터페이스가 실시간으로 업데이트됩니다. 재시작 없이, 깜박임도 없이." },
     { label: "작업 보드", title: "작업 보드",       desc: "에이전트가 하는 모든 작업을 추적하세요. 에이전트가 실행되는 동안 사이드바에서 할 일, 진행 중, 완료로 작업을 정리할 수 있습니다." },
     { label: "기록",     title: "세션 기록",       desc: "모든 에이전트 세션이 자동으로 저장됩니다. 스크롤하여 과거를 돌아보고, 검색하고, 중단한 곳에서 정확히 다시 시작하세요." },
     { label: "멀티탭",   title: "멀티탭 세션",     desc: "여러 에이전트와 터미널을 병렬로 실행하세요. 각 탭은 완전히 독립적입니다. 한 탭에서 바이브 코딩, 다른 탭에서 게임 — 완전한 격리." },
-    { label: "다국어",   title: "11개 언어",       desc: "Coffee CLI는 당신의 언어를 말합니다. 전체 인터페이스를 영어, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский, Tiếng Việt 로 전환하세요. 영어 불필요." },
-    { label: "배경",     title: "맞춤 배경화면",     desc: "Coffee CLI를 당신의 것으로. 이미지든 동영상이든 원하는 것을 배경으로 — 당신의 작업 공간, 당신의 분위기." }
+    { label: "다국어",   title: "11개 언어",       desc: "Teak CLI는 당신의 언어를 말합니다. 전체 인터페이스를 영어, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский, Tiếng Việt 로 전환하세요. 영어 불필요." },
+    { label: "배경",     title: "맞춤 배경화면",     desc: "Teak CLI를 당신의 것으로. 이미지든 동영상이든 원하는 것을 배경으로 — 당신의 작업 공간, 당신의 분위기." }
   ],
   es: [
     { label: "Temas",       title: "Cambio de Tema",        desc: "Cambia entre temas integrados al instante. Toda la interfaz — incluida tu sesión de terminal activa — se actualiza en tiempo real. Sin reinicios ni parpadeos." },
     { label: "Tareas",      title: "Tablero de Tareas",     desc: "Controla todo lo que hace tu agente. Organiza las tareas en Pendiente, En Progreso y Completado — en la barra lateral mientras el agente trabaja." },
     { label: "Historial",   title: "Historial de Sesiones", desc: "Cada sesión del agente se guarda automáticamente. Desplázate, busca y retoma cualquier conversación pasada exactamente donde la dejaste." },
     { label: "Multi-Tab",   title: "Sesiones Multi-Pestaña", desc: "Ejecuta múltiples agentes y terminales en paralelo, cada uno completamente aislado. Vibe-coding en una pestaña, un juego en otra — sin interferencias." },
-    { label: "Idiomas",     title: "11 Idiomas",             desc: "Coffee CLI habla tu idioma — literalmente. Cambia toda la interfaz a inglés, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский o Tiếng Việt. Sin inglés necesario." },
-    { label: "Fondo",       title: "Fondos Personalizados",  desc: "Haz tuyo Coffee CLI. Usa cualquier imagen o vídeo animado como fondo — tu espacio de trabajo, tu ambiente." }
+    { label: "Idiomas",     title: "11 Idiomas",             desc: "Teak CLI habla tu idioma — literalmente. Cambia toda la interfaz a inglés, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский o Tiếng Việt. Sin inglés necesario." },
+    { label: "Fondo",       title: "Fondos Personalizados",  desc: "Haz tuyo Teak CLI. Usa cualquier imagen o vídeo animado como fondo — tu espacio de trabajo, tu ambiente." }
   ],
   fr: [
     { label: "Thèmes",      title: "Changement de Thème",    desc: "Changez de thème instantanément. Toute l'interface — y compris votre session de terminal active — se met à jour en temps réel. Sans redémarrage ni scintillement." },
     { label: "Tâches",      title: "Tableau de Tâches",      desc: "Suivez tout ce que fait votre agent. Organisez les tâches en À faire, En cours et Terminé — dans la barre latérale pendant que l'agent travaille." },
     { label: "Historique",  title: "Historique des Sessions", desc: "Chaque session d'agent est automatiquement sauvegardée. Faites défiler, recherchez et reprenez n'importe quelle conversation passée là où vous l'aviez laissée." },
     { label: "Multi-Onglet", title: "Sessions Multi-Onglets", desc: "Exécutez plusieurs agents et terminaux en parallèle, chacun complètement isolé. Vibe-coding dans un onglet, un jeu dans un autre — zéro interférence." },
-    { label: "Langues",      title: "11 Langues",             desc: "Coffee CLI parle votre langue — littéralement. Basculez toute l'interface en anglais, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский ou Tiếng Việt. Sans anglais requis." },
-    { label: "Fond",         title: "Fonds Personnalisés",    desc: "Coffee CLI à votre image. Utilisez n'importe quelle image ou vidéo animée comme fond — votre espace, votre ambiance." }
+    { label: "Langues",      title: "11 Langues",             desc: "Teak CLI parle votre langue — littéralement. Basculez toute l'interface en anglais, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский ou Tiếng Việt. Sans anglais requis." },
+    { label: "Fond",         title: "Fonds Personnalisés",    desc: "Teak CLI à votre image. Utilisez n'importe quelle image ou vidéo animée comme fond — votre espace, votre ambiance." }
   ],
   de: [
     { label: "Themen",      title: "Thema wechseln",        desc: "Wechseln Sie sofort zwischen integrierten Themen. Die gesamte Oberfläche — einschließlich Ihrer aktiven Terminal-Sitzung — aktualisiert sich in Echtzeit. Kein Neustart, kein Flackern." },
     { label: "Aufgaben",    title: "Aufgaben-Board",        desc: "Behalten Sie alles im Blick, was Ihr Agent tut. Organisieren Sie Aufgaben in Offen, In Bearbeitung und Erledigt — in der Seitenleiste, während der Agent läuft." },
     { label: "Verlauf",     title: "Sitzungsverlauf",       desc: "Jede Agenten-Sitzung wird automatisch gespeichert. Scrollen, suchen und jedes vergangene Gespräch genau dort fortsetzen, wo Sie aufgehört haben." },
     { label: "Multi-Tab",   title: "Multi-Tab-Sitzungen",   desc: "Mehrere Agenten und Terminals parallel ausführen, jedes vollständig isoliert. Vibe-Coding in einem Tab, ein Spiel in einem anderen — keine gegenseitige Beeinflussung." },
-    { label: "Sprachen",    title: "11 Sprachen",           desc: "Coffee CLI spricht Ihre Sprache — buchstäblich. Wechseln Sie die gesamte Oberfläche zu Englisch, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский oder Tiếng Việt. Kein Englisch erforderlich." },
-    { label: "Hintergrund", title: "Eigene Hintergründe",    desc: "Machen Sie Coffee CLI zu Ihrem eigenen. Verwenden Sie ein Bild oder animiertes Video als Hintergrund — Ihr Arbeitsbereich, Ihre Stimmung." }
+    { label: "Sprachen",    title: "11 Sprachen",           desc: "Teak CLI spricht Ihre Sprache — buchstäblich. Wechseln Sie die gesamte Oberfläche zu Englisch, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский oder Tiếng Việt. Kein Englisch erforderlich." },
+    { label: "Hintergrund", title: "Eigene Hintergründe",    desc: "Machen Sie Teak CLI zu Ihrem eigenen. Verwenden Sie ein Bild oder animiertes Video als Hintergrund — Ihr Arbeitsbereich, Ihre Stimmung." }
   ],
   pt: [
     { label: "Temas",       title: "Troca de Tema",          desc: "Alterne entre temas integrados instantaneamente. Toda a interface — incluindo sua sessão de terminal ativa — é atualizada em tempo real. Sem reinicialização, sem cintilação." },
     { label: "Tarefas",     title: "Quadro de Tarefas",      desc: "Acompanhe tudo o que seu agente está fazendo. Organize tarefas em A Fazer, Em Andamento e Concluído — na barra lateral enquanto o agente trabalha." },
     { label: "Histórico",   title: "Histórico de Sessões",   desc: "Cada sessão do agente é salva automaticamente. Role, pesquise e retome qualquer conversa passada exatamente de onde parou." },
     { label: "Multi-Aba",   title: "Sessões Multi-Aba",      desc: "Execute múltiplos agentes e terminais em paralelo, cada um completamente isolado. Vibe-coding em uma aba, um jogo em outra — zero interferência." },
-    { label: "Idiomas",     title: "11 Idiomas",             desc: "Coffee CLI fala o seu idioma — literalmente. Mude toda a interface para inglês, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский ou Tiếng Việt. Sem inglês necessário." },
-    { label: "Papel Parede", title: "Papel de Parede Personalizado", desc: "Torne o Coffee CLI seu. Use qualquer imagem ou vídeo animado como fundo — seu espaço, seu clima." }
+    { label: "Idiomas",     title: "11 Idiomas",             desc: "Teak CLI fala o seu idioma — literalmente. Mude toda a interface para inglês, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский ou Tiếng Việt. Sem inglês necessário." },
+    { label: "Papel Parede", title: "Papel de Parede Personalizado", desc: "Torne o Teak CLI seu. Use qualquer imagem ou vídeo animado como fundo — seu espaço, seu clima." }
   ],
   ru: [
     { label: "Темы",        title: "Смена темы",               desc: "Переключайтесь между встроенными темами мгновенно. Весь интерфейс — включая активную сессию терминала — обновляется в реальном времени. Без перезапуска и мерцания." },
     { label: "Задачи",      title: "Доска задач",              desc: "Отслеживайте всё, что делает ваш агент. Организуйте задачи в «К выполнению», «В работе» и «Готово» — прямо на боковой панели, пока агент работает." },
     { label: "История",     title: "История сессий",           desc: "Каждая сессия агента сохраняется автоматически. Прокручивайте, ищите и возобновляйте любой прошлый разговор точно с того места, где остановились." },
     { label: "Мультитаб",   title: "Мультивкладочные сессии",  desc: "Запускайте несколько агентов и терминалов параллельно, каждый полностью изолирован. Vibe-кодинг в одной вкладке, игра в другой — никаких помех." },
-    { label: "Языки",       title: "11 языков",                desc: "Coffee CLI говорит на вашем языке — буквально. Переключите весь интерфейс на английский, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский или Tiếng Việt. Английский не нужен." },
-    { label: "Обои",        title: "Собственные обои",         desc: "Сделайте Coffee CLI своим. Любое изображение или анимированное видео в качестве фона — ваше рабочее место, ваша атмосфера." }
+    { label: "Языки",       title: "11 языков",                desc: "Teak CLI говорит на вашем языке — буквально. Переключите весь интерфейс на английский, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Português, Русский или Tiếng Việt. Английский не нужен." },
+    { label: "Обои",        title: "Собственные обои",         desc: "Сделайте Teak CLI своим. Любое изображение или анимированное видео в качестве фона — ваше рабочее место, ваша атмосфера." }
   ]
 };
 

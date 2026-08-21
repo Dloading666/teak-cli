@@ -1,4 +1,7 @@
-// Coffee CLI legacy hook cleanup
+// Legacy upstream (Coffee CLI) hook cleanup.
+// Match strings and filenames below must stay as coffee-cli-* / "Coffee CLI"
+// because those are the bytes older installs wrote to disk. Renaming them
+// would skip cleanup. This product is Teak CLI.
 //
 // Coffee no longer installs status hooks or plugins into third-party tools.
 // At app launch this module removes artifacts written by older releases while

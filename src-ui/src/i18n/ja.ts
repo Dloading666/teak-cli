@@ -1,7 +1,7 @@
 import type { I18nKey } from './en';
 
 export const ja = {
-  'app.title': 'Coffee CLI',
+  'app.title': 'Teak CLI',
   'explorer.tab.workspace': 'ワークスペース',
   'explorer.tab.history': 'セッション履歴',
   'nav.status.working': '作業中',
@@ -151,7 +151,7 @@ export const ja = {
   'task.prompt.category_placeholder': 'カテゴリ名（既存を選ぶか新規入力）',
   'task.prompt.body_placeholder': 'プロンプトを書いてAIに送信…',
   'task.note_placeholder': 'メモを書いて、まとめて送信…',
-  'task.welcome_note': `Coffee CLI へようこそ ☕
+  'task.welcome_note': `Teak CLI へようこそ
 
 これは「付箋」です。思いついたことを書いて、右上の ▶ を押せば、まるごと AI に送れます。窮屈な小さな入力欄とはお別れです。
 

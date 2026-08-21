@@ -1,7 +1,7 @@
 import type { I18nKey } from './en';
 
 export const de = {
-  'app.title': 'Coffee CLI',
+  'app.title': 'Teak CLI',
   'explorer.tab.workspace': 'Arbeitsbereich',
   'explorer.tab.history': 'Sitzungen',
   'nav.status.working': 'Arbeitet',
@@ -152,7 +152,7 @@ export const de = {
   'task.prompt.category_placeholder': 'Kategoriename (vorhanden wählen oder neu eingeben)',
   'task.prompt.body_placeholder': 'Prompt schreiben, an KI senden…',
   'task.note_placeholder': 'Schreib etwas auf und sende alles an deinen Agenten…',
-  'task.welcome_note': `Willkommen bei Coffee CLI ☕
+  'task.welcome_note': `Willkommen bei Teak CLI
 
 Das ist ein Notizzettel: Schreib einfach drauflos und tippe oben rechts auf ▶, um alles an deine KI zu schicken. Schluss mit dem engen kleinen Eingabefeld.
 

@@ -72,7 +72,7 @@ export type GitChanges =
        *  commit"). The staged/unstaged split was collapsed 2026-07-06. */
       uncommitted: GitFileEntry[];
       untracked: GitFileEntry[];
-      /** Commits made since this Coffee CLI window opened (baseline..HEAD),
+      /** Commits made since this Teak CLI window opened (baseline..HEAD),
        *  metadata only — files fetched lazily via `gitCommitFiles`. Push-
        *  agnostic (push doesn't move HEAD). Reset on app close. */
       session_commits: CommitMeta[];
@@ -152,7 +152,7 @@ export const commands = {
 
   /** Notify the Rust backend that the window's visibility changed.
    *  When hidden=true, every per-session worker thread (ticker, emitter)
-   *  widens its sleep / coalesce window so a backgrounded Coffee CLI
+   *  widens its sleep / coalesce window so a backgrounded Teak CLI
    *  drops to near-zero CPU instead of running its full foreground
    *  cadence. Apple Silicon laptops in particular need this to keep
    *  the chassis cool when users leave the app open all day. */
@@ -263,7 +263,7 @@ export const commands = {
     invoke<void>('fs_paste', { action, srcPath, targetDir }),
   showInFolder: (path: string) => invoke<void>('show_in_folder', { path }),
 
-  // Task Board persistence (~/.coffee-cli/tasks.json)
+  // Task Board persistence (~/.teak-cli/tasks.json)
   loadTasks: () => invoke<string>('load_tasks'),
   saveTasks: (data: string) => invoke<void>('save_tasks', { data }),
 
@@ -277,10 +277,8 @@ export const commands = {
   openUrl: (url: string) =>
     invoke<void>('open_url', { url }),
 
-  // In-app self-update (Windows): download the latest installer from
-  // coffeecli.com/download/<os> with streamed progress, launch it, exit.
-  // Emits `self-update-progress` while it runs (see onSelfUpdateProgress).
-  // Rejects on non-Windows / download failure — caller falls back to openUrl.
+  // Self-update is disabled in this fork: coffeecli.com serves upstream
+  // Coffee CLI and must not overwrite Teak CLI.
   downloadAndInstallUpdate: () =>
     invoke<void>('download_and_install_update'),
 
@@ -292,7 +290,7 @@ export const commands = {
   stopFsWatcher: () =>
     invoke<void>('stop_fs_watcher'),
 
-  // ─── Per-tool launch overrides (~/.coffee-cli/tools.json) ───────────
+  // ─── Per-tool launch overrides (~/.teak-cli/tools.json) ───────────
   getToolConfig: (tool: string) =>
     invoke<ToolConfigEntry>('get_tool_config', { tool }),
   getAllToolConfigs: () =>
@@ -318,8 +316,8 @@ export async function onSelfUpdateProgress(
 }
 
 /**
- * One entry in `~/.coffee-cli/tools.json`. All fields are optional —
- * empty strings / empty arrays fall through to Coffee CLI's built-in
+ * One entry in `~/.teak-cli/tools.json`. All fields are optional —
+ * empty strings / empty arrays fall through to Teak CLI's built-in
  * defaults for that tool. Lets users say things like "always launch claude
  * with --dangerously-skip-permissions" or "run codex through
  * `docker exec mybox`" without us having to auto-detect every

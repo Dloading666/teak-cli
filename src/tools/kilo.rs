@@ -5,7 +5,7 @@
 //! reuse the OpenCode readers with a different db path:
 //!   - `~/.local/share/kilo/kilo.db` (XDG data root, `app = "kilo"` in
 //!     packages/core/src/global.ts; the fork also honors a `KILO_DB` env
-//!     override that Coffee CLI does not read)
+//!     override that Teak CLI does not read)
 //! See server.rs `kilo_db`, `find_drizzle_sessions_sqlite`, and
 //! `collect_opencode_heatmap_entries`.
 //!

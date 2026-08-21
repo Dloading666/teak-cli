@@ -43,9 +43,10 @@ import { useT } from '../../i18n/useT';
 import type { TaskItem } from './task-types';
 import { TaskEmptyState } from './TaskEmptyState';
 import { useTextContextMenu } from '../../lib/use-text-context-menu';
+import { prefGet, prefSet } from '../../lib/prefs';
 import './TaskPromptView.css';
 
-const COLLAPSED_KEY = 'cc-prompt-collapsed';
+const COLLAPSED_KEY = 'prompt-collapsed';
 
 interface DropLine { id: string; position: 'before' | 'after'; }
 
@@ -87,13 +88,13 @@ export function TaskPromptView({
   // Collapsed categories (keyed by title string), persisted so the fold
   // survives tab switches / restarts.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
-    try { return new Set<string>(JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]')); }
+    try { return new Set<string>(JSON.parse(prefGet(COLLAPSED_KEY) || '[]')); }
     catch { return new Set<string>(); }
   });
   const toggleCollapse = (cat: string) => setCollapsed(prev => {
     const next = new Set(prev);
     if (next.has(cat)) next.delete(cat); else next.add(cat);
-    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next])); } catch { /* Best-effort operation; failure is non-fatal. */ }
+    prefSet(COLLAPSED_KEY, JSON.stringify([...next]));
     return next;
   });
 

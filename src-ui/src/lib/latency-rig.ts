@@ -169,7 +169,7 @@ function scheduleInputRaf(): void {
 }
 
 function dumpRig(): void {
-  let out = '═══ Coffee CLI Latency Rig ═══\n';
+  let out = '═══ Teak CLI Latency Rig ═══\n';
   out += '\n── INPUT path (keydown → rAF) ──\n';
   out += formatLatency(inputRig.latency, 'input latency');
   out += formatCount(inputRig.coalesce, 'keys coalesced/frame', 'events');

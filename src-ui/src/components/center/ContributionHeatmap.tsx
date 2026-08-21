@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { isTauri, commands } from '../../tauri';
 import { useT } from '../../i18n/useT';
+import { prefGet, prefSet } from '../../lib/prefs';
 import './ContributionHeatmap.css';
 
 // 26 weeks ≈ 6 months. Half-year view keeps activity dense enough that
@@ -49,7 +50,7 @@ function levelFor(count: number, max: number): 0 | 1 | 2 | 3 | 4 {
 // ignored — the module-level cache still prevents intra-session refetch.
 type HeatmapEntry = { ts: number; count: number };
 type HeatmapCache = { date: string; entries: HeatmapEntry[]; fetchedAt: number };
-const HEATMAP_CACHE_KEY = 'cc-heatmap-cache';
+const HEATMAP_CACHE_KEY = 'heatmap-cache';
 // Refetch coalescing window. Within this TTL, repeat mounts (user toggling
 // between launchpad ↔ tool tab) skip the IPC call entirely. Past it, we
 // rescan so heatmap reflects intra-day activity (new sessions, new messages
@@ -60,7 +61,7 @@ let memoryCache: HeatmapCache | null = null;
 
 function readPersistedHeatmapCache(): HeatmapCache | null {
   try {
-    const raw = localStorage.getItem(HEATMAP_CACHE_KEY);
+    const raw = prefGet(HEATMAP_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as HeatmapCache;
     if (typeof parsed?.date === 'string' && Array.isArray(parsed?.entries)) {
@@ -78,7 +79,7 @@ function readPersistedHeatmapCache(): HeatmapCache | null {
 
 function writePersistedHeatmapCache(cache: HeatmapCache) {
   try {
-    localStorage.setItem(HEATMAP_CACHE_KEY, JSON.stringify(cache));
+    prefSet(HEATMAP_CACHE_KEY, JSON.stringify(cache));
   } catch { /* Best-effort operation; failure is non-fatal. */ }
 }
 

@@ -10,7 +10,7 @@
 // xterm WriteBuffer timer per pane, which starves the focused terminal on the
 // shared renderer thread").
 //
-// This module is the Coffee CLI port of Orca's `pane-terminal-output-scheduler`:
+// This module is the Teak CLI port of Orca's `pane-terminal-output-scheduler`:
 //   • ONE module-global drain timer for ALL background tabs (not one per tab).
 //   • Foreground (active) tab writes immediately via xterm.write — xterm's
 //     own WriteBuffer paces it, and there's only ONE fg tab so no competition.
@@ -52,7 +52,7 @@ const RESUME_FLUSH_SYNC = 256 * 1024; // 256 KB
 /** One-time in-order warning when the 2MB cap is hit. Pushed as a chunk so it
  *  lands at the correct position (where drops started) in the buffer. */
 const DROP_WARNING =
-  '\r\n\x1b[33m[Coffee CLI: 后台输出积压超过 2MB,已丢弃部分历史输出。切回此 tab 查看实时输出,完整对话见 session 文件]\x1b[0m\r\n';
+  '\r\n\x1b[33m[Teak CLI: 后台输出积压超过 2MB,已丢弃部分历史输出。切回此 tab 查看实时输出,完整对话见 session 文件]\x1b[0m\r\n';
 
 // ── Per-session state ────────────────────────────────────────────────────────
 

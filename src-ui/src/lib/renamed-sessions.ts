@@ -1,7 +1,7 @@
 // Renamed sessions - localStorage-backed custom title table.
 //
 // Same local-marker design as pinned-sessions.ts / hidden-sessions.ts:
-// Coffee only *reads* each CLI tool's session data for the 会话记录 list,
+// Teak only *reads* each CLI tool's session data for the 会话记录 list,
 // so a rename is a per-device override layered on top of the tool's own
 // auto-generated title — never a write into the tool's session files
 // (those formats are per-tool and risky to mutate). Keyed `${tool}:${id}`
@@ -13,14 +13,17 @@
 // subscribes via useSyncExternalStore and re-renders the instant a rename
 // lands.
 
-const STORAGE_KEY = 'coffee:renamed-sessions';
+import { prefGetWith, prefSet } from './prefs';
+
+const STORAGE_KEY = 'renamed-sessions';
+const LEGACY_KEY = 'coffee:renamed-sessions';
 
 let names: Record<string, string> = load();
 const listeners = new Set<() => void>();
 
 function load(): Record<string, string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = prefGetWith(STORAGE_KEY, LEGACY_KEY);
     if (!raw) return {};
     const obj = JSON.parse(raw);
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
@@ -36,7 +39,7 @@ function load(): Record<string, string> {
 
 function persist(): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
+    prefSet(STORAGE_KEY, JSON.stringify(names));
   } catch {
     // quota exceeded / localStorage disabled - rename stays in-memory for this session
   }
