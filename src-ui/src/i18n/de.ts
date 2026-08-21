@@ -4,6 +4,14 @@ export const de = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': 'Arbeitsbereich',
   'explorer.tab.history': 'Sitzungen',
+  'nav.status.working': 'Arbeitet',
+  'nav.status.idle': 'Bereit',
+  'nav.status.waiting': 'Wartet',
+  'nav.new_agent': 'Neue Sitzung',
+  'nav.new_chat': 'Neuer Chat',
+  'nav.empty': 'Noch keine Unterhaltungen',
+  'nav.empty_hint': 'Klicke auf Neuer Chat und wähle ein Tool',
+  'nav.uncategorized': 'Sonstiges',
   'explorer.workspace.select-dir': 'Klicken zum Arbeitsverzeichnis wählen',
 
   // Context Menu

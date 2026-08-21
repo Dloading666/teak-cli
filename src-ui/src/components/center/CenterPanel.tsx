@@ -891,13 +891,6 @@ export function CenterPanel() {
 
 
 
-  const handleAddTab = () => {
-    dispatch({
-      type: 'ADD_TERMINAL',
-      session: { id: crypto.randomUUID(), tool: null, folderPath: null }
-    });
-  };
-
   // External launch (`coffee-cli launch --tool <id> [--cwd <dir>]`) — reached
   // from the cold-start drain (takePendingLaunch) and the warm-start
   // single-instance forward ('launch-request' event). Reuses an idle
@@ -1299,7 +1292,7 @@ export function CenterPanel() {
   return (
     <>
       {tabSlot && createPortal(
-      <div ref={tabsHeaderRef} className="chrome-tabs-header" data-count={terminals.filter(s => !s.isHidden || s.id === activeTerminalId).length}>
+      <div ref={tabsHeaderRef} className="chrome-tabs-header chrome-tabs-header--nav" data-count={terminals.filter(s => !s.isHidden || s.id === activeTerminalId).length}>
         {(() => {
           // Pre-compute visible-strip index for each session so the inner
           // map can do O(1) shift lookups without re-filtering.
@@ -1405,7 +1398,7 @@ export function CenterPanel() {
             diff entirely. No status-grid (diff has no agent state). */}
         {diffTabVisible && (
           <div
-            className={`chrome-tab ${diffTabActive ? 'active' : ''}`}
+            className={`chrome-tab chrome-tab--keep ${diffTabActive ? 'active' : ''}`}
             onClick={() => dispatch({ type: 'SET_DIFF_TAB_ACTIVE', active: true })}
           >
             {/* Diff tab glyph: a document with text lines — reads as "file
@@ -1433,9 +1426,6 @@ export function CenterPanel() {
           </div>
         )}
 
-        <button className="chrome-tab-new" onClick={handleAddTab}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        </button>
       </div>,
       tabSlot)}
       <div className="main-content">

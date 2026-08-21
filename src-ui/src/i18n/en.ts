@@ -3,6 +3,14 @@ export const en = {
   // Explorer
   'explorer.tab.workspace': 'Workspace',
   'explorer.tab.history': 'Sessions',
+  'nav.status.working': 'Working',
+  'nav.status.idle': 'Idle',
+  'nav.status.waiting': 'Waiting',
+  'nav.new_agent': 'New session',
+  'nav.new_chat': 'New chat',
+  'nav.empty': 'No conversations yet',
+  'nav.empty_hint': 'Click New chat and pick a tool to start',
+  'nav.uncategorized': 'Other',
   'explorer.workspace.select-dir': 'Click to select working directory',
 
   // Context Menu

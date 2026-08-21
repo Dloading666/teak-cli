@@ -5,6 +5,14 @@ export const vi = {
   // Explorer
   'explorer.tab.workspace': 'Không gian làm việc',
   'explorer.tab.history': 'Phiên',
+  'nav.status.working': 'Đang chạy',
+  'nav.status.idle': 'Nghỉ',
+  'nav.status.waiting': 'Chờ xác nhận',
+  'nav.new_agent': 'Phiên mới',
+  'nav.new_chat': 'Chat mới',
+  'nav.empty': 'Chưa có hội thoại',
+  'nav.empty_hint': 'Bấm Chat mới và chọn công cụ để bắt đầu',
+  'nav.uncategorized': 'Khác',
   'explorer.workspace.select-dir': 'Nhấp để chọn thư mục làm việc',
 
   // Context Menu

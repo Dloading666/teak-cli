@@ -663,7 +663,7 @@ export function Explorer() {
       const saved = localStorage.getItem('cc-left-tab');
       if (saved === 'workspace' || saved === 'history') return saved;
     } catch { /* Best-effort operation; failure is non-fatal. */ }
-    return 'workspace';
+    return 'history';
   });
   useEffect(() => {
     try { localStorage.setItem('cc-left-tab', activeTab); } catch { /* Best-effort operation; failure is non-fatal. */ }
@@ -832,16 +832,16 @@ export function Explorer() {
 
       <div className="explorer-tabs">
         <button
-          className={`explorer-tab ${activeTab === 'workspace' ? 'active' : ''}`}
-          onClick={() => setActiveTab('workspace')}
-        >
-          {t('explorer.tab.workspace')}
-        </button>
-        <button
           className={`explorer-tab ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => { setActiveTab('history'); refreshHistory(); }}
         >
           {t('explorer.tab.history')}
+        </button>
+        <button
+          className={`explorer-tab ${activeTab === 'workspace' ? 'active' : ''}`}
+          onClick={() => setActiveTab('workspace')}
+        >
+          {t('explorer.tab.workspace')}
         </button>
       </div>
 

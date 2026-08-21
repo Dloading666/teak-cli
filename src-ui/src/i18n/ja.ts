@@ -4,6 +4,14 @@ export const ja = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': 'ワークスペース',
   'explorer.tab.history': 'セッション履歴',
+  'nav.status.working': '作業中',
+  'nav.status.idle': '待機',
+  'nav.status.waiting': '確認待ち',
+  'nav.new_agent': '新しいセッション',
+  'nav.new_chat': '新しい会話',
+  'nav.empty': 'まだ会話がありません',
+  'nav.empty_hint': '「新しい会話」からツールを選んで開始',
+  'nav.uncategorized': 'その他',
   'explorer.workspace.select-dir': '作業フォルダをクリックして選択',
 
   // Context Menu

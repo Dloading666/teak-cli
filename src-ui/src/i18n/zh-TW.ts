@@ -3,7 +3,15 @@ import type { I18nKey } from './en';
 export const zhTW = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': '工作區',
-  'explorer.tab.history': '會話記錄',
+  'explorer.tab.history': '會話',
+  'nav.status.working': '進行中',
+  'nav.status.idle': '空閒',
+  'nav.status.waiting': '等待確認',
+  'nav.new_agent': '新建會話',
+  'nav.new_chat': '新對話',
+  'nav.empty': '還沒有對話',
+  'nav.empty_hint': '點擊「新對話」，在右側選擇工具開始',
+  'nav.uncategorized': '其他',
   'explorer.workspace.select-dir': '點擊選擇工作目錄',
 
   // Context Menu

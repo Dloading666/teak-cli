@@ -4,6 +4,14 @@ export const ru = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': 'Рабочая область',
   'explorer.tab.history': 'Сессии',
+  'nav.status.working': 'В работе',
+  'nav.status.idle': 'Ожидание',
+  'nav.status.waiting': 'Нужно подтверждение',
+  'nav.new_agent': 'Новая сессия',
+  'nav.new_chat': 'Новый чат',
+  'nav.empty': 'Пока нет разговоров',
+  'nav.empty_hint': 'Нажмите «Новый чат» и выберите инструмент',
+  'nav.uncategorized': 'Другое',
   'explorer.workspace.select-dir': 'Нажмите для выбора рабочей папки',
 
   // Context Menu

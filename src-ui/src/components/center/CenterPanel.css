@@ -92,6 +92,12 @@
    titlebar — there's no adjacent terminal to bridge into up here. The active
    tab now reads via its --bg-terminal fill alone (WT-style flat tab). */
 
+/* Session switching lives in the left project rail. Keep + (and the
+   diff tab, marked .chrome-tab--keep) so a new launchpad is still one click. */
+.chrome-tabs-header--nav .chrome-tab:not(.chrome-tab--keep) {
+  display: none;
+}
+
 .chrome-tab-new {
   width: 28px;
   height: 28px;

@@ -4,6 +4,14 @@ export const ko = {
   'app.title': 'Coffee CLI',
   'explorer.tab.workspace': '작업 공간',
   'explorer.tab.history': '세션 기록',
+  'nav.status.working': '작업 중',
+  'nav.status.idle': '대기',
+  'nav.status.waiting': '확인 대기',
+  'nav.new_agent': '새 세션',
+  'nav.new_chat': '새 대화',
+  'nav.empty': '아직 대화가 없습니다',
+  'nav.empty_hint': '「새 대화」를 눌러 도구를 선택하세요',
+  'nav.uncategorized': '기타',
   'explorer.workspace.select-dir': '클릭하여 작업 디렉토리 선택',
 
   // Context Menu
