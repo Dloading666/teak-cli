@@ -9,10 +9,12 @@
 //   3. Multi-agent layout mode — only visible when the active tab is a
 //      multi-agent quadrant. Two modes: grid (2×2) and columns (1×4).
 
-import { commands, isTauri } from '../../tauri';
+import { useCallback, useEffect, useState } from 'react';
+import { commands, isTauri, onSelfUpdateProgress, TEAK_RELEASES_LATEST_URL } from '../../tauri';
 import { useAppState, useAppDispatch, schemeLabels } from '../../store/app-state';
 import { IS_MACOS } from '../../lib/platform';
 import { useT } from '../../i18n/useT';
+import { TeakMark } from './TeakMark';
 import './TitleBar.css';
 
 export function TitleBar() {
@@ -41,6 +43,62 @@ export function TitleBar() {
   const toggleRight = () => dispatch({ type: 'TOGGLE_RIGHT_PANEL' });
   const setGrid    = () => dispatch({ type: 'SET_MULTI_AGENT_LAYOUT', layout: 'grid' });
   const setColumns = () => dispatch({ type: 'SET_MULTI_AGENT_LAYOUT', layout: 'columns' });
+
+  const [hasUpdate, setHasUpdate] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [installPct, setInstallPct] = useState(0);
+  const [installPhase, setInstallPhase] = useState<
+    'speed_test' | 'downloading' | 'launching' | 'error' | null
+  >(null);
+
+  useEffect(() => {
+    const checkUpdate = async () => {
+      try {
+        const { getVersion } = await import('@tauri-apps/api/app');
+        const [local, remote] = await Promise.all([
+          getVersion(),
+          commands.latestReleaseVersion(),
+        ]);
+        const isNewer = (r: string, l: string) => {
+          const rv = r.split('.').map(Number);
+          const lv = l.split('.').map(Number);
+          for (let i = 0; i < 3; i++) {
+            if ((rv[i] ?? 0) > (lv[i] ?? 0)) return true;
+            if ((rv[i] ?? 0) < (lv[i] ?? 0)) return false;
+          }
+          return false;
+        };
+        if (remote && isNewer(remote, local)) setHasUpdate(true);
+      } catch { /* offline or fetch failed — silent */ }
+    };
+    checkUpdate();
+  }, []);
+
+  const handleSelfUpdate = useCallback(async () => {
+    if (installing) return;
+    if (!navigator.userAgent.toLowerCase().includes('win')) {
+      commands.openUrl(TEAK_RELEASES_LATEST_URL).catch(() => {});
+      return;
+    }
+    setInstalling(true);
+    setInstallPhase('speed_test');
+    setInstallPct(0);
+    let unlisten: (() => void) | undefined;
+    try {
+      unlisten = await onSelfUpdateProgress((p) => {
+        setInstallPhase(p.status);
+        setInstallPct(p.percent);
+      });
+      await commands.downloadAndInstallUpdate();
+    } catch {
+      commands.openUrl(TEAK_RELEASES_LATEST_URL).catch(() => {});
+      setInstalling(false);
+      setInstallPhase(null);
+      setInstallPct(0);
+    } finally {
+      unlisten?.();
+    }
+  }, [installing]);
 
   // Show the 2×2 / 1×4 layout picker only for the independent four-split view.
   const activeTab = state.terminals.find(t => t.id === state.activeTerminalId);
@@ -85,6 +143,57 @@ export function TitleBar() {
           their right. The flexible spacer between them stays a draggable handle. */}
       <div className="titlebar-tabs" id="titlebar-tab-slot" />
       <div className="titlebar-drag-spacer" />
+      <div className="titlebar-brand-center">
+        <div className="brand">
+          <TeakMark size={20} className="brand-icon" />
+          <span>{t('app.title')}</span>
+          {hasUpdate && (
+            <button
+              className={`icon-btn xs update-check-btn update-available${installing ? ' is-installing' : ''}`}
+              onClick={handleSelfUpdate}
+              disabled={installing}
+              aria-label="Update Teak CLI"
+            >
+              {installing ? (
+                <svg
+                  className={`update-ring${installPhase === 'speed_test' ? ' spin' : ''}`}
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                >
+                  <circle className="update-ring-track" cx="12" cy="12" r="9" fill="none" strokeWidth="2.6" />
+                  <circle
+                    className="update-ring-progress"
+                    cx="12"
+                    cy="12"
+                    r="9"
+                    fill="none"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                    transform="rotate(-90 12 12)"
+                    strokeDasharray={
+                      installPhase === 'speed_test'
+                        ? `${2 * Math.PI * 9 * 0.25} ${2 * Math.PI * 9}`
+                        : 2 * Math.PI * 9
+                    }
+                    strokeDashoffset={
+                      installPhase === 'speed_test'
+                        ? 0
+                        : 2 * Math.PI * 9 * (1 - installPct / 100)
+                    }
+                  />
+                </svg>
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
       {/* Icons come straight from Lucide (lucide.dev, ISC license). No
           runtime dependency — just the d-paths copied inline so we
           don't pay a 200KB+ import for four glyphs.

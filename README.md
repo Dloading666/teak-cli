@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icons/icon-rounded.png" width="96" alt="Teak CLI" />
+  <img src="brand/teak-icon-512.png" width="96" alt="Teak CLI" />
 </p>
 
 <h1 align="center">Teak CLI</h1>
@@ -22,6 +22,7 @@ Teak CLI is an independent **fork**. The source code is based on **Coffee CLI** 
 
 | | |
 |---|---|
+| Teak CLI | **https://github.com/Dloading666/teak-cli** |
 | Coffee CLI source | **https://github.com/edison7009/Coffee-CLI** |
 | Coffee CLI site | https://coffeecli.com |
 | License (kept) | [AGPL-3.0-or-later](LICENSE) |
@@ -62,8 +63,6 @@ teak-cli.exe launch --tool claude --cwd "C:\work\project"
 teak-cli launch --tool codex --cwd ~/work/project
 ```
 
-This fork does **not** install updates from coffeecli.com. That URL serves upstream Coffee CLI and would overwrite Teak CLI.
-
 ### License
 
 Code: **AGPL-3.0-or-later**. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
@@ -80,14 +79,13 @@ Coffee CLI, Gambit, Pitch, VibeID, and related marks are claimed by the upstream
 
 上游开源仓库（必须保留的出处）：
 
+- 本仓库：https://github.com/Dloading666/teak-cli
 - **https://github.com/edison7009/Coffee-CLI**
 - 官网：https://coffeecli.com
 
 本仓库已换名、换图标、换 bundle id。`LICENSE` / `NOTICE` / `TRADEMARKS.md` 按上游要求保留。本 fork **与 Coffee CLI 项目无官方关系**。
 
 配置目录：`~/.teak-cli/`。若尚不存在且本机还有 `~/.coffee-cli/`，首次启动会把旧目录改名为新目录。
-
-不要从 coffeecli.com 做「在线升级」：那个地址发的是上游 Coffee CLI 安装包，装上去会把本 fork 盖掉。请从源码编译。
 
 ---
 

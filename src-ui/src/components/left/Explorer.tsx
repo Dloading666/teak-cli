@@ -11,10 +11,9 @@ import { clipboardWrite } from '../../lib/clipboard';
 import { beginExplorerDrag } from '../../lib/explorer-drag';
 import { useFileStats, useDirtyDirs } from '../../lib/git-status';
 import { refreshHistory } from '../../lib/history-cache';
-import { commands, onSelfUpdateProgress } from '../../tauri';
+import { commands } from '../../tauri';
 import type { DirEntryInfo } from '../../tauri';
 import { HistoryBoard } from '../right/HistoryBoard';
-import { TeakMark } from '../common/TeakMark';
 import { prefGet, prefSet } from '../../lib/prefs';
 import './Explorer.css';
 
@@ -592,53 +591,6 @@ export function Explorer() {
     return () => window.removeEventListener('fs-refresh', handler);
   }, [folderPath]);
 
-  // Update check
-  const [hasUpdate, setHasUpdate] = useState(false);
-  // The brand (logo + title + the self-update button) renders here but DISPLAYS
-  // in the titlebar's left slot via portal — so it keeps all its Explorer-local
-  // self-update state untouched, and hides together with the left panel (this
-  // component unmounts when the panel is hidden, which is exactly what we want:
-  // no need to relocate the brand to the centre). Slot resolves after mount.
-  const [brandSlot, setBrandSlot] = useState<HTMLElement | null>(null);
-  useEffect(() => { setBrandSlot(document.getElementById('titlebar-brand-slot')); }, []);
-  // Teak CLI is a fork: never consult coffeecli.com for updates, or a click
-  // would download upstream Teak CLI and overwrite this build.
-  useEffect(() => { setHasUpdate(false); }, []);
-
-  // In-app self-update. Click the logo's update icon → a circular ring fills
-  // as the installer downloads, then the wizard launches and the app exits.
-  // Windows only; elsewhere (or on download failure) fall back to the page.
-  const [installing, setInstalling] = useState(false);
-  const [installPct, setInstallPct] = useState(0);
-  const [installPhase, setInstallPhase] = useState<
-    'speed_test' | 'downloading' | 'launching' | 'error' | null
-  >(null);
-  const handleSelfUpdate = useCallback(async () => {
-    if (installing) return;
-    if (!navigator.userAgent.toLowerCase().includes('win')) {
-      return;
-    }
-    setInstalling(true);
-    setInstallPhase('speed_test');
-    setInstallPct(0);
-    let unlisten: (() => void) | undefined;
-    try {
-      unlisten = await onSelfUpdateProgress((p) => {
-        setInstallPhase(p.status);
-        setInstallPct(p.percent);
-      });
-      await commands.downloadAndInstallUpdate();
-      // Success: installer launched and the app is about to exit — leave the
-      // ring as-is until the window goes away.
-    } catch {
-      setInstalling(false);
-      setInstallPhase(null);
-      setInstallPct(0);
-    } finally {
-      unlisten?.();
-    }
-  }, [installing]);
-
   // Persist last-selected left tab, same pattern as TaskBoard's right tab.
   const [activeTab, setActiveTab] = useState<'workspace' | 'history'>(() => {
     try {
@@ -719,62 +671,6 @@ export function Explorer() {
 
   return (
     <div className="panel panel-left explorer-panel" data-icon-theme={state.iconTheme}>
-      {/* Brand + theme/lang controls */}
-      {brandSlot && createPortal(
-        <div className="brand">
-          <TeakMark size={18} className="brand-icon" />
-          <span>{t('app.title')}</span>
-          {hasUpdate && (
-            <button
-              className={`icon-btn xs update-check-btn update-available${installing ? ' is-installing' : ''}`}
-              onClick={handleSelfUpdate}
-              disabled={installing}
-              aria-label="Update Teak CLI"
-            >
-              {installing ? (
-                <svg
-                  className={`update-ring${installPhase === 'speed_test' ? ' spin' : ''}`}
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                >
-                  <circle className="update-ring-track" cx="12" cy="12" r="9" fill="none" strokeWidth="2.6" />
-                  <circle
-                    className="update-ring-progress"
-                    cx="12"
-                    cy="12"
-                    r="9"
-                    fill="none"
-                    strokeWidth="2.6"
-                    strokeLinecap="round"
-                    transform="rotate(-90 12 12)"
-                    strokeDasharray={
-                      installPhase === 'speed_test'
-                        ? `${2 * Math.PI * 9 * 0.25} ${2 * Math.PI * 9}`
-                        : 2 * Math.PI * 9
-                    }
-                    strokeDashoffset={
-                      installPhase === 'speed_test'
-                        ? 0
-                        : 2 * Math.PI * 9 * (1 - installPct / 100)
-                    }
-                  />
-                </svg>
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-              )}
-            </button>
-          )}
-        </div>
-        
-        ,
-        brandSlot
-      )}
-
       <div className="explorer-tabs">
         <button
           className={`explorer-tab ${activeTab === 'history' ? 'active' : ''}`}

@@ -990,6 +990,7 @@ html.is-macos #root {
 
 /* ─── Custom Titlebar ────────────────────────────────── */
 .titlebar {
+    position: relative;
     height: 40px;
     /* Same surface as the side panels (--bg-panel), so the titlebar + left rail
        + right rail read as one continuous "brighter frame" around the darker
@@ -1027,30 +1028,60 @@ html.is-macos #root {
     flex-shrink: 0;
     height: 100%;
     transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1);
-    /* Hosts the app brand (logo + title), portaled here from Explorer. Centre it
-       vertically; overflow:hidden clips it cleanly as the slot collapses with
-       the left panel. */
+    /* Empty spacer: keeps tabs / traffic lights clear of the left rail.
+       Brand no longer lives here — it is window-centered. */
     display: flex;
     align-items: center;
     overflow: hidden;
     min-width: 0;
 }
 
-/* Brand inside the titlebar: pad from the left; never wrap/shrink so it clips
-   (not reflows) as the slot narrows on collapse. */
-.titlebar-left-slot .brand {
-    padding-left: 16px;
+.titlebar-brand-center {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    z-index: 2;
+}
+.titlebar-brand-center .brand {
+    padding: 0 12px;
     white-space: nowrap;
     flex-shrink: 0;
+    background: var(--bg-panel);
 }
-/* macOS: clear the native traffic lights (Overlay draws them top-left) with
-   a comfortable gap. The lights start at trafficLightPosition x:14
-   (tauri.macos.conf.json) and span ~54px → they end ≈68px; 76px left the
-   brand logo almost touching them (~8px), which read as cramped (issue
-   #102). 88px gives a ~20px breathing room between the green light and the
-   logo, matching the spacing Finder/ Safari keep around their own chrome. */
-html.is-macos .titlebar-left-slot .brand {
-    padding-left: 88px;
+.titlebar-brand-center .update-check-btn {
+    pointer-events: auto;
+    position: relative;
+    display: none;
+}
+.titlebar-brand-center .update-check-btn.update-available {
+    display: inline-flex;
+    color: #e85454;
+}
+.titlebar-brand-center .update-check-btn.is-installing {
+    cursor: default;
+    opacity: 1;
+}
+.titlebar-brand-center .update-ring {
+    display: block;
+}
+.titlebar-brand-center .update-ring.spin {
+    transform-origin: center;
+    animation: update-ring-spin 0.7s linear infinite;
+}
+@keyframes update-ring-spin {
+    to { transform: rotate(360deg); }
+}
+.titlebar-brand-center .update-ring-track {
+    stroke: rgba(232, 84, 84, 0.22);
+}
+.titlebar-brand-center .update-ring-progress {
+    stroke: #e85454;
+    transition: stroke-dashoffset 0.2s linear;
 }
 .titlebar-left-slot.is-collapsed {
     width: 0;

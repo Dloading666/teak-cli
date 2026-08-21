@@ -75,7 +75,7 @@ WebView2 对 `navigator.clipboard.*` 和 `document.execCommand('copy'|'paste')` 
 
 ## 项目基础设施参考
 
-- **本 fork 不要沿用 coffeecli.com 安装脚本**。`Web-Home/` 仍是上游站点资源；`install/` 改为从源码构建说明。
-- **不要走 coffeecli.com 发版/升级**：那是上游 Coffee CLI 的 Worker。本 fork 从源码编译；在线升级会装回 Coffee CLI。
+- **不要走 coffeecli.com 发版/升级**：那是上游 Coffee CLI 的 Worker，会把本 fork 盖掉。
+- **在线升级走本仓库 GitHub Releases**（`Dloading666/teak-cli`）。应用内更新检查与安装包下载都指向该仓库，不经过 coffeecli.com。`Web-Home/` 仍是上游站点资源。
 - **PTY 锁死根因 #1 已修**（v0.6.1）：child watcher 线程；若复现视为根因 #2（emit/channel backpressure），看 `src/terminal.rs` reader 线程
 - **Hook forwarder 纪律**（v3.2.5+，来自上游）：`__hook` 全路径 exit 0；`argv[1]` 以 `__` 开头但不认识的子命令也 exit 0（不起 GUI）。排查 hook 问题用 `TEAK_HOOK_DEBUG=1`，日志在 `~/.teak-cli/hooks/hook-debug.log`。旧 Coffee CLI 钩子仍由 `src/hook_installer.rs` 按 `coffee-cli-*` 文件名清理。

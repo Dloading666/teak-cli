@@ -4470,22 +4470,22 @@ fn open_url(url: String) -> Result<(), String> {
 
 // ─── In-app self-update ────────────────────────────────────────────────────
 //
-// Downloads the latest installer from `coffeecli.com/download/<os>` — a CF
-// Worker that proxies the matching GitHub Release asset (China-accessible,
-// stable name, no per-version URL to construct). Streams the body so the
+// Latest installer comes from this fork's GitHub Releases
+// (`Dloading666/teak-cli`), never coffeecli.com (that package is upstream
+// Coffee CLI and would overwrite Teak CLI). Streams the body so the
 // frontend can paint a circular download-progress ring via the
 // `self-update-progress` event, then launches the installer and exits so it
 // can replace our running files. ureq is blocking + rustls, so the whole
 // thing runs on a spawn_blocking thread; `app.emit` works from any thread.
 
-#[allow(dead_code)]
+const GITHUB_REPO: &str = "Dloading666/teak-cli";
+
 #[derive(serde::Serialize, Clone)]
 struct SelfUpdateProgress {
     status: String, // "speed_test" | "downloading" | "launching" | "error"
     percent: u32,
 }
 
-#[allow(dead_code)]
 fn emit_self_update(app: &tauri::AppHandle, status: &str, percent: u32) {
     let _ = app.emit(
         "self-update-progress",
@@ -4493,20 +4493,108 @@ fn emit_self_update(app: &tauri::AppHandle, status: &str, percent: u32) {
     );
 }
 
-#[tauri::command]
-async fn download_and_install_update(_app: tauri::AppHandle) -> Result<(), String> {
-    // Do not download from coffeecli.com — that installer is upstream Coffee CLI
-    // and would overwrite this fork.
-    Err("Teak CLI is a Coffee CLI fork and does not install updates from coffeecli.com. Build from source.".into())
+fn fetch_latest_github_release() -> Result<serde_json::Value, String> {
+    let url = format!("https://api.github.com/repos/{GITHUB_REPO}/releases/latest");
+    let resp = ureq::get(&url)
+        .set("User-Agent", "teak-cli")
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| format!("github latest release: {e}"))?;
+    let body = resp
+        .into_string()
+        .map_err(|e| format!("github latest release body: {e}"))?;
+    serde_json::from_str(&body).map_err(|e| format!("parse github release: {e}"))
 }
 
-#[allow(dead_code)]
+fn installer_asset_matches(name: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        return name.ends_with("Windows_x64-setup.exe") || name.ends_with("x64-setup.exe");
+    }
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
+        return name.ends_with("macOS_arm64.dmg")
+            || (name.contains("aarch64") && name.ends_with(".dmg"));
+    }
+    #[cfg(all(target_os = "macos", not(target_arch = "aarch64")))]
+    {
+        return name.ends_with("macOS_x64.dmg") || name.ends_with("_x64.dmg");
+    }
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    {
+        return name.ends_with("Linux_arm64.deb")
+            || name.ends_with("arm64.deb")
+            || name.ends_with("Linux_arm64.AppImage")
+            || name.ends_with("aarch64.AppImage");
+    }
+    #[cfg(all(target_os = "linux", not(target_arch = "aarch64")))]
+    {
+        return name.ends_with("Linux_x64.deb")
+            || name.ends_with("amd64.deb")
+            || name.ends_with("Linux_x64.AppImage")
+            || name.ends_with("amd64.AppImage");
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        let _ = name;
+        false
+    }
+}
+
+fn installer_download_url(release: &serde_json::Value) -> Result<String, String> {
+    let assets = release
+        .get("assets")
+        .and_then(|a| a.as_array())
+        .ok_or_else(|| "github release has no assets".to_string())?;
+    for asset in assets {
+        let name = asset.get("name").and_then(|n| n.as_str()).unwrap_or("");
+        if installer_asset_matches(name) {
+            if let Some(url) = asset.get("browser_download_url").and_then(|u| u.as_str()) {
+                return Ok(url.to_string());
+            }
+        }
+    }
+    Err("no installer asset for this platform in the latest GitHub release".into())
+}
+
+fn latest_release_version_inner() -> Result<String, String> {
+    let release = fetch_latest_github_release()?;
+    let tag = release
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "github release missing tag_name".to_string())?;
+    let version = tag.trim().trim_start_matches('v');
+    if version.is_empty() {
+        return Err("github release tag_name is empty".into());
+    }
+    Ok(version.to_string())
+}
+
+#[tauri::command]
+async fn latest_release_version() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(latest_release_version_inner)
+        .await
+        .map_err(|e| format!("latest_release_version join failed: {e}"))?
+}
+
+#[tauri::command]
+async fn download_and_install_update(app: tauri::AppHandle) -> Result<(), String> {
+    let app2 = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let release = fetch_latest_github_release()?;
+        let url = installer_download_url(&release)?;
+        run_self_update(&app2, &url)
+    })
+    .await
+    .map_err(|e| format!("self-update task join failed: {e}"))?
+}
+
 fn run_self_update(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     use std::io::{Read, Write};
 
     emit_self_update(app, "speed_test", 0);
 
-    let resp = match ureq::get(url).call() {
+    let resp = match ureq::get(url).set("User-Agent", "teak-cli").call() {
         Ok(r) => r,
         Err(e) => {
             emit_self_update(app, "error", 0);
@@ -4705,6 +4793,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             load_password,
             delete_password,
             open_url,
+            latest_release_version,
             download_and_install_update,
             get_tool_config,
             get_all_tool_configs,

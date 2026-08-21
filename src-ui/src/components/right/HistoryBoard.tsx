@@ -277,10 +277,11 @@ export function HistoryBoard() {
                 const active = row.live.id === state.activeTerminalId;
                 const status = liveStatus(row.live);
                 const statusKey = status === 'wait_input' ? 'waiting' : (status ?? 'idle');
+                const isRunning = status === 'working' || Boolean(row.live.chatPending && status !== 'wait_input');
                 return (
                   <div
                     key={row.key}
-                    className={`nav-session${active ? ' is-active' : ''}`}
+                    className={`nav-session${active ? ' is-active' : ''}${isRunning ? ' is-running' : ''}`}
                     onClick={() => openSession(row)}
                     onContextMenu={(e) => {
                       e.preventDefault();
@@ -343,16 +344,25 @@ export function HistoryBoard() {
                       )}
                       <span className="nav-session-meta">{getToolDisplayName(session.tool)}</span>
                     </div>
-                    <button
-                      type="button"
-                      className="nav-session-close"
-                      onClick={(e) => closeSession(row, e)}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
+                    <div className="nav-session-trailing">
+                      {isRunning && (
+                        <span
+                          className="nav-session-spinner"
+                          title={t('nav.status.working')}
+                          aria-label={t('nav.status.working')}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        className="nav-session-close"
+                        onClick={(e) => closeSession(row, e)}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 );
               })}

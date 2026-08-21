@@ -277,8 +277,9 @@ export const commands = {
   openUrl: (url: string) =>
     invoke<void>('open_url', { url }),
 
-  // Self-update is disabled in this fork: coffeecli.com serves upstream
-  // Coffee CLI and must not overwrite Teak CLI.
+  // Self-update from this repo's GitHub Releases (never coffeecli.com).
+  latestReleaseVersion: () =>
+    invoke<string>('latest_release_version'),
   downloadAndInstallUpdate: () =>
     invoke<void>('download_and_install_update'),
 
@@ -298,6 +299,9 @@ export const commands = {
   setToolConfig: (tool: string, entry: ToolConfigEntry) =>
     invoke<void>('set_tool_config', { tool, entry }),
 };
+
+export const TEAK_RELEASES_LATEST_URL =
+  'https://github.com/Dloading666/teak-cli/releases/latest';
 
 // In-app self-update progress, emitted by download_and_install_update.
 export interface SelfUpdateProgress {

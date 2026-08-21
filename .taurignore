@@ -1,13 +1,11 @@
-# Tauri dev watcher exclusions.
-# In dev mode the frontend loads from Vite dev server (devUrl in
-# tauri.conf.json), not from src-ui/dist. Watching dist causes spurious
-# "file changed → rebuild application" triggers on startup whenever
-# leftover build artifacts from `npm run build` exist, leading to a
-# needless double-compile before the app even opens.
-src-ui/dist/
-src-ui/node_modules/
-
-# Never needs watching — build/artifact dirs.
-target/
-Web-Home/
-docs/
+# Frontend is served by Vite HMR. Watching it here restarts the whole
+# native window on every CSS/TSX save and kills the "live update" loop.
+src-ui
+brand
+screenshot
+Web-Home
+icons
+*.md
+.git
+target
+node_modules
