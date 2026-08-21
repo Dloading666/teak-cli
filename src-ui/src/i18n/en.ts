@@ -209,6 +209,9 @@ Delete this note whenever you're ready, and start your first task.`,
   'heatmap.tooltip_one': '1 message on {date}',
   'heatmap.tooltip_none': 'No activity on {date}',
 
+  'update.download': 'Download update',
+  'update.installing': 'Installing update…',
+
 } as const;
 
 export type I18nKey = keyof typeof en;

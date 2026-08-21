@@ -203,4 +203,7 @@ Supprimez cette note quand vous voulez et commencez votre première tâche.`,
   'heatmap.tooltip_one': '1 message le {date}',
   'heatmap.tooltip_none': 'Aucune activité le {date}',
 
+  'update.download': 'Télécharger la mise à jour',
+  'update.installing': 'Installation de la mise à jour…',
+
 } as const satisfies Record<I18nKey, string>;

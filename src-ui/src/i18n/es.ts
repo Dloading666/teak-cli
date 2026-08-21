@@ -203,4 +203,7 @@ Borra esta nota cuando quieras y empieza tu primera tarea.`,
   'heatmap.tooltip_one': '1 mensaje el {date}',
   'heatmap.tooltip_none': 'Sin actividad el {date}',
 
+  'update.download': 'Descargar actualización',
+  'update.installing': 'Instalando actualización…',
+
 } as const satisfies Record<I18nKey, string>;

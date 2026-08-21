@@ -1,8 +1,13 @@
 // App.tsx — 3-panel IDE layout (frameless window)
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useAppState } from './store/app-state';
+import { useAppState, snapToTerminal } from './store/app-state';
 import { retryInvoke } from './tauri';
+import {
+  applyNavOrderFromSnapshot,
+  loadOpenSessionsFromDisk,
+  saveOpenSessionsNow,
+} from './lib/open-sessions';
 import { initNotifySound } from './lib/notify-sound';
 import { routeFileDrop } from './lib/file-drop';
 import { initHistoryAutoRefresh } from './lib/history-cache';
@@ -186,7 +191,7 @@ function useSlidingPanel(hidden: boolean): { mounted: boolean; collapsed: boolea
 }
 
 export function App() {
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
 
   const [panelWidths, setPanelWidths] = useState<PanelWidths>(() => loadPanelWidths(
     window.innerWidth,
@@ -409,6 +414,43 @@ export function App() {
   // (prefetchHistory flips status to 'ready'), so users who never open it
   // pay only the 60s setInterval tick (a function call that early-returns).
   useEffect(() => initHistoryAutoRefresh(), []);
+
+  // Persist the left-rail session list so an update/restart can restore it.
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      saveOpenSessionsNow(state.terminals, state.activeTerminalId);
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [state.terminals, state.activeTerminalId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const snap = await loadOpenSessionsFromDisk();
+      if (cancelled || !snap) return;
+      applyNavOrderFromSnapshot(snap);
+      const sessions = snap.sessions
+        .map(snapToTerminal)
+        .filter((t): t is NonNullable<typeof t> => t !== null);
+      if (sessions.length === 0) return;
+      dispatch({
+        type: 'RESTORE_OPEN_SESSIONS',
+        sessions,
+        activeId: snap.activeId,
+      });
+    })().catch(() => {});
+    return () => { cancelled = true; };
+  }, [dispatch]);
+
+  useEffect(() => {
+    const flush = () => saveOpenSessionsNow(state.terminals, state.activeTerminalId);
+    window.addEventListener('beforeunload', flush);
+    document.addEventListener('visibilitychange', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      document.removeEventListener('visibilitychange', flush);
+    };
+  }, [state.terminals, state.activeTerminalId]);
 
   return (
     <>

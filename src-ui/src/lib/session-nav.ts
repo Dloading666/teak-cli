@@ -108,3 +108,43 @@ export function liveStatus(terminal: TerminalSession | undefined): AgentStatus |
   if (!terminal) return null;
   return terminal.agentStatus ?? 'idle';
 }
+
+/** Apply a saved id list to live rows. Missing ids are dropped; rows not in
+ *  the list (new chats) sort to the top by recency so they stay discoverable. */
+export function applySessionOrder<T>(
+  rows: T[],
+  order: string[] | undefined,
+  idOf: (row: T) => string,
+  recencyOf: (row: T) => number,
+): T[] {
+  if (!order || order.length === 0) {
+    return rows.slice().sort((a, b) => recencyOf(b) - recencyOf(a));
+  }
+  const byId = new Map<string, T>();
+  for (const row of rows) {
+    const id = idOf(row);
+    if (!byId.has(id)) byId.set(id, row);
+  }
+  const out: T[] = [];
+  const seen = new Set<string>();
+  for (const id of order) {
+    const row = byId.get(id);
+    if (!row || seen.has(id)) continue;
+    out.push(row);
+    seen.add(id);
+  }
+  const newcomers = rows
+    .filter((row) => !seen.has(idOf(row)))
+    .sort((a, b) => recencyOf(b) - recencyOf(a));
+  return [...newcomers, ...out];
+}
+
+/** Move `id` so it sits immediately before `beforeId`. `beforeId === null`
+ *  means append. `id` is inserted even if it wasn't already in `order`. */
+export function moveInOrder(order: string[], id: string, beforeId: string | null): string[] {
+  const without = order.filter((item) => item !== id);
+  if (beforeId == null) return [...without, id];
+  const insertIdx = without.indexOf(beforeId);
+  if (insertIdx < 0) return [...without, id];
+  return [...without.slice(0, insertIdx), id, ...without.slice(insertIdx)];
+}

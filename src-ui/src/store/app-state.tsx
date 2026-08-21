@@ -3,6 +3,11 @@
 import { createContext, useContext, useReducer } from 'react';
 import type { ReactNode } from 'react';
 import { prefGet, prefSet, prefRemove } from '../lib/prefs';
+import {
+  applyNavOrderFromSnapshot,
+  loadOpenSessionsPref,
+  type OpenSessionSnap,
+} from '../lib/open-sessions';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -331,6 +336,8 @@ type Action =
   | { type: 'REORDER_TERMINAL'; sessionId: string; beforeId: string | null }
   | { type: 'SET_ACTIVE_TERMINAL'; id: string | null }
   | { type: 'SET_TERMINAL_TOOL'; id: string; tool: ToolType; toolData?: string; resumeToken?: string }
+  | { type: 'SET_RESUME_TOKEN'; id: string; token: string }
+  | { type: 'RESTORE_OPEN_SESSIONS'; sessions: TerminalSession[]; activeId: string | null }
   | { type: 'SET_TERMINAL_HIDDEN'; id: string; isHidden: boolean }
   | { type: 'RESTART_TERMINAL'; id: string; newId: string }
   | { type: 'OPEN_HYPER_AGENT_TAB' }
@@ -454,6 +461,44 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, toolTitle: undefined, agentStatus: undefined, viewMode: 'terminal', chatPending: undefined, startedAt: Date.now() } : t)
       };
+    case 'SET_RESUME_TOKEN': {
+      const token = action.token.trim();
+      if (!token) return state;
+      if (!state.terminals.some(t => t.id === action.id)) return state;
+      if (state.terminals.some(t => t.id === action.id && t.resumeToken === token)) return state;
+      return {
+        ...state,
+        terminals: state.terminals.map(t => t.id === action.id ? { ...t, resumeToken: token } : t),
+      };
+    }
+    case 'RESTORE_OPEN_SESSIONS': {
+      if (action.sessions.length === 0) return state;
+      const hasLive = state.terminals.some(t => t.tool && t.tool !== 'installer');
+      if (!hasLive) {
+        const activeId = action.activeId
+          && action.sessions.some(t => t.id === action.activeId)
+          ? action.activeId
+          : action.sessions[0].id;
+        return { ...state, terminals: action.sessions, activeTerminalId: activeId };
+      }
+      const extras = new Map(action.sessions.map(s => [s.id, s]));
+      let changed = false;
+      const terminals = state.terminals.map(t => {
+        const src = extras.get(t.id);
+        if (!src) return t;
+        let next = t;
+        if (!next.resumeToken && src.resumeToken) {
+          next = { ...next, resumeToken: src.resumeToken };
+          changed = true;
+        }
+        if (!next.toolTitle && src.toolTitle) {
+          next = { ...next, toolTitle: src.toolTitle };
+          changed = true;
+        }
+        return next;
+      });
+      return changed ? { ...state, terminals } : state;
+    }
     case 'SET_TERMINAL_HIDDEN':
       return {
         ...state,
@@ -656,6 +701,19 @@ const VALID_ICON_THEMES: IconTheme[] = [
   'devicon', 'fluent', 'symbols', 'teak',
 ];
 
+export function snapToTerminal(snap: OpenSessionSnap): TerminalSession | null {
+  const tool = snap.tool as ToolType;
+  if (!tool) return null;
+  return {
+    id: snap.id,
+    tool,
+    folderPath: snap.folderPath,
+    resumeToken: snap.resumeToken,
+    toolTitle: snap.toolTitle,
+    startedAt: snap.startedAt,
+  };
+}
+
 function getInitialState(): AppState {
   // Default 'obsidian' + 'panel' — the "严谨高级简约" out-of-box. Carbon's
   // hex-mesh + translucent chrome is polarizing (love-it-or-hate-it); obsidian
@@ -782,7 +840,12 @@ function getInitialState(): AppState {
     }
   } catch { /* Best-effort operation; failure is non-fatal. */ }
 
-  const defaultTerminalId = crypto.randomUUID();
+  const restored = loadOpenSessionsPref();
+  applyNavOrderFromSnapshot(restored);
+  const restoredTerminals = restored
+    ? restored.sessions.map(snapToTerminal).filter((t): t is TerminalSession => t !== null)
+    : [];
+  const defaultTerminalId = restoredTerminals[0]?.id ?? crypto.randomUUID();
 
   let leftPanelHidden = false;
   let rightPanelHidden = false;
@@ -823,8 +886,12 @@ function getInitialState(): AppState {
     termColorScheme,
     termFont,
     defaultShell,
-    terminals: [{ id: defaultTerminalId, tool: null, folderPath }],
-    activeTerminalId: defaultTerminalId,
+    terminals: restoredTerminals.length > 0
+      ? restoredTerminals
+      : [{ id: defaultTerminalId, tool: null, folderPath }],
+    activeTerminalId: restored && restoredTerminals.some(t => t.id === restored.activeId)
+      ? restored.activeId
+      : defaultTerminalId,
     gambitOpen,
     settingsOpen: false,
     gambitEnterToSend,

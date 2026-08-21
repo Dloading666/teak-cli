@@ -4361,6 +4361,31 @@ fn save_tasks(data: String, app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+fn open_sessions_file_path() -> PathBuf {
+    let dir = crate::tool_config::config_dir().unwrap_or_else(|| PathBuf::from(".teak-cli"));
+    let _ = std::fs::create_dir_all(&dir);
+    dir.join("open-sessions.json")
+}
+
+#[tauri::command]
+fn load_open_sessions() -> Result<String, String> {
+    let path = open_sessions_file_path();
+    if path.exists() {
+        std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read open sessions: {e}"))
+    } else {
+        Ok("{}".to_string())
+    }
+}
+
+#[tauri::command]
+fn save_open_sessions(data: String) -> Result<(), String> {
+    serde_json::from_str::<serde_json::Value>(&data)
+        .map_err(|e| format!("Invalid open-session data (not valid JSON): {e}"))?;
+    let path = open_sessions_file_path();
+    std::fs::write(&path, &data).map_err(|e| format!("Failed to save open sessions: {e}"))
+}
+
 // ─── Credential Store (OS Keychain) ──────────────────────────────────────────
 
 const KEYRING_SERVICE: &str = "teak-cli";
@@ -4474,9 +4499,12 @@ fn open_url(url: String) -> Result<(), String> {
 // (`Dloading666/teak-cli`), never coffeecli.com (that package is upstream
 // Coffee CLI and would overwrite Teak CLI). Streams the body so the
 // frontend can paint a circular download-progress ring via the
-// `self-update-progress` event, then launches the installer and exits so it
-// can replace our running files. ureq is blocking + rustls, so the whole
-// thing runs on a spawn_blocking thread; `app.emit` works from any thread.
+// `self-update-progress` event. Then:
+//   Windows — NSIS `/P /UPDATE /R` (passive install + relaunch)
+//   macOS   — mount the DMG, helper replaces the .app after we exit, `open`
+//   Linux   — replace the running AppImage, or xdg-open a .deb
+// ureq is blocking + rustls, so the whole thing runs on a spawn_blocking
+// thread; `app.emit` works from any thread.
 
 const GITHUB_REPO: &str = "Dloading666/teak-cli";
 
@@ -4507,6 +4535,10 @@ fn fetch_latest_github_release() -> Result<serde_json::Value, String> {
 }
 
 fn installer_asset_matches(name: &str) -> bool {
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("APPIMAGE").is_some() {
+        return name.ends_with(".AppImage") || name.ends_with(".appimage");
+    }
     #[cfg(target_os = "windows")]
     {
         return name.ends_with("Windows_x64-setup.exe") || name.ends_with("x64-setup.exe");
@@ -4610,8 +4642,10 @@ fn run_self_update(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
         "exe"
     } else if cfg!(target_os = "macos") {
         "dmg"
+    } else if std::env::var_os("APPIMAGE").is_some() {
+        "AppImage"
     } else {
-        "bin"
+        "deb"
     };
     let out_path = std::env::temp_dir().join(format!("teak-cli-update-setup.{ext}"));
 
@@ -4650,20 +4684,208 @@ fn run_self_update(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     drop(file);
     emit_self_update(app, "downloading", 100);
 
-    // Launch the installer, then exit so it can overwrite our running files.
     emit_self_update(app, "launching", 100);
+    apply_downloaded_update(app, &out_path)
+}
+
+fn apply_downloaded_update(app: &tauri::AppHandle, package: &std::path::Path) -> Result<(), String> {
     #[cfg(target_os = "windows")]
-    let launch = std::process::Command::new(&out_path).spawn();
+    {
+        let launch = std::process::Command::new(package)
+            .args(["/P", "/UPDATE", "/R"])
+            .spawn();
+        if let Err(e) = launch {
+            emit_self_update(app, "error", 100);
+            return Err(format!("launch installer failed: {e}"));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(800));
+        app.exit(0);
+        return Ok(());
+    }
+
     #[cfg(target_os = "macos")]
-    let launch = std::process::Command::new("open").arg(&out_path).spawn();
+    {
+        return apply_macos_update(app, package);
+    }
+
     #[cfg(target_os = "linux")]
-    let launch = std::process::Command::new("xdg-open").arg(&out_path).spawn();
+    {
+        return apply_linux_update(app, package);
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        let _ = (app, package);
+        Err("self-update is not supported on this platform".into())
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_bundle_path() -> Option<std::path::PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let macos_dir = exe.parent()?;
+    if macos_dir.file_name()?.to_str()? != "MacOS" {
+        return None;
+    }
+    let contents = macos_dir.parent()?;
+    if contents.file_name()?.to_str()? != "Contents" {
+        return None;
+    }
+    contents.parent().map(|p| p.to_path_buf())
+}
+
+#[cfg(target_os = "macos")]
+fn apply_macos_update(app: &tauri::AppHandle, dmg: &std::path::Path) -> Result<(), String> {
+    let dest = macos_bundle_path().ok_or_else(|| {
+        "not running from Teak CLI.app — open the GitHub release to update this build".to_string()
+    })?;
+
+    let attach = std::process::Command::new("hdiutil")
+        .args(["attach", "-nobrowse", "-noverify", "-noautoopen"])
+        .arg(dmg)
+        .output()
+        .map_err(|e| format!("hdiutil attach failed: {e}"))?;
+    if !attach.status.success() {
+        emit_self_update(app, "error", 100);
+        return Err(format!(
+            "hdiutil attach failed: {}",
+            String::from_utf8_lossy(&attach.stderr)
+        ));
+    }
+    let stdout = String::from_utf8_lossy(&attach.stdout);
+    let mount = stdout
+        .lines()
+        .rev()
+        .find_map(|line| {
+            line.find("/Volumes/")
+                .map(|idx| std::path::PathBuf::from(line[idx..].trim()))
+        })
+        .ok_or_else(|| "could not find DMG mount point".to_string())?;
+
+    let src_app = std::fs::read_dir(&mount)
+        .map_err(|e| format!("read mount: {e}"))?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .find(|p| p.extension().and_then(|e| e.to_str()) == Some("app"))
+        .ok_or_else(|| "DMG does not contain a .app bundle".to_string())?;
+
+    let helper = std::env::temp_dir().join("teak-cli-apply-update.sh");
+    let script = r#"#!/bin/bash
+set -euo pipefail
+PID="$1"
+SRC="$2"
+DST="$3"
+MOUNT="$4"
+i=0
+while kill -0 "$PID" 2>/dev/null; do
+  sleep 0.2
+  i=$((i+1))
+  if [ "$i" -gt 150 ]; then break; fi
+done
+sleep 0.4
+rm -rf "$DST"
+mkdir -p "$(dirname "$DST")"
+ditto "$SRC" "$DST"
+xattr -dr com.apple.quarantine "$DST" >/dev/null 2>&1 || true
+hdiutil detach "$MOUNT" -quiet >/dev/null 2>&1 || true
+open "$DST"
+"#;
+    std::fs::write(&helper, script).map_err(|e| format!("write updater helper: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&helper)
+            .map_err(|e| format!("stat updater helper: {e}"))?
+            .permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&helper, perms)
+            .map_err(|e| format!("chmod updater helper: {e}"))?;
+    }
+
+    let pid = std::process::id().to_string();
+    let mut cmd = std::process::Command::new("/bin/bash");
+    cmd.arg(&helper)
+        .arg(&pid)
+        .arg(&src_app)
+        .arg(&dest)
+        .arg(&mount)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    cmd.spawn().map_err(|e| {
+        emit_self_update(app, "error", 100);
+        format!("spawn updater helper failed: {e}")
+    })?;
+
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    app.exit(0);
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn apply_linux_update(app: &tauri::AppHandle, package: &std::path::Path) -> Result<(), String> {
+    if let Ok(current) = std::env::var("APPIMAGE") {
+        let helper = std::env::temp_dir().join("teak-cli-apply-update.sh");
+        let script = r#"#!/bin/bash
+set -euo pipefail
+PID="$1"
+SRC="$2"
+DST="$3"
+i=0
+while kill -0 "$PID" 2>/dev/null; do
+  sleep 0.2
+  i=$((i+1))
+  if [ "$i" -gt 150 ]; then break; fi
+done
+sleep 0.4
+chmod +x "$SRC"
+mv -f "$SRC" "$DST"
+"$DST" >/dev/null 2>&1 &
+"#;
+        std::fs::write(&helper, script).map_err(|e| format!("write updater helper: {e}"))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&helper)
+                .map_err(|e| format!("stat updater helper: {e}"))?
+                .permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&helper, perms)
+                .map_err(|e| format!("chmod updater helper: {e}"))?;
+        }
+        let pid = std::process::id().to_string();
+        let mut cmd = std::process::Command::new("/bin/bash");
+        cmd.arg(&helper)
+            .arg(&pid)
+            .arg(package)
+            .arg(&current)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
+        }
+        cmd.spawn().map_err(|e| {
+            emit_self_update(app, "error", 100);
+            format!("spawn updater helper failed: {e}")
+        })?;
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        app.exit(0);
+        return Ok(());
+    }
+
+    let launch = std::process::Command::new("xdg-open").arg(package).spawn();
     if let Err(e) = launch {
         emit_self_update(app, "error", 100);
         return Err(format!("launch installer failed: {e}"));
     }
-
-    // Let the wizard come up before we tear the app down.
     std::thread::sleep(std::time::Duration::from_millis(800));
     app.exit(0);
     Ok(())
@@ -4789,6 +5011,8 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             fs_paste,
             load_tasks,
             save_tasks,
+            load_open_sessions,
+            save_open_sessions,
             save_password,
             load_password,
             delete_password,

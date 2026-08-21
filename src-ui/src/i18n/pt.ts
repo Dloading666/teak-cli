@@ -204,4 +204,7 @@ Apague esta nota quando quiser e comece a sua primeira tarefa.`,
   'heatmap.tooltip_one': '1 mensagem em {date}',
   'heatmap.tooltip_none': 'Sem atividade em {date}',
 
+  'update.download': 'Baixar atualização',
+  'update.installing': 'Instalando atualização…',
+
 } as const satisfies Record<I18nKey, string>;

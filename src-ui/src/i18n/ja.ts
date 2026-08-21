@@ -206,4 +206,7 @@ export const ja = {
   'heatmap.tooltip_one': '{date} · メッセージ 1 件',
   'heatmap.tooltip_none': '{date} · アクティビティなし',
 
+  'update.download': '更新をダウンロード',
+  'update.installing': '更新をインストール中…',
+
 } as const satisfies Record<I18nKey, string>;

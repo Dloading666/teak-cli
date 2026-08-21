@@ -206,4 +206,7 @@ export const ko = {
   'heatmap.tooltip_one': '{date} · 메시지 1개',
   'heatmap.tooltip_none': '{date} · 활동 없음',
 
+  'update.download': '업데이트 다운로드',
+  'update.installing': '업데이트 설치 중…',
+
 } as const satisfies Record<I18nKey, string>;

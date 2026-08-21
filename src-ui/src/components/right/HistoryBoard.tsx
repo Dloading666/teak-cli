@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { useT } from '../../i18n/useT';
 import { useAppState } from '../../store/app-state';
 import type { SavedSession } from '../../tauri';
@@ -12,7 +13,19 @@ import {
   getHistorySnapshot,
 } from '../../lib/history-cache';
 import { SessionContextMenu, type SessionCtxMenuState } from './SessionContextMenu';
-import { attachHistoryToLive, liveStatus, normCwd, pathBasename } from '../../lib/session-nav';
+import {
+  applySessionOrder,
+  attachHistoryToLive,
+  liveStatus,
+  moveInOrder,
+  normCwd,
+  pathBasename,
+} from '../../lib/session-nav';
+import {
+  getNavOrderSnapshot,
+  setGroupOrder,
+  subscribeNavOrder,
+} from '../../lib/session-nav-order';
 import type { TerminalSession } from '../../store/app-state';
 import HERMES_DATA_URL from '../../icons-inline/hermes.png?inline';
 import OPENCODE_DATA_URL from '../../icons-inline/opencode.png?inline';
@@ -92,11 +105,26 @@ export function HistoryBoard() {
     getHistorySnapshot,
     getHistorySnapshot,
   );
+  const navOrder = useSyncExternalStore(
+    subscribeNavOrder,
+    getNavOrderSnapshot,
+    getNavOrderSnapshot,
+  );
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const cancelRenameRef = useRef(false);
   const [ctxMenu, setCtxMenu] = useState<SessionCtxMenuState | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [rowDrag, setRowDrag] = useState<{
+    sessionId: string;
+    groupKey: string;
+    deltaY: number;
+    fromIdx: number;
+    targetIdx: number;
+    slotHeight: number;
+  } | null>(null);
+  const rowDragSuppressClickRef = useRef(false);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     prefetchHistory();
@@ -168,10 +196,34 @@ export function HistoryBoard() {
           label = parent ? `${base} — ${parent}` : base;
         }
       }
-      result.push({ key, cwd, label, rows: list });
+      result.push({
+        key,
+        cwd,
+        label,
+        rows: applySessionOrder(
+          list,
+          navOrder[key],
+          (row) => row.key,
+          (row) => row.live.startedAt ?? 0,
+        ),
+      });
     }
     return result;
-  }, [state.terminals, historySessions, t]);
+  }, [state.terminals, historySessions, navOrder, t]);
+
+  useEffect(() => () => { dragCleanupRef.current?.(); }, []);
+
+  // Grok and other CLIs do not echo a resume id on stdout. Copy the history
+  // scanner's token onto the live tab so a restart can `--resume` it.
+  useEffect(() => {
+    for (const group of groups) {
+      for (const row of group.rows) {
+        const token = row.saved.session_token?.trim();
+        if (!token || row.live.resumeToken === token) continue;
+        dispatch({ type: 'SET_RESUME_TOKEN', id: row.live.id, token });
+      }
+    }
+  }, [groups, dispatch]);
 
   const startRename = (saved: SavedSession) => {
     const k = `${saved.tool ?? ''}:${saved.id}`;
@@ -211,6 +263,129 @@ export function HistoryBoard() {
     });
   };
 
+  const onSessionClickGuarded = (row: NavRow) => {
+    if (rowDragSuppressClickRef.current) {
+      rowDragSuppressClickRef.current = false;
+      return;
+    }
+    openSession(row);
+  };
+
+  const onSessionPointerDown = (
+    e: ReactPointerEvent<HTMLDivElement>,
+    group: ProjectGroup,
+    row: NavRow,
+  ) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('.nav-session-close, input, textarea, button')) return;
+    if (renamingKey === `${row.saved.tool ?? ''}:${row.saved.id}`) return;
+
+    const groupEl = e.currentTarget.closest('.nav-project');
+    if (!groupEl) return;
+
+    const rowEls = Array.from(groupEl.querySelectorAll<HTMLElement>('.nav-session[data-order-key]'));
+    const positions = rowEls.map((el) => {
+      const rect = el.getBoundingClientRect();
+      return {
+        sessionId: el.dataset.sessionId!,
+        orderKey: el.dataset.orderKey!,
+        center: rect.top + rect.height / 2,
+        height: rect.height,
+      };
+    });
+    const fromIdx = positions.findIndex((p) => p.sessionId === row.live.id);
+    if (fromIdx < 0) return;
+    const ownPos = positions[fromIdx];
+
+    let slotHeight: number;
+    if (fromIdx + 1 < positions.length) {
+      slotHeight = positions[fromIdx + 1].center - ownPos.center;
+    } else if (fromIdx > 0) {
+      slotHeight = ownPos.center - positions[fromIdx - 1].center;
+    } else {
+      slotHeight = ownPos.height;
+    }
+
+    const startY = e.clientY;
+    let started = false;
+    const THRESHOLD = 6;
+
+    const computeTargetIdx = (clientY: number): number => {
+      const draggedCenter = ownPos.center + (clientY - startY);
+      let count = 0;
+      for (let i = 0; i < positions.length; i++) {
+        if (i === fromIdx) continue;
+        if (positions[i].center > draggedCenter) return count;
+        count++;
+      }
+      return count;
+    };
+
+    const onMove = (ev: PointerEvent) => {
+      const dy = ev.clientY - startY;
+      if (!started && Math.abs(dy) < THRESHOLD) return;
+      if (!started) {
+        started = true;
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+      }
+      ev.preventDefault();
+      setRowDrag({
+        sessionId: row.live.id,
+        groupKey: group.key,
+        deltaY: dy,
+        fromIdx,
+        targetIdx: computeTargetIdx(ev.clientY),
+        slotHeight,
+      });
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      finish();
+      if (!started) return;
+      rowDragSuppressClickRef.current = true;
+      const swallow = (ce: MouseEvent) => {
+        ce.stopImmediatePropagation();
+        ce.preventDefault();
+        document.removeEventListener('click', swallow, true);
+        rowDragSuppressClickRef.current = false;
+      };
+      document.addEventListener('click', swallow, true);
+      window.setTimeout(() => document.removeEventListener('click', swallow, true), 50);
+      const targetIdx = computeTargetIdx(ev.clientY);
+      const others = positions.filter((_, i) => i !== fromIdx);
+      const beforeId = targetIdx < others.length ? others[targetIdx].orderKey : null;
+      const visual = positions.map((p) => p.orderKey);
+      setGroupOrder(group.key, moveInOrder(visual, row.key, beforeId));
+      setRowDrag(null);
+    };
+
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return;
+      finish();
+      setRowDrag(null);
+    };
+
+    const finish = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('keydown', onKey);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      dragCleanupRef.current = null;
+    };
+
+    dragCleanupRef.current?.();
+    dragCleanupRef.current = () => {
+      finish();
+      setRowDrag(null);
+    };
+    document.addEventListener('pointermove', onMove, { passive: false });
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('keydown', onKey);
+  };
+
   return (
     <>
       <button
@@ -225,7 +400,7 @@ export function HistoryBoard() {
         {t('nav.new_chat')}
       </button>
 
-      <div className="project-session-nav">
+      <div className={`project-session-nav${rowDrag ? ' is-reordering' : ''}`}>
         {groups.length === 0 && (
           <div className="nav-empty">
             <div className="nav-empty-title">{t('nav.empty')}</div>
@@ -269,7 +444,7 @@ export function HistoryBoard() {
                   </svg>
                 </button>
               </div>
-              {!isCollapsed && group.rows.map((row) => {
+              {!isCollapsed && group.rows.map((row, rowIdx) => {
                 const session = row.saved;
                 const sessionKey = `${session.tool ?? ''}:${session.id}`;
                 const displayName = renamed[sessionKey] ?? session.name;
@@ -278,11 +453,32 @@ export function HistoryBoard() {
                 const status = liveStatus(row.live);
                 const statusKey = status === 'wait_input' ? 'waiting' : (status ?? 'idle');
                 const isRunning = status === 'working' || Boolean(row.live.chatPending && status !== 'wait_input');
+                const isDragging = rowDrag?.sessionId === row.live.id && rowDrag.groupKey === group.key;
+                let siblingShift = 0;
+                if (rowDrag && rowDrag.groupKey === group.key && !isDragging) {
+                  const withoutIdx = rowIdx < rowDrag.fromIdx ? rowIdx : rowIdx - 1;
+                  if (rowIdx < rowDrag.fromIdx && withoutIdx >= rowDrag.targetIdx) {
+                    siblingShift = rowDrag.slotHeight;
+                  } else if (rowIdx > rowDrag.fromIdx && withoutIdx < rowDrag.targetIdx) {
+                    siblingShift = -rowDrag.slotHeight;
+                  }
+                }
+                const dragStyle: CSSProperties | undefined = isDragging
+                  ? { transform: `translateY(${rowDrag!.deltaY}px)` }
+                  : siblingShift !== 0
+                    ? { transform: `translateY(${siblingShift}px)` }
+                    : undefined;
                 return (
                   <div
                     key={row.key}
-                    className={`nav-session${active ? ' is-active' : ''}${isRunning ? ' is-running' : ''}`}
-                    onClick={() => openSession(row)}
+                    data-session-id={row.live.id}
+                    data-order-key={row.key}
+                    className={`nav-session${active ? ' is-active' : ''}${isRunning ? ' is-running' : ''}${isDragging ? ' is-dragging' : ''}`}
+                    style={dragStyle}
+                    aria-grabbed={isDragging}
+                    onClick={() => onSessionClickGuarded(row)}
+                    onPointerDown={(e) => onSessionPointerDown(e, group, row)}
+                    onDragStart={(e) => e.preventDefault()}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       e.stopPropagation();

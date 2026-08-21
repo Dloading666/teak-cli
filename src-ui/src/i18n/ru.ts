@@ -204,4 +204,7 @@ export const ru = {
   'heatmap.tooltip_one': '{date} · 1 сообщение',
   'heatmap.tooltip_none': '{date} · нет активности',
 
+  'update.download': 'Скачать обновление',
+  'update.installing': 'Установка обновления…',
+
 } as const satisfies Record<I18nKey, string>;

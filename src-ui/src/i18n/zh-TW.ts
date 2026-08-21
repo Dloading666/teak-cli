@@ -207,4 +207,7 @@ export const zhTW = {
   'heatmap.tooltip_one': '{date} · 1 則訊息',
   'heatmap.tooltip_none': '{date} · 沒有活動',
 
+  'update.download': '下載更新',
+  'update.installing': '正在安裝更新…',
+
 } as const satisfies Record<I18nKey, string>;

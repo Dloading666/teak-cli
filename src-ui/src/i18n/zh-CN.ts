@@ -208,4 +208,7 @@ export const zhCN = {
   'heatmap.tooltip_one': '{date} · 1 条消息',
   'heatmap.tooltip_none': '{date} · 没有活动',
 
+  'update.download': '下载更新',
+  'update.installing': '正在安装更新…',
+
 } as const satisfies Record<I18nKey, string>;

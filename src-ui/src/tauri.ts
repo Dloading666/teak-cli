@@ -267,6 +267,10 @@ export const commands = {
   loadTasks: () => invoke<string>('load_tasks'),
   saveTasks: (data: string) => invoke<void>('save_tasks', { data }),
 
+  // Left-rail session snapshot (~/.teak-cli/open-sessions.json)
+  loadOpenSessions: () => invoke<string>('load_open_sessions'),
+  saveOpenSessions: (data: string) => invoke<void>('save_open_sessions', { data }),
+
   // Credential store — passwords live in OS keychain, never in localStorage
   savePassword: (host: string, username: string, password: string) =>
     invoke<void>('save_password', { host, username, password }),
@@ -302,6 +306,8 @@ export const commands = {
 
 export const TEAK_RELEASES_LATEST_URL =
   'https://github.com/Dloading666/teak-cli/releases/latest';
+export const TEAK_ISSUES_URL =
+  'https://github.com/Dloading666/teak-cli/issues';
 
 // In-app self-update progress, emitted by download_and_install_update.
 export interface SelfUpdateProgress {

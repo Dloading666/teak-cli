@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { commands, isTauri, onSelfUpdateProgress, TEAK_RELEASES_LATEST_URL } from '../../tauri';
+import { saveOpenSessionsNow } from '../../lib/open-sessions';
 import { useAppState, useAppDispatch, schemeLabels } from '../../store/app-state';
 import { IS_MACOS } from '../../lib/platform';
 import { useT } from '../../i18n/useT';
@@ -52,6 +53,15 @@ export function TitleBar() {
   >(null);
 
   useEffect(() => {
+    const isNewer = (r: string, l: string) => {
+      const rv = r.split('.').map(Number);
+      const lv = l.split('.').map(Number);
+      for (let i = 0; i < 3; i++) {
+        if ((rv[i] ?? 0) > (lv[i] ?? 0)) return true;
+        if ((rv[i] ?? 0) < (lv[i] ?? 0)) return false;
+      }
+      return false;
+    };
     const checkUpdate = async () => {
       try {
         const { getVersion } = await import('@tauri-apps/api/app');
@@ -59,27 +69,22 @@ export function TitleBar() {
           getVersion(),
           commands.latestReleaseVersion(),
         ]);
-        const isNewer = (r: string, l: string) => {
-          const rv = r.split('.').map(Number);
-          const lv = l.split('.').map(Number);
-          for (let i = 0; i < 3; i++) {
-            if ((rv[i] ?? 0) > (lv[i] ?? 0)) return true;
-            if ((rv[i] ?? 0) < (lv[i] ?? 0)) return false;
-          }
-          return false;
-        };
         if (remote && isNewer(remote, local)) setHasUpdate(true);
       } catch { /* offline or fetch failed — silent */ }
     };
     checkUpdate();
+    const interval = window.setInterval(checkUpdate, 15 * 60 * 1000);
+    const onFocus = () => { void checkUpdate(); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const handleSelfUpdate = useCallback(async () => {
     if (installing) return;
-    if (!navigator.userAgent.toLowerCase().includes('win')) {
-      commands.openUrl(TEAK_RELEASES_LATEST_URL).catch(() => {});
-      return;
-    }
+    saveOpenSessionsNow(state.terminals, state.activeTerminalId);
     setInstalling(true);
     setInstallPhase('speed_test');
     setInstallPct(0);
@@ -98,7 +103,7 @@ export function TitleBar() {
     } finally {
       unlisten?.();
     }
-  }, [installing]);
+  }, [installing, state.terminals, state.activeTerminalId]);
 
   // Show the 2×2 / 1×4 layout picker only for the independent four-split view.
   const activeTab = state.terminals.find(t => t.id === state.activeTerminalId);
@@ -149,10 +154,12 @@ export function TitleBar() {
           <span>{t('app.title')}</span>
           {hasUpdate && (
             <button
+              type="button"
               className={`icon-btn xs update-check-btn update-available${installing ? ' is-installing' : ''}`}
               onClick={handleSelfUpdate}
               disabled={installing}
-              aria-label="Update Teak CLI"
+              title={installing ? t('update.installing') : t('update.download')}
+              aria-label={installing ? t('update.installing') : t('update.download')}
             >
               {installing ? (
                 <svg

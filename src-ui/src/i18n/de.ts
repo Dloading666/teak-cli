@@ -204,4 +204,7 @@ Lösch diesen Zettel, wann du willst, und starte deine erste Aufgabe.`,
   'heatmap.tooltip_one': '1 Nachricht am {date}',
   'heatmap.tooltip_none': 'Keine Aktivität am {date}',
 
+  'update.download': 'Update herunterladen',
+  'update.installing': 'Update wird installiert…',
+
 } as const satisfies Record<I18nKey, string>;

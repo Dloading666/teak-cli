@@ -18,7 +18,7 @@ import { playNotifySound } from '../../lib/notify-sound';
 import { useT } from '../../i18n/useT';
 import { IS_MACOS, IS_WINDOWS } from '../../lib/platform';
 import { TERM_COLOR_SCHEMES } from '../center/TierTerminal';
-import { commands, type FontInfo } from '../../tauri';
+import { commands, TEAK_ISSUES_URL, type FontInfo } from '../../tauri';
 import { FontPicker } from './FontPicker';
 import { THEME_COLORS, THEME_SHAPES, ICON_ART_THEMES, LANGUAGES, TASK_VIEW_MODES, isMaskTintTheme } from '../../lib/personalization';
 import { prefGet, prefSet, prefRemove } from '../../lib/prefs';
@@ -674,7 +674,7 @@ export function SettingsModal() {
                   <button
                     type="button"
                     className="settings-feedback-card"
-                    onClick={() => commands.openUrl('https://github.com/edison7009/Coffee-CLI/issues').catch(() => {})}
+                    onClick={() => commands.openUrl(TEAK_ISSUES_URL).catch(() => {})}
                   >
                     <span className="settings-feedback-card-icon">
                       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -684,16 +684,6 @@ export function SettingsModal() {
                     <span className="settings-feedback-card-label">GitHub</span>
                     <ExternalLinkArrow />
                   </button>
-                  {state.currentLang === 'zh-CN' && (
-                    <button
-                      type="button"
-                      className="settings-feedback-card"
-                      onClick={() => commands.openUrl('https://gitcode.com/edison7009/Coffee-CLI/issues').catch(() => {})}
-                    >
-                      <span className="settings-feedback-card-label">国内访问：GitCode</span>
-                      <ExternalLinkArrow />
-                    </button>
-                  )}
                 </div>
               </>
             )}

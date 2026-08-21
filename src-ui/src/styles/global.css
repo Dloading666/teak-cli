@@ -1060,7 +1060,19 @@ html.is-macos #root {
 }
 .titlebar-brand-center .update-check-btn.update-available {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-left: 6px;
+    border: none;
+    border-radius: var(--radius-xs, 4px);
+    background: color-mix(in srgb, #e85454 16%, transparent);
     color: #e85454;
+    cursor: pointer;
+}
+.titlebar-brand-center .update-check-btn.update-available:hover {
+    background: color-mix(in srgb, #e85454 26%, transparent);
 }
 .titlebar-brand-center .update-check-btn.is-installing {
     cursor: default;

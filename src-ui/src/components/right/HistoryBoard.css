@@ -359,6 +359,11 @@
   min-height: 0;
 }
 
+.project-session-nav.is-reordering .nav-session-close {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
 .nav-empty {
   padding: 28px 8px 12px;
   text-align: center;
@@ -458,8 +463,20 @@
   padding: 8px 8px 8px 6px;
   margin-bottom: 2px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
+  cursor: grab;
   color: var(--text-1);
+  user-select: none;
+  /* Siblings ease into the vacated slot while another row is dragged. */
+  transition: background 0.15s, transform 0.18s ease;
+}
+
+.nav-session.is-dragging {
+  z-index: 5;
+  cursor: grabbing;
+  transition: none;
+  background-color: var(--bg-app);
+  background-image: linear-gradient(var(--bg-panel), var(--bg-panel));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
 }
 
 .nav-session:hover {
@@ -498,6 +515,8 @@
   height: 14px;
   flex-shrink: 0;
   object-fit: contain;
+  pointer-events: none;
+  -webkit-user-drag: none;
 }
 
 .nav-tool-icon svg {
@@ -592,7 +611,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .nav-project-chevron,
-  .nav-new-chat {
+  .nav-new-chat,
+  .nav-session {
     transition: none;
   }
 
