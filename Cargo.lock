@@ -4887,7 +4887,7 @@ dependencies = [
 
 [[package]]
 name = "teak-cli"
-version = "3.4.7"
+version = "3.4.8"
 dependencies = [
  "anyhow",
  "axum",

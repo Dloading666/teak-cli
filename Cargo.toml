@@ -1,6 +1,6 @@
 [package]
 name = "teak-cli"
-version = "3.4.7"
+version = "3.4.8"
 edition = "2021"
 description = "Teak CLI — native desktop workspace for AI CLIs (fork of Coffee CLI)"
 license = "AGPL-3.0-or-later"
