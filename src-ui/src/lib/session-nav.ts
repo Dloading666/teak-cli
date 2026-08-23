@@ -49,9 +49,17 @@ export function isGenericSessionName(name: string, fallbackName: string): boolea
   return false;
 }
 
-function pickSessionLabel(historyName: string | undefined, oscName: string, fallbackName: string): string {
+export function pickSessionLabel(
+  historyName: string | undefined,
+  oscName: string,
+  fallbackName: string,
+  titleIsManual = false,
+): string {
   const history = historyName?.trim() ?? '';
   const osc = oscName.trim();
+  // Grok `/rename` writes summary.json with title_is_manual. That name is
+  // newer than the OSC auto-title Grok often leaves behind.
+  if (titleIsManual && history && !isGenericSessionName(history, fallbackName)) return history;
   // The live CLI's OSC / generated title is the name the agent is advertising
   // right now. Archival first-prompt names lag and can belong to a pre-fork
   // session if the tab token is still pointing at the old conversation.
@@ -100,11 +108,12 @@ export function attachHistoryToLive(
     if (token) claimed.add(`${tool}:${token}`);
     return {
       ...base,
-      name: pickSessionLabel(row.name, base.name, fallbackName),
+      name: pickSessionLabel(row.name, base.name, fallbackName, Boolean(row.title_is_manual)),
       session_token: row.session_token ?? base.session_token,
       file_path: row.file_path || base.file_path,
       saved_at: row.saved_at || base.saved_at,
       created_at: row.created_at ?? base.created_at,
+      title_is_manual: row.title_is_manual,
     };
   };
 

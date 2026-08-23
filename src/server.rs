@@ -1091,6 +1091,11 @@ struct SavedSession {
     created_at: Option<String>,
     file_path: Option<String>,
     turn_count: Option<u32>,
+    /// Grok `/rename` (and Teak's write-back) sets `title_is_manual` in
+    /// summary.json. The left rail must prefer that over a leftover
+    /// localStorage overlay or a stale OSC auto-title.
+    #[serde(default)]
+    title_is_manual: bool,
 }
 
 #[tauri::command]
@@ -1464,6 +1469,7 @@ fn parse_agent_jsonl(
         created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
+            title_is_manual: false,
     })
 }
 
@@ -1559,6 +1565,7 @@ fn parse_pi_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession> {
         created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
+            title_is_manual: false,
     })
 }
 
@@ -1728,6 +1735,7 @@ fn parse_codex_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession
         created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
+            title_is_manual: false,
     })
 }
 
@@ -1877,6 +1885,7 @@ fn parse_gemini_session_jsonl(
         created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
+            title_is_manual: false,
     })
 }
 
@@ -1991,6 +2000,7 @@ fn parse_qwen_session_jsonl(file_path: &std::path::Path) -> Option<SavedSession>
         created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
+            title_is_manual: false,
     })
 }
 
@@ -3009,6 +3019,7 @@ fn find_kimi_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
             // turn_count deferred — counting wire.jsonl is extra I/O per
             // session and the History board renders fine without it.
             turn_count: None,
+            title_is_manual: false,
         });
     }
 }
@@ -3098,6 +3109,21 @@ fn grok_root(home: &std::path::Path) -> Option<std::path::PathBuf> {
     if path.is_dir() { Some(path) } else { None }
 }
 
+fn grok_title_from_summary(s: &serde_json::Value) -> (String, bool) {
+    let title_is_manual = s.get("title_is_manual").and_then(|v| v.as_bool()).unwrap_or(false);
+    let title = s.get("generated_title").and_then(|x| x.as_str()).filter(|s| !s.is_empty())
+        .or_else(|| s.get("session_summary").and_then(|x| x.as_str()))
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let safe = s.replace('\n', " ");
+            let mut chars = safe.chars();
+            let chunk: String = chars.by_ref().take(80).collect();
+            if chars.next().is_some() { format!("{}...", chunk) } else { chunk }
+        })
+        .unwrap_or_else(|| "Grok Build Session".to_string());
+    (title, title_is_manual)
+}
+
 /// Grok Build history second pass. Walks `sessions/<encoded-cwd>/<uuid>/`,
 /// stats each `summary.json` for mtime to pre-select the newest 200 (mirrors
 /// the JSONL pipeline's stat-first/parse-top-N discipline), then reads each
@@ -3143,16 +3169,7 @@ fn find_grok_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
             .map(|s| s.to_string())
             .unwrap_or_default();
 
-        let title = s.get("generated_title").and_then(|x| x.as_str()).filter(|s| !s.is_empty())
-            .or_else(|| s.get("session_summary").and_then(|x| x.as_str()))
-            .filter(|s| !s.is_empty())
-            .map(|s| {
-                let safe = s.replace('\n', " ");
-                let mut chars = safe.chars();
-                let chunk: String = chars.by_ref().take(80).collect();
-                if chars.next().is_some() { format!("{}...", chunk) } else { chunk }
-            })
-            .unwrap_or_else(|| "Grok Build Session".to_string());
+        let (title, title_is_manual) = grok_title_from_summary(&s);
 
         // Normalize to epoch milliseconds, matching every other scanner. The
         // summary mtime is also the pre-selection key and advances per turn.
@@ -3179,6 +3196,7 @@ fn find_grok_sessions(home: &std::path::Path, result: &mut Vec<SavedSession>) {
             // turn_count deferred - counting chat_history.jsonl is extra I/O per
             // session and the History board renders fine without it.
             turn_count: None,
+            title_is_manual,
         });
     }
 }
@@ -3249,6 +3267,69 @@ fn rename_grok_session(token: &str, name: &str) -> Result<(), String> {
         }
     }
     Err(format!("grok session {token} not found"))
+}
+
+#[derive(Serialize, Clone)]
+struct NativeSessionTitle {
+    token: String,
+    name: String,
+    title_is_manual: bool,
+}
+
+/// Cheap title lookup for live Grok tabs. Walks cwd dirs looking for
+/// `<cwd>/<token>/summary.json` instead of rescanning every session.
+#[tauri::command]
+fn peek_native_session_titles(tool: String, tokens: Vec<String>) -> Result<Vec<NativeSessionTitle>, String> {
+    match tool.as_str() {
+        "grok" => Ok(peek_grok_titles(&tokens)),
+        _ => Ok(Vec::new()),
+    }
+}
+
+fn peek_grok_titles(tokens: &[String]) -> Vec<NativeSessionTitle> {
+    let mut wanted: std::collections::HashSet<String> = tokens
+        .iter()
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .collect();
+    let mut out = Vec::new();
+    if wanted.is_empty() {
+        return out;
+    }
+    let Some(home) = dirs::home_dir() else { return out };
+    let Some(root) = grok_root(&home) else { return out };
+    let Ok(cwd_dirs) = std::fs::read_dir(&root) else { return out };
+    for cwd_entry in cwd_dirs.flatten() {
+        if wanted.is_empty() {
+            break;
+        }
+        let cwd_path = cwd_entry.path();
+        if !cwd_path.is_dir() {
+            continue;
+        }
+        let pending: Vec<String> = wanted.iter().cloned().collect();
+        for token in pending {
+            let summary = cwd_path.join(&token).join("summary.json");
+            let Ok(raw) = std::fs::read_to_string(&summary) else { continue };
+            let Ok(s) = serde_json::from_str::<serde_json::Value>(&raw) else { continue };
+            let id = s
+                .get("info")
+                .and_then(|info| info.get("id"))
+                .and_then(|id| id.as_str())
+                .unwrap_or("");
+            if !id.is_empty() && id != token {
+                continue;
+            }
+            let (name, title_is_manual) = grok_title_from_summary(&s);
+            out.push(NativeSessionTitle {
+                token: token.clone(),
+                name,
+                title_is_manual,
+            });
+            wanted.remove(&token);
+        }
+    }
+    out
 }
 
 /// Grok Build heatmap second pass. For each session dir in the cutoff window,
@@ -3421,6 +3502,7 @@ fn parse_hermes_json(file_path: &std::path::Path) -> Option<SavedSession> {
         created_at: created_at.or_else(|| file_created_epoch_ms(file_path)),
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
+            title_is_manual: false,
     })
 }
 
@@ -3467,6 +3549,7 @@ fn parse_opencode_session(file_path: &std::path::Path, message_dir: &std::path::
         created_at,
         file_path: Some(file_path.to_string_lossy().into_owned()),
         turn_count: Some(turn_count),
+            title_is_manual: false,
     })
 }
 
@@ -3575,6 +3658,7 @@ fn find_drizzle_sessions_sqlite(
             // file_path, so read_opencode_session still owns parsing).
             file_path: Some(db_path.to_string_lossy().into_owned()),
             turn_count: Some(turn_count),
+            title_is_manual: false,
         })
     });
 
@@ -3732,6 +3816,7 @@ fn find_hermes_sessions_sqlite(db_path: &std::path::Path, result: &mut Vec<Saved
             created_at: Some(((hermes_started_at_secs(started_at) * 1000.0) as i64).to_string()),
             file_path: None,
             turn_count: Some(turn_count),
+            title_is_manual: false,
         })
     });
     if let Ok(iter) = iter {
@@ -5092,6 +5177,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             load_open_sessions,
             save_open_sessions,
             rename_native_session,
+            peek_native_session_titles,
             save_password,
             load_password,
             delete_password,
@@ -5933,5 +6019,27 @@ mod tests {
             Some("39ec6c4e-83e4-4fd4-a79a-bdfdf9894bb2")
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn grok_summary_manual_title_is_flagged() {
+        let s = serde_json::json!({
+            "generated_title": "teak cli热部署5173",
+            "session_summary": "teak cli热部署5173",
+            "title_is_manual": true
+        });
+        let (title, manual) = grok_title_from_summary(&s);
+        assert_eq!(title, "teak cli热部署5173");
+        assert!(manual);
+    }
+
+    #[test]
+    fn grok_summary_auto_title_is_not_manual() {
+        let s = serde_json::json!({
+            "generated_title": "Push Teak CLI and publish v0.0.1 Release",
+        });
+        let (title, manual) = grok_title_from_summary(&s);
+        assert_eq!(title, "Push Teak CLI and publish v0.0.1 Release");
+        assert!(!manual);
     }
 }

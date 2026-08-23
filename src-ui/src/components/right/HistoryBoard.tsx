@@ -11,6 +11,7 @@ import {
   refreshHistory,
   subscribeHistory,
   getHistorySnapshot,
+  applyNativeTitlePatches,
 } from '../../lib/history-cache';
 import { SessionContextMenu, type SessionCtxMenuState } from './SessionContextMenu';
 import {
@@ -131,6 +132,37 @@ export function HistoryBoard() {
     refreshHistory();
   }, []);
 
+  const grokTokensKey = state.terminals
+    .filter((term) => term.tool === 'grok' && !term.isHidden && term.resumeToken)
+    .map((term) => term.resumeToken as string)
+    .sort()
+    .join('|');
+
+  useEffect(() => {
+    if (!grokTokensKey) return;
+    const tokens = grokTokensKey.split('|');
+    let cancelled = false;
+    const tick = () => {
+      commands.peekNativeSessionTitles('grok', tokens)
+        .then((rows) => {
+          if (cancelled || !rows?.length) return;
+          applyNativeTitlePatches(rows);
+          for (const row of rows) {
+            if (row.title_is_manual && row.token && row.name) {
+              setCustomName('grok', row.token, row.name);
+            }
+          }
+        })
+        .catch(() => {});
+    };
+    tick();
+    const id = window.setInterval(tick, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [grokTokensKey]);
+
   const launchpadOpen = !!state.terminals.find(
     (term) => term.id === state.activeTerminalId && !term.tool,
   );
@@ -216,14 +248,26 @@ export function HistoryBoard() {
   // Keep the tab's resume token pointed at the CLI session this row bound.
   // Grok never echoes an id, so this is the only writer. Claude can also
   // land here when OSC/ai-title identifies a newer conversation than the
-  // first captured `--resume` id. Do not freeze native titles into the
+  // first captured `--resume` id. Do not freeze auto titles into the
   // user-rename table — that made "你好" stick after the CLI moved on.
+  // Manual Grok titles (`title_is_manual`) must overwrite a leftover overlay
+  // so `/rename` shows up on the left rail.
   useEffect(() => {
     for (const group of groups) {
       for (const row of group.rows) {
         const token = row.saved.session_token?.trim();
         if (token && row.live.resumeToken !== token) {
           dispatch({ type: 'SET_RESUME_TOKEN', id: row.live.id, token });
+        }
+        const tool = row.saved.tool ?? '';
+        const native = row.saved.name?.trim();
+        if (tool === 'grok' && row.saved.title_is_manual && native && token) {
+          if (lookupCustomName(tool, row.live.id, token) !== native) {
+            setCustomName(tool, token, native);
+          }
+          if (row.live.toolTitle !== native) {
+            dispatch({ type: 'SET_TAB_TITLE', id: row.live.id, title: native });
+          }
         }
       }
     }
@@ -464,10 +508,13 @@ export function HistoryBoard() {
                 const session = row.saved;
                 const sessionKey = `${session.tool ?? ''}:${session.id}`;
                 const tokenForName = session.session_token ?? row.live.resumeToken;
+                const overlay = tokenForName
+                  ? renamed[`${session.tool ?? ''}:${tokenForName}`]
+                  : renamed[sessionKey];
                 const displayName = (
-                  tokenForName
-                    ? renamed[`${session.tool ?? ''}:${tokenForName}`]
-                    : renamed[sessionKey]
+                  session.title_is_manual && session.name?.trim()
+                    ? session.name.trim()
+                    : overlay
                 ) ?? session.name;
                 const isRenaming = renamingKey === sessionKey;
                 const active = row.live.id === state.activeTerminalId;

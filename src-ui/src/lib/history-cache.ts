@@ -22,7 +22,7 @@
 //   'idle'), so users who never open the History tab pay zero polling cost.
 
 import { commands, isTauri } from '../tauri';
-import type { SavedSession } from '../tauri';
+import type { NativeSessionTitle, SavedSession } from '../tauri';
 import { onWindowForeground, onWindowBackground } from './window-focus-filter';
 
 type HistoryStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -135,6 +135,32 @@ export function subscribeHistory(listener: () => void): () => void {
 
 export function getHistorySnapshot(): HistoryState {
   return state;
+}
+
+/** Patch live Grok titles from peek_native_session_titles without a full rescan. */
+export function applyNativeTitlePatches(patches: NativeSessionTitle[]): void {
+  if (!patches.length || state.status !== 'ready') return;
+  const byToken = new Map(
+    patches
+      .filter((p) => p.token && p.name)
+      .map((p) => [p.token, p] as const),
+  );
+  if (byToken.size === 0) return;
+  let changed = false;
+  const sessions = state.sessions.map((session) => {
+    const token = session.session_token;
+    if (!token) return session;
+    const patch = byToken.get(token);
+    if (!patch) return session;
+    if (session.name === patch.name && Boolean(session.title_is_manual) === patch.title_is_manual) {
+      return session;
+    }
+    changed = true;
+    return { ...session, name: patch.name, title_is_manual: patch.title_is_manual };
+  });
+  if (!changed) return;
+  state = { sessions, status: 'ready' };
+  emit();
 }
 
 /// Wire up the background auto-refresh triggers. Call once from a

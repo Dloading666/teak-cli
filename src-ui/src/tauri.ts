@@ -97,6 +97,14 @@ export interface SavedSession {
   created_at?: string;
   file_path?: string;
   turn_count?: number;
+  /** Grok `/rename` (and Teak write-back) pin summary.json. Beats leftover overlays. */
+  title_is_manual?: boolean;
+}
+
+export interface NativeSessionTitle {
+  token: string;
+  name: string;
+  title_is_manual: boolean;
 }
 
 export interface ChatSessionRead {
@@ -272,6 +280,8 @@ export const commands = {
   saveOpenSessions: (data: string) => invoke<void>('save_open_sessions', { data }),
   renameNativeSession: (tool: string, token: string, name: string) =>
     invoke<void>('rename_native_session', { tool, token, name }),
+  peekNativeSessionTitles: (tool: string, tokens: string[]) =>
+    invoke<NativeSessionTitle[]>('peek_native_session_titles', { tool, tokens }),
 
   // Credential store — passwords live in OS keychain, never in localStorage
   savePassword: (host: string, username: string, password: string) =>
