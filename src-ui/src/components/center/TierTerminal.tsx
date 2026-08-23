@@ -27,6 +27,8 @@ import { parseGrokTerminalTitle } from '../../lib/grok-terminal-title';
 import { consumeOscTitles } from '../../lib/osc-title';
 import { markNotifySoundPromptSubmitted } from '../../lib/notify-sound';
 import { onWindowForeground } from '../../lib/window-focus-filter';
+import { getHistorySnapshot, prefetchHistory, refreshHistory } from '../../lib/history-cache';
+import { attachHistoryToLive } from '../../lib/session-nav';
 import { commands } from '../../tauri';
 import { supportsNativeAgentStatus, useAppDispatch, useAppState, type AgentStatus, type ToolType, type ThemeColor } from '../../store/app-state';
 import { useT } from '../../i18n/useT';
@@ -35,6 +37,32 @@ import { TermContextMenu, type TermContextMenuState } from './TermContextMenu';
 import { TeakMark } from '../common/TeakMark';
 import '@xterm/xterm/css/xterm.css';
 import './TierTerminal.css';
+
+async function waitForLiveTerminalSize(
+  term: Terminal,
+  fit: FitAddon,
+  el: HTMLElement | null,
+  isLive: () => boolean,
+  stillMounted: () => boolean,
+  preferDefaultSize: () => boolean,
+): Promise<{ cols: number; rows: number }> {
+  while (stillMounted()) {
+    if (isLive()) {
+      if (preferDefaultSize()) {
+        return { cols: Math.max(term.cols, 80), rows: Math.max(term.rows, 24) };
+      }
+      const rect = el?.getBoundingClientRect();
+      if (rect && rect.width > 40 && rect.height > 40) {
+        try { fit.fit(); } catch { /* container may still be settling */ }
+        if (term.cols > 20 && term.rows > 8) {
+          return { cols: term.cols, rows: term.rows };
+        }
+      }
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+  }
+  return { cols: Math.max(term.cols, 80), rows: Math.max(term.rows, 24) };
+}
 
 // Installer scripts are fetched at runtime from CF (hot-updatable, no release needed).
 // Falls back to GitHub raw if CF is unreachable.
@@ -1328,17 +1356,74 @@ function TierTerminalImpl({
           if (!mounted) return;
           dispatch({ type: 'SET_FOLDER', path: cwd });
         },
+        onSessionToken: (token) => {
+          if (!mounted || !token) return;
+          const live = appStateRef.current.terminals.find((item) => item.id === sessionId);
+          if (live && live.resumeToken !== token) {
+            dispatch({ type: 'SET_RESUME_TOKEN', id: sessionId, token });
+            refreshHistory();
+          }
+        },
       });
       if (mounted) unlisteners.push(unsubEvents); else { unsubEvents(); return; }
 
       // All listeners registered — NOW start the PTY process
       if (!mounted) return;
 
-      const initialCols = term.cols || 80;
-      const initialRows = term.rows || 24;
+      // Restored background tabs are `display:none` (0×0). Starting Grok/Claude
+      // there paints a tiny TUI that never fills the pane after the tab is
+      // selected. Wait until this tab is actually on screen with a real size.
+      const sized = await waitForLiveTerminalSize(
+        term,
+        fit,
+        termRef.current,
+        () => projectionActiveRef.current,
+        () => mounted,
+        () => appStateRef.current.terminals.find((item) => item.id === sessionId)?.viewMode === 'chat',
+      );
+      if (!mounted) return;
+      const initialCols = sized.cols;
+      const initialRows = sized.rows;
 
         try {
-          await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined, resumeToken, appStateRef.current.defaultShell);
+          // RESTORE_OPEN_SESSIONS can land after this mount-only effect closed
+          // over its props (deps []), leaving the closure's resumeToken
+          // undefined while the merged state has one. Read the token at spawn
+          // time instead — background tabs sit behind waitForLiveTerminalSize
+          // long enough for the merge to arrive, and foreground tabs resolve
+          // the ref lookup in the same tick either way.
+          let spawnResumeToken = appStateRef.current.terminals.find((item) => item.id === sessionId)?.resumeToken ?? resumeToken;
+          // A restored tab may still hold the pre-fork id. Wait briefly for
+          // native history so OSC/ai-title can point `--resume` at the
+          // conversation the CLI actually last ran.
+          if (spawnResumeToken) {
+            prefetchHistory();
+            const deadline = Date.now() + 1_500;
+            while (mounted && Date.now() < deadline) {
+              const snap = getHistorySnapshot();
+              if (snap.status === 'ready' || snap.status === 'error') {
+                const live = appStateRef.current.terminals.find((item) => item.id === sessionId);
+                if (live) {
+                  const bound = attachHistoryToLive(
+                    live,
+                    snap.sessions,
+                    new Set(),
+                    getToolDisplayName(live.tool ?? ''),
+                  );
+                  if (bound.session_token) {
+                    spawnResumeToken = bound.session_token;
+                    if (live.resumeToken !== bound.session_token) {
+                      dispatch({ type: 'SET_RESUME_TOKEN', id: sessionId, token: bound.session_token });
+                    }
+                  }
+                }
+                break;
+              }
+              await new Promise((resolve) => window.setTimeout(resolve, 50));
+            }
+            if (!mounted) return;
+          }
+          await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined, spawnResumeToken, appStateRef.current.defaultShell);
         } catch (err) {
           // Resume / launch validation failures (missing cwd, bad token
           // format, binary not on PATH) land here. The upstream CLI's own
@@ -1347,6 +1432,20 @@ function TierTerminalImpl({
           if (mounted) {
             term.write(`\r\n\x1b[31m${String(err)}\x1b[0m\r\n`);
           }
+        }
+
+        // Catch up if the first Session ID banner landed before the event
+        // handler attached. Later forks / `/new` arrive via onSessionToken.
+        try {
+          const liveToken = await commands.getTerminalSessionToken(sessionId);
+          if (mounted && liveToken) {
+            const live = appStateRef.current.terminals.find((item) => item.id === sessionId);
+            if (live && live.resumeToken !== liveToken) {
+              dispatch({ type: 'SET_RESUME_TOKEN', id: sessionId, token: liveToken });
+            }
+          }
+        } catch {
+          // Backend session gone — nothing left to capture.
         }
 
         // Continuously report on-screen visibility to the backend so its
@@ -1385,6 +1484,11 @@ function TierTerminalImpl({
             // contexts.
             if (visible) {
               attachWebglRenderer(term, webglRef, contextLossAttemptsRef);
+              try { fitRef.current?.fit(); } catch { /* ignore */ }
+              const liveTerm = xtermRef.current;
+              if (liveTerm && liveTerm.cols > 0 && liveTerm.rows > 0) {
+                commands.tierTerminalResize(sessionId, liveTerm.cols, liveTerm.rows).catch(() => {});
+              }
             } else {
               detachWebglRenderer(webglRef);
             }

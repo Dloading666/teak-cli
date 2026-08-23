@@ -52,9 +52,12 @@ export function isGenericSessionName(name: string, fallbackName: string): boolea
 function pickSessionLabel(historyName: string | undefined, oscName: string, fallbackName: string): string {
   const history = historyName?.trim() ?? '';
   const osc = oscName.trim();
-  if (history && !isGenericSessionName(history, fallbackName)) return history;
+  // The live CLI's OSC / generated title is the name the agent is advertising
+  // right now. Archival first-prompt names lag and can belong to a pre-fork
+  // session if the tab token is still pointing at the old conversation.
   if (osc && !isGenericSessionName(osc, fallbackName)) return osc;
-  return history || osc || fallbackName;
+  if (history && !isGenericSessionName(history, fallbackName)) return history;
+  return osc || history || fallbackName;
 }
 
 export function liveAsSaved(terminal: TerminalSession, fallbackName: string): SavedSession {
@@ -100,20 +103,37 @@ export function attachHistoryToLive(
       name: pickSessionLabel(row.name, base.name, fallbackName),
       session_token: row.session_token ?? base.session_token,
       file_path: row.file_path || base.file_path,
+      saved_at: row.saved_at || base.saved_at,
+      created_at: row.created_at ?? base.created_at,
     };
   };
-
-  if (terminal.resumeToken) {
-    const byToken = history.find((s) => (
-      s.tool === tool && s.session_token === terminal.resumeToken
-    ));
-    if (byToken) return claim(byToken);
-  }
 
   const candidates = history
     .filter((s) => s.tool === tool && s.session_token && !claimed.has(`${tool}:${s.session_token}`))
     .filter((s) => !cwdKey || (!!s.cwd && normCwd(s.cwd) === cwdKey))
     .sort((a, b) => parseTime(b.created_at ?? b.saved_at) - parseTime(a.created_at ?? a.saved_at));
+
+  const byToken = terminal.resumeToken
+    ? candidates.find((s) => s.session_token === terminal.resumeToken)
+    : undefined;
+
+  const osc = (terminal.toolTitle ?? '').trim();
+  const byTitle = osc && !isGenericSessionName(osc, fallbackName)
+    ? candidates.find((s) => (s.name ?? '').trim() === osc)
+    : undefined;
+
+  // OSC/ai-title identifies the running conversation. A stored resume token
+  // can still point at the pre-fork greeting session; prefer the live title
+  // when the two disagree.
+  if (byTitle && byToken && byTitle.session_token !== byToken.session_token) {
+    return claim(byTitle);
+  }
+  if (byTitle && !byToken) return claim(byTitle);
+  if (byToken) return claim(byToken);
+
+  // A live token that history has not indexed yet must not steal another
+  // conversation in the same workspace.
+  if (terminal.resumeToken) return base;
 
   const started = terminal.startedAt ?? 0;
   const fresh = started

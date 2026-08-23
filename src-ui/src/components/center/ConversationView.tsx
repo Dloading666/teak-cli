@@ -721,10 +721,18 @@ function ConversationViewImpl({
     let nextForcedScanAt = pending ? Date.now() + 400 : Number.POSITIVE_INFINITY;
     const bindFrom = async (sessions: SavedSession[]): Promise<boolean> => {
       const exactToken = resumeToken ?? capturedToken;
-      const candidates = selectSources(
+      let candidates = selectSources(
         sessions, tool, folderPath, exactToken, pending, startedAt, ownerKey,
         competingBindingsRef.current,
       );
+      // Stored token can lag (pre-fork). If it matches nothing, the backend
+      // capture is the next identity to try — not a stale history row.
+      if (candidates.length === 0 && capturedToken && capturedToken !== exactToken) {
+        candidates = selectSources(
+          sessions, tool, folderPath, capturedToken, pending, startedAt, ownerKey,
+          competingBindingsRef.current,
+        );
+      }
       for (const candidate of candidates) {
         let read: ChatSessionRead;
         try {
@@ -794,12 +802,12 @@ function ConversationViewImpl({
     const discover = async () => {
       try {
         // Claude and a few CLIs expose their freshly-created native session id
-        // through PTY output. Prefer that authoritative identity whenever it
-        // is available; creation-time matching below remains the fallback for
+        // through PTY output. Re-read every tick: `--resume` / `/new` replace
+        // the first captured id, and caching it would bind chat to the old
+        // transcript forever. Creation-time matching remains the fallback for
         // tools that never print a token.
-        if (!resumeToken && !capturedToken) {
-          capturedToken = await commands.getTerminalSessionToken(sessionId) ?? undefined;
-        }
+        const latestToken = await commands.getTerminalSessionToken(sessionId);
+        if (latestToken) capturedToken = latestToken;
         // The app-wide history cache often already contains the source. Try it
         // first for resumed/pending turns; content validation below makes stale
         // metadata safe. A fresh direct-terminal session has no fingerprint,
@@ -831,7 +839,7 @@ function ConversationViewImpl({
       cancelled = true;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [source, tool, folderPath, resumeToken, pending, startedAt, ownerKey, agentStatus, isActive, isVisible, competingBindingsKey, sessionId]);
+  }, [source, tool, folderPath, resumeToken, pending, startedAt, ownerKey, agentStatus, isActive, isVisible, competingBindingsKey, sessionId, dispatch]);
 
   useEffect(() => {
     if (!isTauri) return;

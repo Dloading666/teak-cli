@@ -1317,6 +1317,16 @@ fn parse_agent_jsonl(
             if let Some(s) = value.get("sessionId").and_then(|v| v.as_str()) {
                 if !s.is_empty() { session_id = s.to_string(); }
             }
+            // Claude Code writes a generated sidebar title as `ai-title`.
+            // Prefer the latest one over the first user prompt so Teak's
+            // label matches the CLI's own session name.
+            if value.get("type").and_then(|v| v.as_str()) == Some("ai-title") {
+                if let Some(t) = value.get("aiTitle").and_then(|v| v.as_str()).map(str::trim) {
+                    if !t.is_empty() {
+                        title = t.to_string();
+                    }
+                }
+            }
             if let Some(c) = value.get("cwd").and_then(|v| v.as_str()) {
                 if cwd.is_empty() && !c.is_empty() { cwd = c.to_string(); }
             }
@@ -5901,6 +5911,27 @@ mod tests {
         let got = parse_agent_jsonl(&f, "claude", &std::collections::HashMap::new()).expect("mixed-array session kept");
         // Title comes from the real text block, not the injected tool_result.
         assert_eq!(got.name, "帮我把这个文件重构一下");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn prefers_claude_ai_title_over_first_prompt() {
+        let dir = std::env::temp_dir().join(format!("teak-cli-ai-title-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("39ec6c4e-fake-ai-title.jsonl");
+        write_jsonl(&f, &[
+            "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"你好，你可以做什么\"},\"sessionId\":\"39ec6c4e-83e4-4fd4-a79a-bdfdf9894bb2\"}",
+            "{\"type\":\"assistant\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"你好\"}]}}",
+            "{\"type\":\"ai-title\",\"aiTitle\":\"修复 app logo 变黑问题\",\"sessionId\":\"39ec6c4e-83e4-4fd4-a79a-bdfdf9894bb2\"}",
+        ]);
+        let got = parse_agent_jsonl(&f, "claude", &std::collections::HashMap::new())
+            .expect("session with ai-title kept");
+        assert_eq!(got.name, "修复 app logo 变黑问题");
+        assert_eq!(
+            got.session_token.as_deref(),
+            Some("39ec6c4e-83e4-4fd4-a79a-bdfdf9894bb2")
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

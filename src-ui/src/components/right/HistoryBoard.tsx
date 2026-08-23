@@ -16,7 +16,6 @@ import { SessionContextMenu, type SessionCtxMenuState } from './SessionContextMe
 import {
   applySessionOrder,
   attachHistoryToLive,
-  isGenericSessionName,
   liveStatus,
   moveInOrder,
   normCwd,
@@ -214,8 +213,11 @@ export function HistoryBoard() {
 
   useEffect(() => () => { dragCleanupRef.current?.(); }, []);
 
-  // Grok and other CLIs do not echo a resume id on stdout. Copy the history
-  // scanner's token onto the live tab so a restart can `--resume` it.
+  // Keep the tab's resume token pointed at the CLI session this row bound.
+  // Grok never echoes an id, so this is the only writer. Claude can also
+  // land here when OSC/ai-title identifies a newer conversation than the
+  // first captured `--resume` id. Do not freeze native titles into the
+  // user-rename table — that made "你好" stick after the CLI moved on.
   useEffect(() => {
     for (const group of groups) {
       for (const row of group.rows) {
@@ -223,13 +225,6 @@ export function HistoryBoard() {
         if (token && row.live.resumeToken !== token) {
           dispatch({ type: 'SET_RESUME_TOKEN', id: row.live.id, token });
         }
-        const tool = row.saved.tool ?? '';
-        const native = row.saved.name?.trim();
-        if (!native) continue;
-        if (lookupCustomName(tool, row.live.id, token || row.live.resumeToken)) continue;
-        if (isGenericSessionName(native, getToolDisplayName(tool))) continue;
-        setCustomName(tool, row.live.id, native);
-        if (token) setCustomName(tool, token, native);
       }
     }
   }, [groups, dispatch]);
@@ -468,11 +463,12 @@ export function HistoryBoard() {
               {!isCollapsed && group.rows.map((row, rowIdx) => {
                 const session = row.saved;
                 const sessionKey = `${session.tool ?? ''}:${session.id}`;
-                const displayName = lookupCustomName(
-                  session.tool ?? '',
-                  session.id,
-                  session.session_token ?? row.live.resumeToken,
-                ) ?? renamed[sessionKey] ?? session.name;
+                const tokenForName = session.session_token ?? row.live.resumeToken;
+                const displayName = (
+                  tokenForName
+                    ? renamed[`${session.tool ?? ''}:${tokenForName}`]
+                    : renamed[sessionKey]
+                ) ?? session.name;
                 const isRenaming = renamingKey === sessionKey;
                 const active = row.live.id === state.activeTerminalId;
                 const status = liveStatus(row.live);
@@ -518,11 +514,21 @@ export function HistoryBoard() {
                             const hist = getHistorySnapshot().sessions.find((s) => (
                               s.tool === session.tool && s.session_token === liveToken
                             ));
-                            next = {
-                              ...next,
-                              session_token: liveToken,
-                              file_path: hist?.file_path || next.file_path,
-                            };
+                            const bound = session.session_token?.trim();
+                            const osc = row.live.toolTitle?.trim();
+                            const liveMatchesTitle = Boolean(
+                              osc && hist && (hist.name ?? '').trim() === osc,
+                            );
+                            if (!bound || bound === liveToken || liveMatchesTitle) {
+                              next = {
+                                ...next,
+                                session_token: liveToken,
+                                file_path: hist?.file_path || next.file_path,
+                              };
+                              if (liveToken !== row.live.resumeToken) {
+                                dispatch({ type: 'SET_RESUME_TOKEN', id: row.live.id, token: liveToken });
+                              }
+                            }
                           }
                         } catch { /* token capture is best-effort */ }
                         setCtxMenu({ session: next, x, y });

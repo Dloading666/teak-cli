@@ -57,15 +57,17 @@ export function getCustomName(tool: string, id: string): string | undefined {
   return names[key(tool, id)];
 }
 
-/** Prefer the tab's own rename, then a resume-token alias so a PTY restart
- *  (new terminal id, same CLI session) keeps the label. */
+/** Prefer the CLI session token so a leftover tab-id label from a previous
+ *  conversation cannot stick after `--resume` forks or `/new`. Fall back to
+ *  the Teak tab id only when this tab has no live token yet. */
 export function lookupCustomName(
   tool: string,
   id: string,
   resumeToken?: string | null,
 ): string | undefined {
-  return names[key(tool, id)]
-    ?? (resumeToken ? names[key(tool, resumeToken)] : undefined);
+  const token = resumeToken?.trim();
+  if (token) return names[key(tool, token)];
+  return names[key(tool, id)];
 }
 
 /** Set (or replace) a custom title. Empty / whitespace-only clears the

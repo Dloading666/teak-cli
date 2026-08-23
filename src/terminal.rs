@@ -228,6 +228,22 @@ pub struct TerminalExitEvent {
     pub exit_code: i32,
 }
 
+/// Fired when the PTY scanner captures a (possibly new) CLI session id.
+/// Claude-family tools print `Session ID:` again after `--resume` forks or
+/// `/new`; the frontend must replace the tab's stored token so copy-id and
+/// restore target the conversation that is actually running.
+#[derive(Serialize, Clone)]
+pub struct TerminalSessionTokenEvent {
+    pub id: String,
+    pub token: String,
+}
+
+/// True when `candidate` should replace the token already stored for a PTY.
+pub fn session_token_changed(current: &Option<String>, candidate: &str) -> bool {
+    let next = candidate.trim();
+    !next.is_empty() && current.as_deref() != Some(next)
+}
+
 // ─── Agent Presets for Session Resume ─────────────────────
 
 pub struct AgentPreset {
@@ -994,7 +1010,6 @@ pub fn spawn(
             regex::Regex::new(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\].*?(?:\x07|\x1b\\)|\x1b.").unwrap();
 
         let mut pending: Vec<u8> = Vec::with_capacity(131072);
-        let mut token_captured = false;
         let mut last_flush = Instant::now();
 
         loop {
@@ -1054,24 +1069,44 @@ pub fn spawn(
                 let data = String::from_utf8_lossy(&pending[..valid_end]).to_string();
                 let stripped = ansi_re.replace_all(&data, "").to_string();
 
-                // Session token capture (once per session, for `--resume`).
-                if !token_captured {
-                    if let Some(ref re) = session_id_regex {
-                        if let Some(caps) = re.captures(&stripped) {
-                            if let Some(token) = caps.get(1) {
-                                let token_str = token.as_str().to_string();
+                // Session token capture. Keep scanning: `--resume` and `/new`
+                // print a fresh id after the first banner, and latching the
+                // first match forever makes copy-session-id / restore target
+                // a dead pre-fork conversation.
+                if let Some(ref re) = session_id_regex {
+                    if let Some(caps) = re.captures(&stripped) {
+                        if let Some(token) = caps.get(1) {
+                            let token_str = token.as_str().trim().to_string();
+                            let changed = if let Ok(map) = session_for_token.lock() {
+                                if let Some(sess) = map.get(&session_id_out) {
+                                    if let Ok(mut t) = sess.session_token.lock() {
+                                        if session_token_changed(&t, &token_str) {
+                                            *t = Some(token_str.clone());
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            };
+                            if changed {
                                 eprintln!(
                                     "[Tier Terminal] Captured session token: {}...",
                                     &token_str[..token_str.len().min(12)]
                                 );
-                                if let Ok(map) = session_for_token.lock() {
-                                    if let Some(sess) = map.get(&session_id_out) {
-                                        if let Ok(mut t) = sess.session_token.lock() {
-                                            *t = Some(token_str);
-                                        }
-                                    }
-                                }
-                                token_captured = true;
+                                let _ = app_out.emit(
+                                    "tier-terminal-session-token",
+                                    TerminalSessionTokenEvent {
+                                        id: session_id_out.clone(),
+                                        token: token_str,
+                                    },
+                                );
                             }
                         }
                     }
@@ -1289,6 +1324,23 @@ mod tests {
             "claude",
             "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
         ));
+    }
+
+    #[test]
+    fn session_token_changed_sets_then_replaces() {
+        let mut current: Option<String> = None;
+        assert!(session_token_changed(&current, "e21f3bd5-f35c-4802-88eb-5c1b4f15e1a6"));
+        current = Some("e21f3bd5-f35c-4802-88eb-5c1b4f15e1a6".into());
+        assert!(!session_token_changed(
+            &current,
+            "e21f3bd5-f35c-4802-88eb-5c1b4f15e1a6"
+        ));
+        assert!(session_token_changed(
+            &current,
+            "39ec6c4e-83e4-4fd4-a79a-bdfdf9894bb2"
+        ));
+        assert!(!session_token_changed(&current, ""));
+        assert!(!session_token_changed(&current, "   "));
     }
 
     #[test]

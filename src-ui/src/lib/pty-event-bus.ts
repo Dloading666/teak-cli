@@ -25,11 +25,13 @@ interface OutputEventPayload { id: string; data: string; }
 interface StatusEventPayload { id: string; running: boolean; exit_code: number | null; }
 interface CwdEventPayload { id: string; cwd: string; }
 interface ExitEventPayload { id: string; exit_code: number; }
+interface SessionTokenEventPayload { id: string; token: string; }
 
 type OutputHandler = (data: string) => void;
 type StatusHandler = (running: boolean, exitCode: number | null) => void;
 type CwdHandler = (cwd: string) => void;
 type ExitHandler = (exitCode: number) => void;
+type SessionTokenHandler = (token: string) => void;
 
 interface TerminalEventHandlers {
   onOutput?: OutputHandler;
@@ -40,12 +42,16 @@ interface TerminalEventHandlers {
    *  after the reader thread sees EOF — onExit may arrive earlier, and with
    *  the real exit code instead of the hardcoded 0 in the status event. */
   onExit?: ExitHandler;
+  /** Fires when the PTY scanner captures a CLI session id, including later
+   *  replacements after `--resume` forks or `/new`. */
+  onSessionToken?: SessionTokenHandler;
 }
 
 const outputHandlers = new Map<string, Set<OutputHandler>>();
 const statusHandlers = new Map<string, Set<StatusHandler>>();
 const cwdHandlers = new Map<string, Set<CwdHandler>>();
 const exitHandlers = new Map<string, Set<ExitHandler>>();
+const sessionTokenHandlers = new Map<string, Set<SessionTokenHandler>>();
 
 let globalUnlisteners: UnlistenFn[] | null = null;
 let initPromise: Promise<void> | null = null;
@@ -68,6 +74,11 @@ async function ensureInit(): Promise<void> {
       }));
       registered.push(await listen<ExitEventPayload>('tier-terminal-exit', (event) => {
         exitHandlers.get(event.payload.id)?.forEach(handler => handler(event.payload.exit_code));
+      }));
+      registered.push(await listen<SessionTokenEventPayload>('tier-terminal-session-token', (event) => {
+        const token = event.payload.token?.trim();
+        if (!token) return;
+        sessionTokenHandlers.get(event.payload.id)?.forEach(handler => handler(token));
       }));
       globalUnlisteners = registered;
     } catch (error) {
@@ -107,6 +118,7 @@ export async function subscribeTerminalEvents(
   const myStatus = handlers.onStatus;
   const myCwd = handlers.onCwd;
   const myExit = handlers.onExit;
+  const mySessionToken = handlers.onSessionToken;
 
   const add = <T,>(map: Map<string, Set<T>>, handler: T | undefined) => {
     if (!handler) return;
@@ -121,6 +133,7 @@ export async function subscribeTerminalEvents(
   add(statusHandlers, myStatus);
   add(cwdHandlers, myCwd);
   add(exitHandlers, myExit);
+  add(sessionTokenHandlers, mySessionToken);
 
   return () => {
     const remove = <T,>(map: Map<string, Set<T>>, handler: T | undefined) => {
@@ -134,5 +147,6 @@ export async function subscribeTerminalEvents(
     remove(statusHandlers, myStatus);
     remove(cwdHandlers, myCwd);
     remove(exitHandlers, myExit);
+    remove(sessionTokenHandlers, mySessionToken);
   };
 }

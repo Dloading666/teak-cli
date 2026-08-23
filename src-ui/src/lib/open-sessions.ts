@@ -25,6 +25,7 @@ export interface OpenSessionSnap {
   resumeToken?: string;
   toolTitle?: string;
   startedAt?: number;
+  viewMode?: 'terminal' | 'chat';
 }
 
 export interface OpenSessionsFile {
@@ -43,6 +44,7 @@ interface PersistableTerminal {
   toolTitle?: string;
   startedAt?: number;
   isHidden?: boolean;
+  viewMode?: 'terminal' | 'chat';
 }
 
 export function isPersistableTool(tool: string | null | undefined): boolean {
@@ -59,17 +61,21 @@ export function parseOpenSessions(raw: string | null | undefined): OpenSessionsF
       if (!row || typeof row !== 'object') continue;
       if (typeof row.id !== 'string' || !row.id) continue;
       if (!isPersistableTool(row.tool)) continue;
+      const resumeToken = typeof row.resumeToken === 'string' && row.resumeToken
+        ? row.resumeToken
+        : undefined;
       sessions.push({
         id: row.id,
         tool: row.tool,
         folderPath: typeof row.folderPath === 'string' ? row.folderPath : null,
-        resumeToken: typeof row.resumeToken === 'string' && row.resumeToken
-          ? row.resumeToken
-          : undefined,
+        resumeToken,
         toolTitle: typeof row.toolTitle === 'string' && row.toolTitle.trim()
           ? row.toolTitle
           : undefined,
         startedAt: typeof row.startedAt === 'number' ? row.startedAt : undefined,
+        viewMode: row.viewMode === 'chat' || row.viewMode === 'terminal'
+          ? row.viewMode
+          : undefined,
       });
     }
     if (sessions.length === 0) return null;
@@ -120,6 +126,7 @@ function buildSnapshot(
       resumeToken: term.resumeToken,
       toolTitle: term.toolTitle,
       startedAt: term.startedAt,
+      viewMode: term.viewMode,
     });
   }
   if (sessions.length === 0) return null;

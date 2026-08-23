@@ -723,6 +723,7 @@ export function snapToTerminal(snap: OpenSessionSnap): TerminalSession | null {
     resumeToken: snap.resumeToken,
     toolTitle: snap.toolTitle,
     startedAt: snap.startedAt,
+    viewMode: snap.viewMode,
   };
 }
 
