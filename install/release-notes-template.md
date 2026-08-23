@@ -1,49 +1,54 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-### Teak CLI v0.0.4
+### Teak CLI v0.0.5
 
-- **Grok `/rename` 的标题会出现在左侧栏。** 手动改名写入 `summary.json` 后优先显示，不再被残留的 OSC 自动标题盖掉。
-- **应用图标底板颜色更新。** Dock / 安装包图标与当前品牌色对齐。
+- **会话可以置顶。** 左侧栏单独一组，重启后仍在。
+- **需要确认时标题栏会提示。** 只认 CLI 的 `wait_input`，点一下跳到对应会话。
+- **更新按钮会显示本版说明。** 从 GitHub Release 取纯文本条目，不把远程 Markdown 当 HTML 渲染。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-### Teak CLI v0.0.4
+### Teak CLI v0.0.5
 
-- **Grok `/rename` titles show on the left rail.** A manual name in `summary.json` wins over a leftover OSC auto-title.
-- **App icon plate color refreshed.** Dock and installer icons match the current brand color.
+- **Sessions can be pinned.** They stay in their own left-rail group across restart.
+- **The titlebar flags sessions that need attention.** It only trusts native `wait_input` and jumps to that session.
+- **The update control shows this release's notes.** GitHub Release bullets are extracted as plain text and never rendered as HTML.
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-### Teak CLI v0.0.4
+### Teak CLI v0.0.5
 
-- **Grok `/rename` 的標題會出現在左側欄。** 手動改名寫入 `summary.json` 後優先顯示，不再被殘留的 OSC 自動標題蓋掉。
-- **應用圖示底板顏色更新。** Dock / 安裝包圖示與目前品牌色對齊。
+- **工作階段可以置頂。** 左側欄單獨一組，重啟後仍在。
+- **需要確認時標題列會提示。** 只認 CLI 的 `wait_input`，點一下跳到對應工作階段。
+- **更新按鈕會顯示本版說明。** 從 GitHub Release 取純文字條目，不把遠端 Markdown 當 HTML 渲染。
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-### Teak CLI v0.0.4
+### Teak CLI v0.0.5
 
-- **Grok の `/rename` が左レールに出ます。** `summary.json` の手動タイトルが、残った OSC 自動タイトルより優先されます。
-- **アプリアイコンのプレート色を更新しました。** Dock とインストーラのアイコンをブランド色に合わせます。
+- **セッションをピン留めできます。** 再起動後も左レールの専用グループに残ります。
+- **確認が必要なときタイトルバーが知らせます。** CLI の `wait_input` だけを信じ、そのセッションへ飛びます。
+- **アップデート操作に本版の説明が出ます。** GitHub Release の箇条書きをプレーンテキストとして抜き、HTML としては描画しません。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-### Teak CLI v0.0.4
+### Teak CLI v0.0.5
 
-- **Grok `/rename` 제목이 왼쪽 레일에 표시됩니다.** `summary.json`의 수동 이름이 남은 OSC 자동 제목보다 우선합니다.
-- **앱 아이콘 플레이트 색을 갱신했습니다.** Dock과 설치 파일 아이콘을 현재 브랜드 색에 맞춥니다.
+- **세션을 고정할 수 있습니다.** 재시작 후에도 왼쪽 레일 별도 그룹에 남습니다.
+- **확인이 필요하면 타이틀바가 표시합니다.** CLI `wait_input`만 믿고 해당 세션으로 이동합니다.
+- **업데이트 버튼에 이번 버전 설명이 나옵니다.** GitHub Release 항목을 일반 텍스트로만 꺼내며 HTML로는 렌더하지 않습니다.
 
 </details>
