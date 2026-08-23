@@ -1,175 +1,142 @@
 #!/usr/bin/env python3
-"""Render Teak CLI dock icons in the same metallic-on-dark language as the
-current Coffee CLI sources (full-bleed square for unix, pre-rounded for Windows).
+"""Prepare and render the approved Teak CLI app icon artwork.
 
-Run from repo root: python3 brand/render_teak_icon.py
+The canonical source is ``brand/teak-icon-master.png``: a 1024px RGBA image
+with genuine transparency outside the icon plate. Normal use refreshes the
+brand copies and the two platform source files consumed by
+``scripts/rebuild-icons.py``::
+
+    python3 brand/render_teak_icon.py
+    python3 scripts/rebuild-icons.py
+
+Image-generation previews sometimes contain a *painted* checkerboard instead
+of alpha. Import one explicitly with::
+
+    python3 brand/render_teak_icon.py --import-preview /path/to/approved.png
+
+Importing removes only that near-white exterior and keeps the approved icon's
+interior artwork. The cleaned result becomes the reproducible master.
 """
 
 from __future__ import annotations
 
-import math
+import argparse
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageChops, ImageDraw, ImageFilter
+from PIL import Image, ImageFilter
 
 HERE = Path(__file__).resolve().parent
+REPO = HERE.parent
+ICONS = REPO / "icons"
+
 SIZE = 1024
-# Matches Coffee CLI's windows source rounding (~0.225 of the canvas).
-CORNER_R = int(SIZE * 0.225)
+MASTER = HERE / "teak-icon-master.png"
+
+# The approved plate's median edge colour. Checkerboard-contaminated edge
+# pixels are de-matted to this colour before alpha is applied, preventing a
+# pale fringe after Lanczos downscaling into the 16–512px bundle frames.
+EDGE_GREEN = np.array([43, 82, 70], dtype=np.uint8)  # #2B5246
 
 
-def lerp(a: float, b: float, t: float) -> float:
-    return a + (b - a) * t
+def _dark_subject_mask(rgb: Image.Image) -> Image.Image:
+    """Return the approved icon silhouette from a near-white preview.
+
+    The icon (including its brightest wood highlights) stays below luma 225;
+    the checkerboard sits around 240–255. A tiny close removes compression
+    pinholes, then a one-pixel inset plus feather discards colour-contaminated
+    boundary pixels while retaining a clean antialiased silhouette.
+    """
+    arr = np.asarray(rgb, dtype=np.float32)
+    luma = 0.299 * arr[..., 0] + 0.587 * arr[..., 1] + 0.114 * arr[..., 2]
+    subject = Image.fromarray(np.where(luma < 225.0, 255, 0).astype(np.uint8))
+    subject = subject.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MinFilter(3))
+
+    bbox = subject.getbbox()
+    if bbox is None:
+        raise ValueError("approved preview does not contain a detectable icon")
+    width = bbox[2] - bbox[0]
+    height = bbox[3] - bbox[1]
+    if width < rgb.width * 0.6 or height < rgb.height * 0.6:
+        raise ValueError(f"detected subject is unexpectedly small: bbox={bbox}")
+
+    inset = subject.filter(ImageFilter.MinFilter(3))
+    return inset.filter(ImageFilter.GaussianBlur(0.7))
 
 
-def mix_rgb(c1: tuple[int, int, int], c2: tuple[int, int, int], t: float) -> tuple[int, int, int]:
-    t = max(0.0, min(1.0, t))
-    return (
-        int(lerp(c1[0], c2[0], t)),
-        int(lerp(c1[1], c2[1], t)),
-        int(lerp(c1[2], c2[2], t)),
+def import_preview(path: Path) -> None:
+    """Convert an approved square preview into the transparent 1024px master."""
+    preview = Image.open(path)
+    if preview.width != preview.height:
+        raise ValueError(f"approved preview must be square, got {preview.size}")
+
+    rgba = preview.convert("RGBA")
+    alpha = rgba.getchannel("A")
+    has_real_transparency = alpha.getextrema()[0] < 250
+
+    if not has_real_transparency:
+        rgb = preview.convert("RGB")
+        clean_alpha = _dark_subject_mask(rgb)
+        source = np.asarray(rgb, dtype=np.uint8).copy()
+
+        # All pixels outside the solid subject, including the feather band,
+        # receive plate-coloured RGB. Their alpha controls visibility; this
+        # avoids white/checkerboard RGB bleeding into small icon frames.
+        solid = np.asarray(clean_alpha, dtype=np.uint8) >= 250
+        source[~solid] = EDGE_GREEN
+        rgba = Image.fromarray(source).convert("RGBA")
+        rgba.putalpha(clean_alpha)
+
+    rgba = rgba.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
+    if rgba.getpixel((0, 0))[3] != 0:
+        raise ValueError("imported master does not have a transparent corner")
+    rgba.save(MASTER)
+    print(f"imported approved master: {MASTER}")
+
+
+def render_sources() -> None:
+    if not MASTER.exists():
+        raise SystemExit(
+            f"missing {MASTER}; import the approved artwork with --import-preview first"
+        )
+
+    master = Image.open(MASTER).convert("RGBA")
+    if master.size != (SIZE, SIZE):
+        raise ValueError(f"master must be {SIZE}x{SIZE}, got {master.size}")
+    if master.getpixel((0, 0))[3] != 0:
+        raise ValueError("master must have transparent outer corners")
+
+    outputs = {
+        HERE / "teak-icon-unix.png": master,
+        HERE / "teak-icon-windows.png": master,
+        HERE / "teak-icon-512.png": master.resize((512, 512), Image.Resampling.LANCZOS),
+        HERE / "teak-icon-32.png": master.resize((32, 32), Image.Resampling.LANCZOS),
+        ICONS / "icon-source-unix.png": master,
+        ICONS / "icon-source-windows.png": master,
+    }
+    for path, image in outputs.items():
+        image.save(path)
+        print(f"wrote {path.relative_to(REPO)} ({image.width}x{image.height})")
+
+    print("next: python3 scripts/rebuild-icons.py")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--import-preview",
+        type=Path,
+        metavar="PNG",
+        help="clean a selected square preview into the canonical RGBA master",
     )
-
-
-def background(size: int) -> Image.Image:
-    """Dark radial wash, lighter at upper-left — same lighting as the coffee icon."""
-    y, x = np.mgrid[0:size, 0:size].astype(np.float32)
-    nx = x / size
-    ny = y / size
-    d = np.hypot(nx - 0.30, ny - 0.16)
-    t = np.clip(d / 1.05, 0.0, 1.0) ** 0.82
-    # Warm-black, not pure cool gray — teak sits on a slightly brown dark.
-    light = np.array([52, 48, 44], dtype=np.float32)
-    dark = np.array([10, 9, 8], dtype=np.float32)
-    rgb = light * (1.0 - t[..., None]) + dark * t[..., None]
-    img = np.concatenate([rgb, np.full((size, size, 1), 255.0)], axis=2).astype(np.uint8)
-    return Image.fromarray(img, "RGBA")
-
-
-def t_mask(size: int) -> Image.Image:
-    """Chunky T-table: slab top + pedestal. Optically centered."""
-    m = Image.new("L", (size, size), 0)
-    d = ImageDraw.Draw(m)
-    r = int(size * 0.035)
-    # Tabletop / deck
-    top = (
-        int(size * 0.193),
-        int(size * 0.340),
-        int(size * 0.807),
-        int(size * 0.476),
-    )
-    # Pedestal — overlaps the slab so the join is solid
-    leg = (
-        int(size * 0.418),
-        int(size * 0.445),
-        int(size * 0.582),
-        int(size * 0.805),
-    )
-    d.rounded_rectangle(top, radius=r, fill=255)
-    d.rounded_rectangle(leg, radius=r, fill=255)
-    return m
-
-
-def metallic_fill(size: int, mask: Image.Image) -> Image.Image:
-    """Left-lit brushed metal, slightly warm so it doesn't clone the coffee chrome."""
-    y, x = np.mgrid[0:size, 0:size].astype(np.float32)
-    nx = x / (size - 1)
-    ny = y / (size - 1)
-    # Primary left→right falloff + a vertical sheen through the slab
-    sheen = 0.55 + 0.45 * np.exp(-((nx - 0.28) ** 2) / 0.10) * (0.85 + 0.15 * np.sin(ny * math.pi))
-    sheen = sheen - 0.18 * nx - 0.06 * ny
-    sheen = np.clip(sheen, 0.0, 1.0)
-
-    highlight = np.array([236, 228, 214], dtype=np.float32)  # warm silver
-    mid = np.array([186, 168, 140], dtype=np.float32)        # teak-lit metal
-    shadow = np.array([118, 102, 82], dtype=np.float32)
-
-    t = 1.0 - sheen
-    # two-stop: highlight→mid for the bright half, mid→shadow for the rest
-    k = np.clip(t * 1.15, 0.0, 1.0)
-    rgb = np.where(
-        k[..., None] < 0.5,
-        highlight * (1 - k[..., None] * 2) + mid * (k[..., None] * 2),
-        mid * (1 - (k[..., None] - 0.5) * 2) + shadow * ((k[..., None] - 0.5) * 2),
-    )
-    alpha = np.array(mask, dtype=np.float32)[..., None]
-    rgba = np.concatenate([rgb, alpha], axis=2).astype(np.uint8)
-    return Image.fromarray(rgba, "RGBA")
-
-
-def bevel(mask: Image.Image, fill: Image.Image) -> Image.Image:
-    """Thin light rim + bottom-right inner shade, matching the coffee glyph."""
-    # Outer rim: dilate, fill with pale metal, stamp the glyph back on top.
-    rim = mask.filter(ImageFilter.MaxFilter(7))
-    rim_img = Image.new("RGBA", mask.size, (220, 214, 204, 0))
-    rim_px = np.array(rim_img)
-    rim_px[..., 3] = np.array(rim)
-    rim_img = Image.fromarray(rim_px, "RGBA")
-
-    # Inner shade along the lower-right contour
-    shifted = Image.new("L", mask.size, 0)
-    shifted.paste(mask, (6, 7))
-    inner = ImageChops.subtract(mask, shifted)
-    inner = inner.filter(ImageFilter.GaussianBlur(1.2))
-    shade = Image.new("RGBA", mask.size, (40, 32, 24, 0))
-    sp = np.array(shade)
-    sp[..., 3] = (np.array(inner).astype(np.float32) * 0.55).astype(np.uint8)
-    shade = Image.fromarray(sp, "RGBA")
-
-    # Top-left inner highlight
-    shifted_hl = Image.new("L", mask.size, 0)
-    shifted_hl.paste(mask, (-5, -6))
-    hl = ImageChops.subtract(mask, shifted_hl)
-    hl = hl.filter(ImageFilter.GaussianBlur(1.0))
-    shine = Image.new("RGBA", mask.size, (255, 250, 240, 0))
-    hp = np.array(shine)
-    hp[..., 3] = (np.array(hl).astype(np.float32) * 0.40).astype(np.uint8)
-    shine = Image.fromarray(hp, "RGBA")
-
-    out = Image.alpha_composite(rim_img, fill)
-    out = Image.alpha_composite(out, shade)
-    out = Image.alpha_composite(out, shine)
-    # Re-clip to dilated rim so bevel doesn't leak
-    clipped = Image.new("RGBA", mask.size, (0, 0, 0, 0))
-    clipped.paste(out, (0, 0), rim)
-    return clipped
-
-
-def round_corners(img: Image.Image, radius: int) -> Image.Image:
-    mask = Image.new("L", img.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [0, 0, img.size[0] - 1, img.size[1] - 1], radius=radius, fill=255
-    )
-    out = img.copy()
-    out.putalpha(mask)
-    return out
-
-
-def compose(rounded: bool) -> Image.Image:
-    bg = background(SIZE)
-    mask = t_mask(SIZE)
-    fill = metallic_fill(SIZE, mask)
-    glyph = bevel(mask, fill)
-    out = Image.alpha_composite(bg, glyph)
-    if rounded:
-        out = round_corners(out, CORNER_R)
-    return out
+    return parser.parse_args()
 
 
 def main() -> None:
-    unix = compose(rounded=False)
-    windows = compose(rounded=True)
-
-    unix.save(HERE / "teak-icon-unix.png")
-    windows.save(HERE / "teak-icon-windows.png")
-    windows.resize((512, 512), Image.LANCZOS).save(HERE / "teak-icon-512.png")
-    unix.resize((32, 32), Image.LANCZOS).save(HERE / "teak-icon-32.png")
-    print("wrote:")
-    print(" ", HERE / "teak-icon-unix.png")
-    print(" ", HERE / "teak-icon-windows.png")
-    print(" ", HERE / "teak-icon-512.png")
-    print(" ", HERE / "teak-icon-32.png")
+    args = parse_args()
+    if args.import_preview is not None:
+        import_preview(args.import_preview.expanduser().resolve())
+    render_sources()
 
 
 if __name__ == "__main__":

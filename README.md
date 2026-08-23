@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="brand/teak-icon-512.png" width="96" alt="Teak CLI" />
+  <img src="brand/teak-icon-512.png?v=7e99db8a95e4" width="96" alt="Teak CLI" />
 </p>
 
 <h1 align="center">Teak CLI</h1>

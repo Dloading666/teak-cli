@@ -2,15 +2,16 @@
 from __future__ import annotations
 # Teak CLI — Icon Pipeline (PNG-based, platform-split)
 #
-# The brand ships two source artworks with the SAME glyph, differing only in
-# how the outer corners are handled:
+# The brand keeps two source slots with the SAME glyph so platform-specific
+# treatment can diverge later without changing this output pipeline:
 #
-#   * icons/icon-source-windows.png — pre-rounded corners. Windows does NOT
-#     round icon corners for you, so the artwork carries its own rounding.
+#   * icons/icon-source-windows.png — the Windows source slot.
 #
-#   * icons/icon-source-unix.png   — full-bleed square. macOS, Linux, iOS and
-#     Android all apply the platform's rounded mask themselves, so the source
-#     stays opaque edge-to-edge or the rounding would cut into transparent art.
+#   * icons/icon-source-unix.png   — the macOS/Linux/mobile source slot.
+#
+# The current approved artwork is an inset squircle with transparent corners
+# on both platforms. Do not describe the unix source as full-bleed: macOS Dock
+# uses the bundled artwork as-is and otherwise displays square corners.
 #
 # Output split (one source per platform, never mixed):
 #   * Windows  — icons/icon.ico + MS Store tiles          ← windows source
@@ -140,7 +141,7 @@ def ios_icon_px(fname: str) -> int | None:
 
 
 def build_android_foreground(src: Image.Image, canvas: int, out: Path):
-    """Adaptive-icon foreground: the full-bleed art shrunk into the 66/108 dp
+    """Adaptive-icon foreground: the source art shrunk into the 66/108 dp
     safe zone on a transparent canvas, centered. The launcher's mask crops the
     rest; the background color stays #fff (ic_launcher_background.xml)."""
     content = round(canvas * ANDROID_SAFE_FRACTION)

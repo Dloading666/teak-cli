@@ -1,7 +1,7 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <!-- Teak CLI mark: a T that is also a table (deck + pedestal). -->
-  <rect width="1024" height="1024" rx="234" fill="#1e1d1b"/>
-  <g fill="#d4a05a">
+  <rect width="1024" height="1024" rx="234" fill="#2b5146"/>
+  <g fill="#dd9a5e">
     <rect x="198" y="348" width="628" height="140" rx="36"/>
     <rect x="428" y="456" width="168" height="372" rx="36"/>
   </g>
