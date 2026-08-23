@@ -7,6 +7,9 @@ export const zhTW = {
   'nav.status.working': '進行中',
   'nav.status.idle': '空閒',
   'nav.status.waiting': '等待確認',
+  'nav.pinned': '置頂',
+  'attention.required': '需要處理',
+  'settings.attention.label': '「需要處理」標籤',
   'nav.new_agent': '新建會話',
   'nav.new_chat': '新對話',
   'nav.empty': '還沒有對話',
@@ -209,5 +212,7 @@ export const zhTW = {
 
   'update.download': '下載更新',
   'update.installing': '正在安裝更新…',
+  'update.whats_new': '更新內容',
+  'update.notes_unavailable': '此版本暫無更新說明。',
 
 } as const satisfies Record<I18nKey, string>;

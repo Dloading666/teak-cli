@@ -8,6 +8,9 @@ export const vi = {
   'nav.status.working': 'Đang chạy',
   'nav.status.idle': 'Nghỉ',
   'nav.status.waiting': 'Chờ xác nhận',
+  'nav.pinned': 'Đã ghim',
+  'attention.required': 'Cần xử lý',
+  'settings.attention.label': 'Nhãn cần xử lý',
   'nav.new_agent': 'Phiên mới',
   'nav.new_chat': 'Chat mới',
   'nav.empty': 'Chưa có hội thoại',
@@ -211,4 +214,6 @@ Xóa tờ ghi chú này khi bạn sẵn sàng và bắt đầu tác vụ đầu 
 
   'update.download': 'Tải bản cập nhật',
   'update.installing': 'Đang cài đặt cập nhật…',
+  'update.whats_new': 'Nội dung cập nhật',
+  'update.notes_unavailable': 'Phiên bản này chưa có ghi chú cập nhật.',
 } as const satisfies Record<I18nKey, string>;

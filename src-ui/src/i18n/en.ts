@@ -6,6 +6,9 @@ export const en = {
   'nav.status.working': 'Working',
   'nav.status.idle': 'Idle',
   'nav.status.waiting': 'Waiting',
+  'nav.pinned': 'Pinned',
+  'attention.required': 'Needs attention',
+  'settings.attention.label': 'Needs-attention label',
   'nav.new_agent': 'New session',
   'nav.new_chat': 'New chat',
   'nav.empty': 'No conversations yet',
@@ -211,6 +214,8 @@ Delete this note whenever you're ready, and start your first task.`,
 
   'update.download': 'Download update',
   'update.installing': 'Installing update…',
+  'update.whats_new': "What's new",
+  'update.notes_unavailable': 'No release notes are available for this version.',
 
 } as const;
 

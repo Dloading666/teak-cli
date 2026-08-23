@@ -7,6 +7,9 @@ export const ja = {
   'nav.status.working': '作業中',
   'nav.status.idle': '待機',
   'nav.status.waiting': '確認待ち',
+  'nav.pinned': 'ピン留め',
+  'attention.required': '対応が必要',
+  'settings.attention.label': '「対応が必要」ラベル',
   'nav.new_agent': '新しいセッション',
   'nav.new_chat': '新しい会話',
   'nav.empty': 'まだ会話がありません',
@@ -208,5 +211,7 @@ export const ja = {
 
   'update.download': '更新をダウンロード',
   'update.installing': '更新をインストール中…',
+  'update.whats_new': '更新内容',
+  'update.notes_unavailable': 'このバージョンには更新内容がありません。',
 
 } as const satisfies Record<I18nKey, string>;

@@ -7,6 +7,9 @@ export const de = {
   'nav.status.working': 'Arbeitet',
   'nav.status.idle': 'Bereit',
   'nav.status.waiting': 'Wartet',
+  'nav.pinned': 'Angeheftet',
+  'attention.required': 'Aktion erforderlich',
+  'settings.attention.label': 'Hinweis „Aktion erforderlich“',
   'nav.new_agent': 'Neue Sitzung',
   'nav.new_chat': 'Neuer Chat',
   'nav.empty': 'Noch keine Unterhaltungen',
@@ -206,5 +209,7 @@ Lösch diesen Zettel, wann du willst, und starte deine erste Aufgabe.`,
 
   'update.download': 'Update herunterladen',
   'update.installing': 'Update wird installiert…',
+  'update.whats_new': 'Neuerungen',
+  'update.notes_unavailable': 'Für diese Version sind keine Hinweise verfügbar.',
 
 } as const satisfies Record<I18nKey, string>;

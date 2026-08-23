@@ -3,8 +3,8 @@
 // Mirror of hidden-sessions.ts: Teak only reads each CLI tool's session
 // data for the 会话记录 list, so "pinning" is a local per-device marker,
 // not a write to the tool's own store. We keep a set of `${tool}:${id}`
-// keys the user has pinned; HistoryBoard sorts pinned sessions to the top
-// and shows a pushpin marker on their cards. Pin/unpin happens via the
+// keys the user has pinned; HistoryBoard moves them into an independent
+// Codex-style "置顶" shelf at the top of the rail. Pin/unpin happens via the
 // session card's right-click context menu.
 //
 // `${tool}:${id}` guards against a uuid colliding across two tools' id
@@ -50,34 +50,51 @@ function key(tool: string, id: string): string {
   return `${tool}:${id}`;
 }
 
-export function pinSession(tool: string, id: string): void {
-  const k = key(tool, id);
-  if (pinned.has(k)) return;
+/** Stable native identity first; live terminal id is a compatibility fallback. */
+export function sessionPinKeys(
+  tool: string,
+  id: string,
+  token?: string | null,
+  aliases: string[] = [],
+): string[] {
+  const stable = token?.trim();
+  const ids = [stable, id, ...aliases]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  return [...new Set(ids.map((value) => key(tool, value)))];
+}
+
+export function pinSession(tool: string, id: string, token?: string | null, aliases: string[] = []): void {
+  const [stable, ...legacy] = sessionPinKeys(tool, id, token, aliases);
+  if (!stable) return;
+  if (pinned.has(stable) && !legacy.some((candidate) => pinned.has(candidate))) return;
   const next = new Set(pinned);
-  next.add(k);
+  next.add(stable);
+  // Migrate a pre-token/live-tab marker to the native session token. A token
+  // survives closing and reopening the tab; a random terminal id may not.
+  for (const candidate of legacy) next.delete(candidate);
   pinned = next;
   persist();
   emit();
 }
 
-export function unpinSession(tool: string, id: string): void {
-  const k = key(tool, id);
-  if (!pinned.has(k)) return;
+export function unpinSession(tool: string, id: string, token?: string | null, aliases: string[] = []): void {
+  const keys = sessionPinKeys(tool, id, token, aliases);
+  if (!keys.some((candidate) => pinned.has(candidate))) return;
   const next = new Set(pinned);
-  next.delete(k);
+  for (const candidate of keys) next.delete(candidate);
   pinned = next;
   persist();
   emit();
 }
 
-export function togglePin(tool: string, id: string): void {
-  const k = key(tool, id);
-  if (pinned.has(k)) unpinSession(tool, id);
-  else pinSession(tool, id);
+export function togglePin(tool: string, id: string, token?: string | null, aliases: string[] = []): void {
+  if (isPinned(tool, id, token, aliases)) unpinSession(tool, id, token, aliases);
+  else pinSession(tool, id, token, aliases);
 }
 
-export function isPinned(tool: string, id: string): boolean {
-  return pinned.has(key(tool, id));
+export function isPinned(tool: string, id: string, token?: string | null, aliases: string[] = []): boolean {
+  return sessionPinKeys(tool, id, token, aliases).some((candidate) => pinned.has(candidate));
 }
 
 /** useSyncExternalStore subscribe. */

@@ -230,6 +230,9 @@ export interface AppState {
   hotkeyScheme: HotkeyScheme;
   // How the titlebar's three panel toggles render (icon+hotkey / icon / hidden).
   titlebarToggleDisplay: TitlebarToggleDisplay;
+  // Global native permission-wait label in the titlebar. The underlying
+  // agentStatus remains active when hidden; this is presentation only.
+  attentionLabelVisible: boolean;
 
   // IDE-style layout toggles driven from titlebar controls.
   // Default both panels visible — matches first-time user expectation.
@@ -354,6 +357,7 @@ type Action =
   | { type: 'SET_GAMBIT_ENTER_TO_SEND'; value: boolean }
   | { type: 'SET_HOTKEY_SCHEME'; value: HotkeyScheme }
   | { type: 'SET_TITLEBAR_TOGGLE_DISPLAY'; value: TitlebarToggleDisplay }
+  | { type: 'SET_ATTENTION_LABEL_VISIBLE'; value: boolean }
   | { type: 'SET_GAMBIT_DRAFT'; id: string; draft: string }
   | { type: 'APPEND_GAMBIT_DRAFT'; id: string; text: string }
   | { type: 'SET_SESSION_VIEW'; id: string; viewMode: 'terminal' | 'chat' }
@@ -512,27 +516,61 @@ function reducer(state: AppState, action: Action): AppState {
         ),
         activeTerminalId: state.activeTerminalId === action.id ? action.newId : state.activeTerminalId
       };
-    case 'SET_AGENT_STATUS':
+    case 'SET_AGENT_STATUS': {
       // Native-title tools emit frequent OSC activity frames. Their parsers
       // dispatch each frame, but equal states must not re-render the app.
-      if (!state.terminals.some(t => t.id === action.id && supportsNativeAgentStatus(t.tool))) return state;
-      if (state.terminals.some(t => t.id === action.id && t.agentStatus === action.status)) {
-        // Idle means the CLI is waiting for input — drop a leftover optimistic
-        // chatPending so the left-rail spinner cannot outlive the turn.
-        if (action.status === 'idle' && state.terminals.some(t => t.id === action.id && t.chatPending)) {
-          return {
-            ...state,
-            terminals: state.terminals.map(t => t.id === action.id ? { ...t, chatPending: undefined } : t),
-          };
+      const direct = state.terminals.find(t => t.id === action.id);
+      if (direct) {
+        if (!supportsNativeAgentStatus(direct.tool)) return state;
+        if (direct.agentStatus === action.status) {
+          // Idle means the CLI is waiting for input — drop a leftover optimistic
+          // chatPending so the left-rail spinner cannot outlive the turn.
+          if (action.status === 'idle' && direct.chatPending) {
+            return {
+              ...state,
+              terminals: state.terminals.map(t => t.id === action.id ? { ...t, chatPending: undefined } : t),
+            };
+          }
+          return state;
         }
-        return state;
+        return {
+          ...state,
+          terminals: state.terminals.map(t => t.id === action.id
+            ? { ...t, agentStatus: action.status, chatPending: action.status === 'idle' ? undefined : t.chatPending }
+            : t)
+        };
       }
+
+      // Independent split panes have their own PTY ids (`tab::split-N`) but
+      // their render state lives inside the parent tab's `multiAgent.panes`.
+      // Preserve the same authoritative-status gate as regular tabs, then
+      // mirror the native OSC state onto the pane so global chrome can surface
+      // permission waits from panes that are not currently focused.
+      const paneMatch = action.id.match(/^(.*)::(?:split|pane)-(\d+)$/);
+      if (!paneMatch) return state;
+      const tabId = paneMatch[1];
+      const paneIdx = Number(paneMatch[2]);
+      const parent = state.terminals.find(t => t.id === tabId);
+      const pane = parent?.multiAgent?.panes.find(item => item.paneIdx === paneIdx);
+      if (!pane || !supportsNativeAgentStatus(pane.tool)) return state;
+      if (pane.agentStatus === action.status) return state;
+
       return {
         ...state,
-        terminals: state.terminals.map(t => t.id === action.id
-          ? { ...t, agentStatus: action.status, chatPending: action.status === 'idle' ? undefined : t.chatPending }
-          : t)
+        terminals: state.terminals.map(t => {
+          if (t.id !== tabId || !t.multiAgent) return t;
+          return {
+            ...t,
+            multiAgent: {
+              ...t.multiAgent,
+              panes: t.multiAgent.panes.map(item => item.paneIdx === paneIdx
+                ? { ...item, agentStatus: action.status }
+                : item),
+            },
+          };
+        }),
       };
+    }
     case 'SET_BG':
       return { ...state, bgPath: action.path, bgType: action.bgType };
     case 'CLEAR_BG':
@@ -557,6 +595,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, hotkeyScheme: action.value };
     case 'SET_TITLEBAR_TOGGLE_DISPLAY':
       return { ...state, titlebarToggleDisplay: action.value };
+    case 'SET_ATTENTION_LABEL_VISIBLE':
+      return { ...state, attentionLabelVisible: action.value };
     case 'SET_GAMBIT_DRAFT':
       return {
         ...state,
@@ -800,6 +840,7 @@ function getInitialState(): AppState {
   // Overridden only by a stored valid scheme.
   let hotkeyScheme: HotkeyScheme = 'alt-qwe';
   let titlebarToggleDisplay: TitlebarToggleDisplay = 'icon-hotkey';
+  let attentionLabelVisible = true;
   try {
     const storedPath = prefGet('bg-path');
     const storedType = prefGet('bg-type') as 'image' | 'video' | 'none' | null;
@@ -832,6 +873,7 @@ function getInitialState(): AppState {
     if (storedTtd === 'icon-hotkey' || storedTtd === 'icon' || storedTtd === 'hidden') {
       titlebarToggleDisplay = storedTtd;
     }
+    attentionLabelVisible = prefGet('attention-label-visible') !== 'false';
     // New key (post-refactor): wallpaper opacity, 0-100, larger = more
     // visible. Old key was `cc-wallpaper-dim` (0-80, larger = darker
     // overlay). On first load after upgrade, fall back to the legacy
@@ -910,6 +952,7 @@ function getInitialState(): AppState {
     gambitEnterToSend,
     hotkeyScheme,
     titlebarToggleDisplay,
+    attentionLabelVisible,
     leftPanelHidden,
     rightPanelHidden,
     multiAgentLayout,

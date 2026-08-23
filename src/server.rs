@@ -4677,6 +4677,16 @@ struct SelfUpdateProgress {
     percent: u32,
 }
 
+#[derive(serde::Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct LatestReleaseInfo {
+    version: String,
+    // GitHub Release body. The frontend treats this as untrusted Markdown,
+    // extracts plain-text bullets for the active locale, and never renders it
+    // as HTML.
+    notes: String,
+}
+
 fn emit_self_update(app: &tauri::AppHandle, status: &str, percent: u32) {
     let _ = app.emit(
         "self-update-progress",
@@ -4752,8 +4762,7 @@ fn installer_download_url(release: &serde_json::Value) -> Result<String, String>
     Err("no installer asset for this platform in the latest GitHub release".into())
 }
 
-fn latest_release_version_inner() -> Result<String, String> {
-    let release = fetch_latest_github_release()?;
+fn release_info_from_json(release: &serde_json::Value) -> Result<LatestReleaseInfo, String> {
     let tag = release
         .get("tag_name")
         .and_then(|v| v.as_str())
@@ -4762,14 +4771,26 @@ fn latest_release_version_inner() -> Result<String, String> {
     if version.is_empty() {
         return Err("github release tag_name is empty".into());
     }
-    Ok(version.to_string())
+    Ok(LatestReleaseInfo {
+        version: version.to_string(),
+        notes: release
+            .get("body")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+    })
+}
+
+fn latest_release_info_inner() -> Result<LatestReleaseInfo, String> {
+    let release = fetch_latest_github_release()?;
+    release_info_from_json(&release)
 }
 
 #[tauri::command]
-async fn latest_release_version() -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(latest_release_version_inner)
+async fn latest_release_info() -> Result<LatestReleaseInfo, String> {
+    tauri::async_runtime::spawn_blocking(latest_release_info_inner)
         .await
-        .map_err(|e| format!("latest_release_version join failed: {e}"))?
+        .map_err(|e| format!("latest_release_info join failed: {e}"))?
 }
 
 #[tauri::command]
@@ -5182,7 +5203,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             load_password,
             delete_password,
             open_url,
-            latest_release_version,
+            latest_release_info,
             download_and_install_update,
             get_tool_config,
             get_all_tool_configs,
@@ -6041,5 +6062,35 @@ mod tests {
         let (title, manual) = grok_title_from_summary(&s);
         assert_eq!(title, "Push Teak CLI and publish v0.0.1 Release");
         assert!(!manual);
+    }
+
+    #[test]
+    fn release_info_keeps_notes_and_normalizes_version() {
+        let release = serde_json::json!({
+            "tag_name": " v0.0.5 ",
+            "body": "- Added the needs-attention label.\n- Fixed session pinning."
+        });
+
+        let info = release_info_from_json(&release).expect("valid release info");
+
+        assert_eq!(info.version, "0.0.5");
+        assert_eq!(
+            info.notes,
+            "- Added the needs-attention label.\n- Fixed session pinning."
+        );
+    }
+
+    #[test]
+    fn release_info_allows_empty_notes_but_rejects_missing_tag() {
+        let without_notes = serde_json::json!({ "tag_name": "v1.2.3", "body": null });
+        let info = release_info_from_json(&without_notes).expect("notes are optional");
+        assert_eq!(info.version, "1.2.3");
+        assert!(info.notes.is_empty());
+
+        let without_tag = serde_json::json!({ "body": "- change" });
+        assert_eq!(
+            release_info_from_json(&without_tag).unwrap_err(),
+            "github release missing tag_name"
+        );
     }
 }

@@ -7,6 +7,9 @@ export const ko = {
   'nav.status.working': '작업 중',
   'nav.status.idle': '대기',
   'nav.status.waiting': '확인 대기',
+  'nav.pinned': '고정',
+  'attention.required': '확인 필요',
+  'settings.attention.label': '확인 필요 라벨',
   'nav.new_agent': '새 세션',
   'nav.new_chat': '새 대화',
   'nav.empty': '아직 대화가 없습니다',
@@ -208,5 +211,7 @@ export const ko = {
 
   'update.download': '업데이트 다운로드',
   'update.installing': '업데이트 설치 중…',
+  'update.whats_new': '업데이트 내용',
+  'update.notes_unavailable': '이 버전에는 업데이트 내용이 없습니다.',
 
 } as const satisfies Record<I18nKey, string>;

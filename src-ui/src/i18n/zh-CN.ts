@@ -7,6 +7,9 @@ export const zhCN = {
   'nav.status.working': '进行中',
   'nav.status.idle': '空闲',
   'nav.status.waiting': '等待确认',
+  'nav.pinned': '置顶',
+  'attention.required': '需要处理',
+  'settings.attention.label': '“需要处理”标签',
   'nav.new_agent': '新建会话',
   'nav.new_chat': '新对话',
   'nav.empty': '还没有对话',
@@ -210,5 +213,7 @@ export const zhCN = {
 
   'update.download': '下载更新',
   'update.installing': '正在安装更新…',
+  'update.whats_new': '更新内容',
+  'update.notes_unavailable': '此版本暂无更新说明。',
 
 } as const satisfies Record<I18nKey, string>;

@@ -22,6 +22,8 @@ export interface SessionCtxMenuState {
   session: SavedSession;
   x: number;
   y: number;
+  /** Native history ids used by older pin markers before token-based keys. */
+  pinAliases?: string[];
 }
 
 const ICON_PROPS = {
@@ -43,7 +45,7 @@ export function SessionContextMenu({ menu, onClose, onRename, onDelete }: {
 }) {
   const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
-  const { session } = menu;
+  const { session, pinAliases = [] } = menu;
 
   // Dismiss on outside-click + Escape - same as Explorer's ContextMenu.
   useEffect(() => {
@@ -66,10 +68,10 @@ export function SessionContextMenu({ menu, onClose, onRename, onDelete }: {
   const hasResume = !!resumeCmd;
   const hasPath = !!filePath;
   const hasGroup2 = hasToken || hasPath; // resume implies token, so this covers it
-  const pinned = isPinned(session.tool ?? '', session.id);
+  const pinned = isPinned(session.tool ?? '', session.id, token, pinAliases);
 
   const copy = (text: string) => { clipboardWrite(text); onClose(); };
-  const handlePin = () => { togglePin(session.tool ?? '', session.id); onClose(); };
+  const handlePin = () => { togglePin(session.tool ?? '', session.id, token, pinAliases); onClose(); };
   const handleRename = () => { onRename(session); onClose(); };
   const handleDelete = () => {
     if (onDelete) onDelete(session);

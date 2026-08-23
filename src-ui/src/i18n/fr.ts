@@ -7,6 +7,9 @@ export const fr = {
   'nav.status.working': 'En cours',
   'nav.status.idle': 'Inactif',
   'nav.status.waiting': 'En attente',
+  'nav.pinned': 'Épinglées',
+  'attention.required': 'Attention requise',
+  'settings.attention.label': 'Libellé d’attention',
   'nav.new_agent': 'Nouvelle session',
   'nav.new_chat': 'Nouveau chat',
   'nav.empty': 'Pas encore de conversations',
@@ -205,5 +208,7 @@ Supprimez cette note quand vous voulez et commencez votre première tâche.`,
 
   'update.download': 'Télécharger la mise à jour',
   'update.installing': 'Installation de la mise à jour…',
+  'update.whats_new': 'Nouveautés',
+  'update.notes_unavailable': 'Aucune note disponible pour cette version.',
 
 } as const satisfies Record<I18nKey, string>;

@@ -7,6 +7,9 @@ export const ru = {
   'nav.status.working': 'В работе',
   'nav.status.idle': 'Ожидание',
   'nav.status.waiting': 'Нужно подтверждение',
+  'nav.pinned': 'Закреплённые',
+  'attention.required': 'Требует внимания',
+  'settings.attention.label': 'Метка «Требует внимания»',
   'nav.new_agent': 'Новая сессия',
   'nav.new_chat': 'Новый чат',
   'nav.empty': 'Пока нет разговоров',
@@ -206,5 +209,7 @@ export const ru = {
 
   'update.download': 'Скачать обновление',
   'update.installing': 'Установка обновления…',
+  'update.whats_new': 'Что нового',
+  'update.notes_unavailable': 'Для этой версии нет описания изменений.',
 
 } as const satisfies Record<I18nKey, string>;

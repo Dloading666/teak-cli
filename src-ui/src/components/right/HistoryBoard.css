@@ -386,6 +386,25 @@
   margin-bottom: 8px;
 }
 
+.nav-project.is-pinned-group {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+/* Codex-style pinned shelf: a quiet text heading, distinct from project
+   folders. Pinned sessions live here exclusively rather than duplicating in
+   their project group. */
+.nav-pinned-header {
+  padding: 4px 8px 6px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
 .nav-project-header {
   display: flex;
   align-items: center;
@@ -485,6 +504,10 @@
 
 .nav-session.is-active {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.nav-session.is-history {
+  cursor: pointer;
 }
 
 .nav-session-dot {

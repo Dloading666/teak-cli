@@ -9,14 +9,62 @@
 //   3. Multi-agent layout mode — only visible when the active tab is a
 //      multi-agent quadrant. Two modes: grid (2×2) and columns (1×4).
 
-import { useCallback, useEffect, useState } from 'react';
-import { commands, isTauri, onSelfUpdateProgress, TEAK_RELEASES_LATEST_URL } from '../../tauri';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  commands,
+  isTauri,
+  onSelfUpdateProgress,
+  TEAK_RELEASES_LATEST_URL,
+  type LatestReleaseInfo,
+} from '../../tauri';
 import { saveOpenSessionsNow } from '../../lib/open-sessions';
-import { useAppState, useAppDispatch, schemeLabels } from '../../store/app-state';
+import { releaseNoteItems } from '../../lib/release-notes';
+import {
+  isSplitTool,
+  paneSessionId,
+  schemeLabels,
+  supportsNativeAgentStatus,
+  useAppDispatch,
+  useAppState,
+  type TerminalSession,
+  type ToolType,
+} from '../../store/app-state';
+import { focusTerminal } from '../../lib/focus-registry';
+import { setFocusedPane } from '../../lib/pane-focus';
+import { getToolDisplayName } from '../../lib/tool-info';
 import { IS_MACOS } from '../../lib/platform';
 import { useT } from '../../i18n/useT';
 import { TeakMark } from './TeakMark';
 import './TitleBar.css';
+
+interface AttentionTarget {
+  sessionId: string;
+  tabId: string;
+  tool: Exclude<ToolType, null>;
+  paneIdx?: number;
+}
+
+/** Collect only authoritative native `wait_input` states. Never infer an
+ * attention request from output silence or generic idle state. */
+function collectAttentionTargets(terminals: TerminalSession[]): AttentionTarget[] {
+  const targets: AttentionTarget[] = [];
+  for (const terminal of terminals) {
+    if (terminal.tool && supportsNativeAgentStatus(terminal.tool) && terminal.agentStatus === 'wait_input') {
+      targets.push({ sessionId: terminal.id, tabId: terminal.id, tool: terminal.tool });
+    }
+    if (!isSplitTool(terminal.tool)) continue;
+    for (const pane of terminal.multiAgent?.panes ?? []) {
+      if (!pane.tool || !supportsNativeAgentStatus(pane.tool) || pane.agentStatus !== 'wait_input') continue;
+      targets.push({
+        sessionId: paneSessionId(terminal.id, pane.paneIdx, 'split'),
+        tabId: terminal.id,
+        tool: pane.tool,
+        paneIdx: pane.paneIdx,
+      });
+    }
+  }
+  return targets;
+}
 
 export function TitleBar() {
   const { state } = useAppState();
@@ -45,7 +93,7 @@ export function TitleBar() {
   const setGrid    = () => dispatch({ type: 'SET_MULTI_AGENT_LAYOUT', layout: 'grid' });
   const setColumns = () => dispatch({ type: 'SET_MULTI_AGENT_LAYOUT', layout: 'columns' });
 
-  const [hasUpdate, setHasUpdate] = useState(false);
+  const [availableRelease, setAvailableRelease] = useState<LatestReleaseInfo | null>(null);
   const [installing, setInstalling] = useState(false);
   const [installPct, setInstallPct] = useState(0);
   const [installPhase, setInstallPhase] = useState<
@@ -67,9 +115,9 @@ export function TitleBar() {
         const { getVersion } = await import('@tauri-apps/api/app');
         const [local, remote] = await Promise.all([
           getVersion(),
-          commands.latestReleaseVersion(),
+          commands.latestReleaseInfo(),
         ]);
-        if (remote && isNewer(remote, local)) setHasUpdate(true);
+        setAvailableRelease(remote && isNewer(remote.version, local) ? remote : null);
       } catch { /* offline or fetch failed — silent */ }
     };
     checkUpdate();
@@ -105,9 +153,43 @@ export function TitleBar() {
     }
   }, [installing, state.terminals, state.activeTerminalId]);
 
+  const updateNotes = useMemo(
+    () => releaseNoteItems(availableRelease?.notes ?? '', state.currentLang),
+    [availableRelease?.notes, state.currentLang],
+  );
+
   // Show the 2×2 / 1×4 layout picker only for the independent four-split view.
   const activeTab = state.terminals.find(t => t.id === state.activeTerminalId);
   const showMaLayout = activeTab?.tool === 'four-split';
+
+  // Global attention label. If the currently focused terminal is already one
+  // of several waiters, point at the next one; repeated clicks therefore walk
+  // every pending permission prompt without needing a popover or search UI.
+  const attentionTargets = collectAttentionTargets(state.terminals);
+  const focusedSessionId = activeTab && isSplitTool(activeTab.tool) && activeTab.multiAgent?.focusedPaneIdx
+    ? paneSessionId(activeTab.id, activeTab.multiAgent.focusedPaneIdx, 'split')
+    : state.activeTerminalId;
+  const attentionTarget = attentionTargets.find(target => target.sessionId !== focusedSessionId)
+    ?? attentionTargets[0];
+  const attentionToolName = attentionTarget ? getToolDisplayName(attentionTarget.tool) : '';
+  const attentionTitle = attentionTargets
+    .map(target => `${getToolDisplayName(target.tool)}${target.paneIdx ? ` · P${target.paneIdx}` : ''}`)
+    .join('\n');
+
+  const focusAttentionTarget = () => {
+    if (!attentionTarget) return;
+    dispatch({ type: 'SET_ACTIVE_TERMINAL', id: attentionTarget.tabId });
+    if (attentionTarget.paneIdx !== undefined) {
+      dispatch({ type: 'SET_FOCUSED_PANE', tabId: attentionTarget.tabId, paneIdx: attentionTarget.paneIdx });
+      setFocusedPane(attentionTarget.tabId, attentionTarget.paneIdx);
+    } else {
+      // Permission confirmation must happen in the real TUI, not the history
+      // projection. This also handles a user switching back to Chat while the
+      // native Action Required title remains active.
+      dispatch({ type: 'SET_SESSION_VIEW', id: attentionTarget.tabId, viewMode: 'terminal' });
+    }
+    window.setTimeout(() => focusTerminal(attentionTarget.sessionId), 0);
+  };
 
   // Drag is wired as a single JS path: mousedown anywhere on the bar (except
   // on a child <button>) calls `startDragging()`, double-click toggles
@@ -152,55 +234,89 @@ export function TitleBar() {
         <div className="brand">
           <TeakMark size={20} className="brand-icon" />
           <span>{t('app.title')}</span>
-          {hasUpdate && (
-            <button
-              type="button"
-              className={`icon-btn xs update-check-btn update-available${installing ? ' is-installing' : ''}`}
-              onClick={handleSelfUpdate}
-              disabled={installing}
-              title={installing ? t('update.installing') : t('update.download')}
-              aria-label={installing ? t('update.installing') : t('update.download')}
-            >
-              {installing ? (
-                <svg
-                  className={`update-ring${installPhase === 'speed_test' ? ' spin' : ''}`}
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                >
-                  <circle className="update-ring-track" cx="12" cy="12" r="9" fill="none" strokeWidth="2.6" />
-                  <circle
-                    className="update-ring-progress"
-                    cx="12"
-                    cy="12"
-                    r="9"
-                    fill="none"
-                    strokeWidth="2.6"
-                    strokeLinecap="round"
-                    transform="rotate(-90 12 12)"
-                    strokeDasharray={
-                      installPhase === 'speed_test'
-                        ? `${2 * Math.PI * 9 * 0.25} ${2 * Math.PI * 9}`
-                        : 2 * Math.PI * 9
-                    }
-                    strokeDashoffset={
-                      installPhase === 'speed_test'
-                        ? 0
-                        : 2 * Math.PI * 9 * (1 - installPct / 100)
-                    }
-                  />
-                </svg>
-              ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-              )}
-            </button>
+          {availableRelease && (
+            <span className="update-control">
+              <button
+                type="button"
+                className={`icon-btn xs update-check-btn update-available${installing ? ' is-installing' : ''}`}
+                onClick={handleSelfUpdate}
+                disabled={installing}
+                aria-label={installing ? t('update.installing') : t('update.download')}
+                aria-describedby="titlebar-update-notes"
+              >
+                {installing ? (
+                  <svg
+                    className={`update-ring${installPhase === 'speed_test' ? ' spin' : ''}`}
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle className="update-ring-track" cx="12" cy="12" r="9" fill="none" strokeWidth="2.6" />
+                    <circle
+                      className="update-ring-progress"
+                      cx="12"
+                      cy="12"
+                      r="9"
+                      fill="none"
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                      transform="rotate(-90 12 12)"
+                      strokeDasharray={
+                        installPhase === 'speed_test'
+                          ? `${2 * Math.PI * 9 * 0.25} ${2 * Math.PI * 9}`
+                          : 2 * Math.PI * 9
+                      }
+                      strokeDashoffset={
+                        installPhase === 'speed_test'
+                          ? 0
+                          : 2 * Math.PI * 9 * (1 - installPct / 100)
+                      }
+                    />
+                  </svg>
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                )}
+              </button>
+              <div id="titlebar-update-notes" className="update-release-popover" role="tooltip">
+                <div className="update-release-heading">
+                  <span className="update-release-version">v{availableRelease.version}</span>
+                  <span>{t('update.whats_new')}</span>
+                </div>
+                {updateNotes.length > 0 ? (
+                  <ul className="update-release-list">
+                    {updateNotes.map((note, index) => <li key={`${index}:${note}`}>{note}</li>)}
+                  </ul>
+                ) : (
+                  <p className="update-release-empty">{t('update.notes_unavailable')}</p>
+                )}
+              </div>
+            </span>
           )}
         </div>
       </div>
+      {state.attentionLabelVisible && attentionTarget && (
+        <button
+          type="button"
+          className="titlebar-attention"
+          onClick={focusAttentionTarget}
+          title={`${t('attention.required')}\n${attentionTitle}`}
+          aria-label={`${t('attention.required')}: ${attentionTitle.replace(/\n/g, ', ')}`}
+        >
+          <span className="titlebar-attention-dot" aria-hidden="true" />
+          <span className="titlebar-attention-label">{t('attention.required')}</span>
+          <span className="titlebar-attention-separator" aria-hidden="true">·</span>
+          <span className="titlebar-attention-tool">
+            {attentionToolName}{attentionTarget.paneIdx ? ` P${attentionTarget.paneIdx}` : ''}
+          </span>
+          {attentionTargets.length > 1 && (
+            <span className="titlebar-attention-count">+{attentionTargets.length - 1}</span>
+          )}
+        </button>
+      )}
       {/* Icons come straight from Lucide (lucide.dev, ISC license). No
           runtime dependency — just the d-paths copied inline so we
           don't pay a 200KB+ import for four glyphs.

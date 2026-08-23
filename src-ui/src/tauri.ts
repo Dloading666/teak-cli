@@ -107,6 +107,13 @@ export interface NativeSessionTitle {
   title_is_manual: boolean;
 }
 
+/** Metadata returned by this fork's latest published GitHub Release. */
+export interface LatestReleaseInfo {
+  version: string;
+  /** Untrusted GitHub Release Markdown. Render as plain text only. */
+  notes: string;
+}
+
 export interface ChatSessionRead {
   data: string;
   cursor: number | null;
@@ -294,8 +301,8 @@ export const commands = {
     invoke<void>('open_url', { url }),
 
   // Self-update from this repo's GitHub Releases (never coffeecli.com).
-  latestReleaseVersion: () =>
-    invoke<string>('latest_release_version'),
+  latestReleaseInfo: () =>
+    invoke<LatestReleaseInfo>('latest_release_info'),
   downloadAndInstallUpdate: () =>
     invoke<void>('download_and_install_update'),
 

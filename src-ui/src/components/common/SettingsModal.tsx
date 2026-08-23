@@ -240,6 +240,10 @@ export function SettingsModal() {
     dispatch({ type: 'SET_TITLEBAR_TOGGLE_DISPLAY', value });
     prefSet('titlebar-toggle-display', value);
   };
+  const setAttentionLabelVisible = (value: boolean) => {
+    dispatch({ type: 'SET_ATTENTION_LABEL_VISIBLE', value });
+    prefSet('attention-label-visible', String(value));
+  };
 
   // Sound notification toggles — local state + localStorage only. The
   // notify-sound module reads these keys live on native title state changes,
@@ -578,6 +582,24 @@ export function SettingsModal() {
                       </button>
                     );
                   })}
+                </div>
+
+                <div className="settings-section-label">{t('settings.attention.label')}</div>
+                <div className="settings-key-row">
+                  <button
+                    className={`settings-key-card${state.attentionLabelVisible ? ' active' : ''}`}
+                    onClick={() => setAttentionLabelVisible(true)}
+                    aria-pressed={state.attentionLabelVisible}
+                  >
+                    <span className="settings-key-combo">{t('settings.sound.on')}</span>
+                  </button>
+                  <button
+                    className={`settings-key-card${!state.attentionLabelVisible ? ' active' : ''}`}
+                    onClick={() => setAttentionLabelVisible(false)}
+                    aria-pressed={!state.attentionLabelVisible}
+                  >
+                    <span className="settings-key-combo">{t('settings.sound.off')}</span>
+                  </button>
                 </div>
               </>
             )}

@@ -7,6 +7,9 @@ export const pt = {
   'nav.status.working': 'Em andamento',
   'nav.status.idle': 'Inativo',
   'nav.status.waiting': 'Aguardando',
+  'nav.pinned': 'Fixadas',
+  'attention.required': 'Requer atenção',
+  'settings.attention.label': 'Etiqueta de atenção',
   'nav.new_agent': 'Nova sessão',
   'nav.new_chat': 'Novo chat',
   'nav.empty': 'Ainda não há conversas',
@@ -206,5 +209,7 @@ Apague esta nota quando quiser e comece a sua primeira tarefa.`,
 
   'update.download': 'Baixar atualização',
   'update.installing': 'Instalando atualização…',
+  'update.whats_new': 'Novidades',
+  'update.notes_unavailable': 'Não há notas disponíveis para esta versão.',
 
 } as const satisfies Record<I18nKey, string>;
