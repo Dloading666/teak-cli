@@ -16,6 +16,16 @@ export interface TabActions {
    *  yet, etc.). Callers use the return value to decide whether to clear
    *  the source draft — silent failures must not lose user text. */
   paste: (text: string) => boolean;
+  /** Submit a user-visible prompt through the tab's normal PTY input path.
+   *  Unlike `paste`, this resolves only after both the text write and the
+   *  trailing Enter have reached the native PTY. Collaboration bootstrap
+   *  uses this after an explicit user confirmation; it never writes while
+   *  the PTY is starting or while the current prompt may contain a draft. */
+  submitVisiblePrompt: (text: string) => Promise<boolean>;
+  /** Conservative readiness used by collaboration bootstrap. `clean=false`
+   *  means the user may have partially typed into the TUI; callers must leave
+   *  that input alone and offer a manual-copy fallback. */
+  bootstrapSafety: () => { ready: boolean; clean: boolean };
   /** Insert text at the cursor without submitting. Used by file-drop:
    *  dragging a file into the terminal should mirror OS-native terminal
    *  behavior — the path appears at the cursor as if typed, and the user

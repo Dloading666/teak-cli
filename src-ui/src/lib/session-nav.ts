@@ -126,6 +126,11 @@ export function attachHistoryToLive(
     ? candidates.find((s) => s.session_token === terminal.resumeToken)
     : undefined;
 
+  // A collaboration launch plan owns the pre-spawn resume token. Until the
+  // running PTY reports a different authoritative token, history titles may
+  // describe a fork in the same cwd and must not rebind this row to it.
+  if (terminal.exactResumeToken) return claim(byToken);
+
   const osc = (terminal.toolTitle ?? '').trim();
   const byTitle = osc && !isGenericSessionName(osc, fallbackName)
     ? candidates.find((s) => (s.name ?? '').trim() === osc)

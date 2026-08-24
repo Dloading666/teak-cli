@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod collaboration;
 mod terminal;
 mod server;
 mod hook_installer;
@@ -18,6 +19,17 @@ mod windows_path;
 use anyhow::Result;
 
 fn main() -> Result<()> {
+    // Exact hidden collaboration helper dispatch must run before the generic
+    // legacy `__*` compatibility exit below. It is a local CLI transport only
+    // and never starts the GUI.
+    {
+        let mut argv = std::env::args_os();
+        let _program = argv.next();
+        if argv.next().as_deref() == Some(std::ffi::OsStr::new("__collab")) {
+            std::process::exit(collaboration::helper::run_cli_from(argv));
+        }
+    }
+
     // ── Legacy hook compatibility (fast path) ────────────────────────────
     // Current builds install no hooks. Keep the historical subcommands as
     // silent exit-0 handlers so a stale config that startup could not rewrite

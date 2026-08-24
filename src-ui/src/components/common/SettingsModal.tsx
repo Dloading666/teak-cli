@@ -22,9 +22,10 @@ import { commands, TEAK_ISSUES_URL, type FontInfo } from '../../tauri';
 import { FontPicker } from './FontPicker';
 import { THEME_COLORS, THEME_SHAPES, ICON_ART_THEMES, LANGUAGES, TASK_VIEW_MODES, isMaskTintTheme } from '../../lib/personalization';
 import { prefGet, prefSet, prefRemove } from '../../lib/prefs';
+import { CollaborationSettings } from '../../features/collaboration';
 import './SettingsModal.css';
 
-type Section = 'appearance' | 'wallpaper' | 'terminal' | 'gambit' | 'sound' | 'tasks' | 'language' | 'feedback';
+type Section = 'appearance' | 'wallpaper' | 'terminal' | 'gambit' | 'sound' | 'tasks' | 'collaboration' | 'language' | 'feedback';
 
 // Trailing "opens outside the app" affordance on the feedback cards.
 const ExternalLinkArrow = () => (
@@ -90,6 +91,12 @@ const ICONS: Record<Section, ReactNode> = {
       <path d="m9 11 3 3L22 4" />
     </svg>
   ),
+  collaboration: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="8" cy="8" r="3" /><circle cx="17" cy="7" r="2.5" /><circle cx="17" cy="17" r="2.5" />
+      <path d="M10.8 7.1 14.5 7M10.4 10.2l4.8 5M5.5 11v3.5A2.5 2.5 0 0 0 8 17h6.5" />
+    </svg>
+  ),
   language: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" />
@@ -116,6 +123,7 @@ export function SettingsModal() {
   const dispatch = useAppDispatch();
   const t = useT();
   const [section, setSection] = useState<Section>('appearance');
+  const [collaborationDirty, setCollaborationDirty] = useState(false);
   const [version, setVersion] = useState('');
   // Installed fonts for the terminal font picker — loaded lazily (Rust scan)
   // the first time the Terminal section is opened. null = not loaded yet.
@@ -138,7 +146,18 @@ export function SettingsModal() {
   const [soundWait, setSoundWait] = useState(() => readSoundPref('sound-wait'));
 
   const open = state.settingsOpen;
-  const close = () => dispatch({ type: 'SET_SETTINGS_OPEN', open: false });
+  const confirmDiscardCollaborationDraft = () => (
+    !collaborationDirty || window.confirm(t('collab.unsaved_leave_confirm'))
+  );
+  const close = () => {
+    if (!confirmDiscardCollaborationDraft()) return;
+    dispatch({ type: 'SET_SETTINGS_OPEN', open: false });
+  };
+  const selectSection = (next: Section) => {
+    if (next === section) return;
+    if (section === 'collaboration' && !confirmDiscardCollaborationDraft()) return;
+    setSection(next);
+  };
 
   // App version for the rail footer — pulled from the Tauri runtime (matches
   // tauri.conf.json) once, lazily so non-Tauri dev just shows nothing.
@@ -157,7 +176,7 @@ export function SettingsModal() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, collaborationDirty]);
 
   // Lazy-load the system font list + probe available shells when the
   // Terminal section is first shown. Both come from the Rust side and are
@@ -265,6 +284,7 @@ export function SettingsModal() {
     { id: 'gambit',     label: t('settings.gambit') },
     { id: 'sound',      label: t('settings.sound') },
     { id: 'tasks',      label: t('settings.tasks') },
+    { id: 'collaboration', label: t('settings.collaboration') },
     { id: 'language',   label: t('settings.language') },
     { id: 'feedback',   label: t('settings.feedback') },
   ];
@@ -284,7 +304,7 @@ export function SettingsModal() {
             <button
               key={s.id}
               className={`settings-rail-item${section === s.id ? ' active' : ''}`}
-              onClick={() => setSection(s.id)}
+              onClick={() => selectSection(s.id)}
             >
               <span className="settings-rail-icon">{ICONS[s.id]}</span>
               {s.label}
@@ -667,6 +687,10 @@ export function SettingsModal() {
                   })}
                 </div>
               </>
+            )}
+
+            {section === 'collaboration' && (
+              <CollaborationSettings onDirtyChange={setCollaborationDirty} />
             )}
 
             {section === 'language' && (

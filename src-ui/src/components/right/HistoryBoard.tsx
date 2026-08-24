@@ -790,6 +790,14 @@ export function HistoryBoard() {
                           try {
                             const liveToken = await commands.getTerminalSessionToken(row.live.id);
                             if (liveToken) {
+                              if (liveToken !== row.live.resumeToken) {
+                                dispatch({
+                                  type: 'SET_RESUME_TOKEN',
+                                  id: row.live.id,
+                                  token: liveToken,
+                                  authoritativeRuntime: true,
+                                });
+                              }
                               const hist = getHistorySnapshot().sessions.find((s) => (
                                 s.tool === session.tool && s.session_token === liveToken
                               ));
@@ -804,9 +812,6 @@ export function HistoryBoard() {
                                   session_token: liveToken,
                                   file_path: hist?.file_path || next.file_path,
                                 };
-                                if (liveToken !== row.live.resumeToken) {
-                                  dispatch({ type: 'SET_RESUME_TOKEN', id: row.live.id, token: liveToken });
-                                }
                               }
                             }
                           } catch { /* token capture is best-effort */ }

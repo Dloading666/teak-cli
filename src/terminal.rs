@@ -491,6 +491,17 @@ pub struct TerminalSession {
 
 pub type SharedSession = Arc<Mutex<std::collections::HashMap<String, TerminalSession>>>;
 
+/// Optional lifecycle hook for features that bind capabilities to one exact
+/// PTY generation. It receives the Teak terminal session ID; generation-bound
+/// callers capture their expected generation in the closure so a late watcher
+/// cannot revoke a replacement PTY that reused the same ID.
+pub type TerminalExitHook = Arc<dyn Fn(&str) + Send + Sync + 'static>;
+
+/// Optional hook for a tool whose durable identity must remain bound to the
+/// native session selected at launch. It receives the Teak terminal ID and a
+/// newly observed native session token whenever the PTY parser sees a change.
+pub type TerminalSessionTokenHook = Arc<dyn Fn(&str, &str) + Send + Sync + 'static>;
+
 // ─── Spawn ────────────────────────────────────────────────
 
 /// Spawns `program` with `args` inside a PTY via portable-pty.
@@ -515,6 +526,8 @@ pub fn spawn(
     theme_mode: Option<String>,
     locale: Option<String>,
     extra_env: Vec<(String, String)>,
+    exit_hook: Option<TerminalExitHook>,
+    session_token_hook: Option<TerminalSessionTokenHook>,
 ) -> anyhow::Result<()> {
     use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 
@@ -847,6 +860,9 @@ pub fn spawn(
                 exit_code,
             },
         );
+        if let Some(hook) = exit_hook {
+            hook(&sid_for_watcher);
+        }
         // Force PTY master drop → reader thread gets EOF → cleanup path runs.
         // Safe even if already dropped by the kill thread (guard just goes
         // from None to None).
@@ -1096,6 +1112,9 @@ pub fn spawn(
                                 false
                             };
                             if changed {
+                                if let Some(hook) = session_token_hook.as_ref() {
+                                    hook(&session_id_out, &token_str);
+                                }
                                 eprintln!(
                                     "[Tier Terminal] Captured session token: {}...",
                                     &token_str[..token_str.len().min(12)]

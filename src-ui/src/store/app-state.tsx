@@ -162,6 +162,11 @@ export interface TerminalSession {
   /// which spawns the tool with its `--resume <token>` flag instead of a
   /// fresh launch. Cleared on any subsequent SET_TERMINAL_TOOL.
   resumeToken?: string;
+  /** The resume token came from a collaboration launch plan and is the exact
+   *  native identity Rust must receive at PTY spawn. Pre-spawn history/title
+   *  discovery may not replace it. A different token reported by the running
+   *  PTY clears this flag and becomes the new ordinary session identity. */
+  exactResumeToken?: boolean;
   isHidden?: boolean;
   agentStatus?: AgentStatus;
   gambitDraft?: string;    // Unsent textarea content, preserved across tab switches
@@ -338,8 +343,8 @@ type Action =
   | { type: 'REMOVE_TERMINAL'; id: string }
   | { type: 'REORDER_TERMINAL'; sessionId: string; beforeId: string | null }
   | { type: 'SET_ACTIVE_TERMINAL'; id: string | null }
-  | { type: 'SET_TERMINAL_TOOL'; id: string; tool: ToolType; toolData?: string; resumeToken?: string }
-  | { type: 'SET_RESUME_TOKEN'; id: string; token: string }
+  | { type: 'SET_TERMINAL_TOOL'; id: string; tool: ToolType; toolData?: string; resumeToken?: string; exactResumeToken?: boolean }
+  | { type: 'SET_RESUME_TOKEN'; id: string; token: string; exactResumeToken?: boolean; authoritativeRuntime?: boolean }
   | { type: 'RESTORE_OPEN_SESSIONS'; sessions: TerminalSession[]; activeId: string | null }
   | { type: 'SET_TERMINAL_HIDDEN'; id: string; isHidden: boolean }
   | { type: 'RESTART_TERMINAL'; id: string; newId: string }
@@ -463,16 +468,26 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_TERMINAL_TOOL':
       return {
         ...state,
-        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, toolTitle: undefined, agentStatus: undefined, viewMode: 'terminal', chatPending: undefined, startedAt: Date.now() } : t)
+        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, exactResumeToken: action.exactResumeToken ? true : undefined, toolTitle: undefined, agentStatus: undefined, viewMode: 'terminal', chatPending: undefined, startedAt: Date.now() } : t)
       };
     case 'SET_RESUME_TOKEN': {
       const token = action.token.trim();
       if (!token) return state;
-      if (!state.terminals.some(t => t.id === action.id)) return state;
-      if (state.terminals.some(t => t.id === action.id && t.resumeToken === token)) return state;
+      const terminal = state.terminals.find(t => t.id === action.id);
+      if (!terminal) return state;
+      if (terminal.resumeToken === token && (!action.exactResumeToken || terminal.exactResumeToken)) return state;
+      if (terminal.exactResumeToken && !action.authoritativeRuntime) return state;
       return {
         ...state,
-        terminals: state.terminals.map(t => t.id === action.id ? { ...t, resumeToken: token } : t),
+        terminals: state.terminals.map(t => t.id === action.id ? {
+          ...t,
+          resumeToken: token,
+          exactResumeToken: action.exactResumeToken
+            ? true
+            : action.authoritativeRuntime
+              ? undefined
+              : t.exactResumeToken,
+        } : t),
       };
     }
     case 'RESTORE_OPEN_SESSIONS': {
@@ -493,6 +508,14 @@ function reducer(state: AppState, action: Action): AppState {
         let next = t;
         if (!next.resumeToken && src.resumeToken) {
           next = { ...next, resumeToken: src.resumeToken };
+          changed = true;
+        }
+        if (
+          src.exactResumeToken
+          && !next.exactResumeToken
+          && next.resumeToken === src.resumeToken
+        ) {
+          next = { ...next, exactResumeToken: true };
           changed = true;
         }
         if (!next.toolTitle && src.toolTitle) {
@@ -761,6 +784,7 @@ export function snapToTerminal(snap: OpenSessionSnap): TerminalSession | null {
     tool,
     folderPath: snap.folderPath,
     resumeToken: snap.resumeToken,
+    exactResumeToken: snap.exactResumeToken,
     toolTitle: snap.toolTitle,
     startedAt: snap.startedAt,
     viewMode: snap.viewMode,

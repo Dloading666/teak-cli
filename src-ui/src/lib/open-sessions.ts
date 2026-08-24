@@ -23,6 +23,7 @@ export interface OpenSessionSnap {
   tool: string;
   folderPath: string | null;
   resumeToken?: string;
+  exactResumeToken?: boolean;
   toolTitle?: string;
   startedAt?: number;
   viewMode?: 'terminal' | 'chat';
@@ -41,6 +42,7 @@ interface PersistableTerminal {
   tool: string | null;
   folderPath: string | null;
   resumeToken?: string;
+  exactResumeToken?: boolean;
   toolTitle?: string;
   startedAt?: number;
   isHidden?: boolean;
@@ -69,6 +71,7 @@ export function parseOpenSessions(raw: string | null | undefined): OpenSessionsF
         tool: row.tool,
         folderPath: typeof row.folderPath === 'string' ? row.folderPath : null,
         resumeToken,
+        exactResumeToken: resumeToken && row.exactResumeToken === true ? true : undefined,
         toolTitle: typeof row.toolTitle === 'string' && row.toolTitle.trim()
           ? row.toolTitle
           : undefined,
@@ -124,6 +127,7 @@ function buildSnapshot(
       tool: term.tool as string,
       folderPath: term.folderPath,
       resumeToken: term.resumeToken,
+      exactResumeToken: term.resumeToken && term.exactResumeToken ? true : undefined,
       toolTitle: term.toolTitle,
       startedAt: term.startedAt,
       viewMode: term.viewMode,

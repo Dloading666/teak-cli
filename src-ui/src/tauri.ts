@@ -1,5 +1,13 @@
 // Tauri v2 typed invoke wrapper
 
+import type {
+  CollaborationBootstrapPlanDto,
+  CollaborationMemberLaunchPlanDto,
+  CollaborationSnapshotDto,
+  CollaborationTeamDto,
+  GrokSessionOptionDto,
+} from './features/collaboration/types';
+
 // Extend Window with Tauri globals to avoid TS2339
 declare global {
   interface Window {
@@ -281,6 +289,46 @@ export const commands = {
   // Task Board persistence (~/.teak-cli/tasks.json)
   loadTasks: () => invoke<string>('load_tasks'),
   saveTasks: (data: string) => invoke<void>('save_tasks', { data }),
+
+  // Grok Build collaboration management. The frontend keeps these DTOs in
+  // one feature-owned module so the Rust serde structs can mirror them
+  // exactly. Agent-to-agent transport does not use Tauri IPC.
+  collaborationGetSnapshot: () =>
+    invoke<CollaborationSnapshotDto>('collaboration_get_snapshot'),
+  collaborationSetEnabled: (enabled: boolean) =>
+    invoke<void>('collaboration_set_enabled', { enabled }),
+  collaborationSaveTeam: (team: CollaborationTeamDto) =>
+    invoke<CollaborationTeamDto>('collaboration_save_team', { team }),
+  collaborationSetTeamPaused: (teamId: string, paused: boolean) =>
+    invoke<CollaborationTeamDto>('collaboration_set_team_paused', { teamId, paused }),
+  collaborationArchiveTeam: (teamId: string) =>
+    invoke<void>('collaboration_archive_team', { teamId }),
+  collaborationListGrokSessions: () =>
+    invoke<GrokSessionOptionDto[]>('collaboration_list_grok_sessions'),
+  collaborationGetMemberLaunchPlan: (teamId: string, memberId: string, expectedRevision: number) =>
+    invoke<CollaborationMemberLaunchPlanDto>('collaboration_get_member_launch_plan', {
+      teamId,
+      memberId,
+      expectedRevision,
+    }),
+  collaborationBeginBootstrap: (
+    teamId: string,
+    memberId: string,
+    terminalSessionId: string,
+    expectedGeneration: number,
+  ) => invoke<CollaborationBootstrapPlanDto>('collaboration_begin_bootstrap', {
+    teamId,
+    memberId,
+    terminalSessionId,
+    expectedGeneration,
+  }),
+  collaborationObserveTerminalActivity: (
+    terminalSessionId: string,
+    activity: 'idle' | 'working' | 'wait_input',
+  ) => invoke<boolean>('collaboration_observe_terminal_activity', {
+    terminalSessionId,
+    activity,
+  }),
 
   // Left-rail session snapshot (~/.teak-cli/open-sessions.json)
   loadOpenSessions: () => invoke<string>('load_open_sessions'),

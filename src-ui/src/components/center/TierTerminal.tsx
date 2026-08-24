@@ -454,6 +454,20 @@ function TierTerminalImpl({
   // is unstable here. Not reset on successful re-attach.
   const contextLossAttemptsRef = useRef(0);
   const grokPermissionReleaseTimerRef = useRef<number | undefined>(undefined);
+  // Collaboration bootstrap is allowed only after the PTY spawn call has
+  // succeeded and while the prompt is conservatively known to be empty.
+  // Any unsubmitted keyboard/IME/paste input flips `clean` to false. This is
+  // intentionally fail-closed: navigation escape sequences can produce a
+  // false positive, but must never cause Teak to overwrite a user's draft.
+  const ptyReadyRef = useRef(false);
+  const bootstrapInputCleanRef = useRef(true);
+  const bootstrapSubmissionRef = useRef(false);
+  const lastInputWriteRef = useRef<Promise<void>>(Promise.resolve());
+  // This is deliberately separate from Redux's display status. Grok's stale
+  // spinner fallback may paint the UI idle after two quiet seconds, but that
+  // heuristic is not authority to submit a bootstrap turn. Only a real Grok
+  // OSC title parsed as idle can open this gate.
+  const grokAuthoritativeIdleRef = useRef(false);
 
   // ── Startup splash state ─────────────────────────────────────────────────
   const [showSplash, setShowSplash] = useState(true);
@@ -875,10 +889,25 @@ function TierTerminalImpl({
     const forwardInput = (rawData: string) => {
       const data = stripRightClickMouse(rawData);
       if (!data) return;
+      if (tool === 'grok') {
+        // A real Grok idle OSC is the only signal allowed to reopen the
+        // collaboration bootstrap gate. Enter, paste, IME, and ordinary
+        // keystrokes all make the previous idle observation stale.
+        grokAuthoritativeIdleRef.current = false;
+      }
+      if (!bootstrapSubmissionRef.current) {
+        if (data.includes('\r') || data.includes('\n') || data.includes('\x03')) {
+          bootstrapInputCleanRef.current = true;
+        } else {
+          bootstrapInputCleanRef.current = false;
+        }
+      }
       if (data.includes('\r') || data.includes('\n')) {
         markNotifySoundPromptSubmitted(sessionId, tool);
       }
-      commands.tierTerminalInput(sessionId, data).catch(() => {});
+      const write = commands.tierTerminalInput(sessionId, data);
+      lastInputWriteRef.current = write;
+      write.catch(() => {});
     };
     term.onData(forwardInput);
 
@@ -1118,7 +1147,26 @@ function TierTerminalImpl({
         grokPermissionReleaseTimerRef.current = undefined;
       }
     };
+    let lastCollaborationActivityReport = { status: '' as AgentStatus | '', at: 0 };
+    const reportGrokCollaborationActivity = (status: AgentStatus) => {
+      const live = appStateRef.current.terminals.find(item => item.id === sessionId);
+      // Ordinary and merely saved Grok sessions must retain the old zero-IPC
+      // path. Only a tab launched from an exact collaboration plan reports
+      // native activity; an authoritative A→B token change clears this flag.
+      if (!live?.exactResumeToken) return;
+      const now = Date.now();
+      // Native spinner titles can arrive several times per second. Keep the
+      // backend state fresh without turning every animation frame into IPC;
+      // Rust performs the authoritative terminal/generation/listener checks.
+      if (
+        lastCollaborationActivityReport.status === status
+        && now - lastCollaborationActivityReport.at < 1_000
+      ) return;
+      lastCollaborationActivityReport = { status, at: now };
+      commands.collaborationObserveTerminalActivity(sessionId, status).catch(() => {});
+    };
     const setGrokStatus = (status: AgentStatus) => {
+      reportGrokCollaborationActivity(status);
       if (status === grokStatus) return;
       grokStatus = status;
       dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status });
@@ -1156,6 +1204,11 @@ function TierTerminalImpl({
         const parsed = parseGrokTerminalTitle(title);
         displayTitle = parsed.displayTitle;
         if (parsed.status === 'working') lastWorkingOscAt = Date.now();
+        if (parsed.status === 'idle' && grokStatus !== 'wait_input') {
+          grokAuthoritativeIdleRef.current = true;
+        } else if (parsed.status !== 'idle') {
+          grokAuthoritativeIdleRef.current = false;
+        }
 
         // When unfocused, Grok intentionally hides Action Required for half of
         // each one-second blink cycle. Hold blue briefly so that native blink
@@ -1212,6 +1265,9 @@ function TierTerminalImpl({
           hasOutputRef.current = true;
           outputBytesRef.current += data.length;
           lastOutputAtRef.current = Date.now();
+          if (tool === 'grok') {
+            grokAuthoritativeIdleRef.current = false;
+          }
           if (tool === 'claude' || tool === 'codex' || tool === 'grok') {
             const consumed = consumeOscTitles(oscCarry + data);
             oscCarry = consumed.rest;
@@ -1331,6 +1387,7 @@ function TierTerminalImpl({
         },
         onStatus: (running) => {
           if (!mounted || running) return;
+          ptyReadyRef.current = false;
           setProcessExited(true);
           if (usesNativeStatus) {
             dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
@@ -1347,6 +1404,7 @@ function TierTerminalImpl({
           // upstream tool's own output). The CLI's own exit text, if any,
           // already speaks for itself.
           if (!mounted) return;
+          ptyReadyRef.current = false;
           setProcessExited(true);
           if (usesNativeStatus) {
             dispatch({ type: 'SET_AGENT_STATUS', id: sessionId, status: 'idle' });
@@ -1360,7 +1418,7 @@ function TierTerminalImpl({
           if (!mounted || !token) return;
           const live = appStateRef.current.terminals.find((item) => item.id === sessionId);
           if (live && live.resumeToken !== token) {
-            dispatch({ type: 'SET_RESUME_TOKEN', id: sessionId, token });
+            dispatch({ type: 'SET_RESUME_TOKEN', id: sessionId, token, authoritativeRuntime: true });
             refreshHistory();
           }
         },
@@ -1392,11 +1450,13 @@ function TierTerminalImpl({
           // time instead — background tabs sit behind waitForLiveTerminalSize
           // long enough for the merge to arrive, and foreground tabs resolve
           // the ref lookup in the same tick either way.
-          let spawnResumeToken = appStateRef.current.terminals.find((item) => item.id === sessionId)?.resumeToken ?? resumeToken;
+          const liveAtSpawn = appStateRef.current.terminals.find((item) => item.id === sessionId);
+          const exactResumeToken = liveAtSpawn?.exactResumeToken === true;
+          let spawnResumeToken = liveAtSpawn?.resumeToken ?? resumeToken;
           // A restored tab may still hold the pre-fork id. Wait briefly for
           // native history so OSC/ai-title can point `--resume` at the
           // conversation the CLI actually last ran.
-          if (spawnResumeToken) {
+          if (spawnResumeToken && !exactResumeToken) {
             prefetchHistory();
             const deadline = Date.now() + 1_500;
             while (mounted && Date.now() < deadline) {
@@ -1424,11 +1484,13 @@ function TierTerminalImpl({
             if (!mounted) return;
           }
           await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined, spawnResumeToken, appStateRef.current.defaultShell);
+          ptyReadyRef.current = true;
         } catch (err) {
           // Resume / launch validation failures (missing cwd, bad token
           // format, binary not on PATH) land here. The upstream CLI's own
           // startup errors come through the PTY stream, not this path.
           console.error('[TierTerminal] tierTerminalStart failed', err);
+          ptyReadyRef.current = false;
           if (mounted) {
             term.write(`\r\n\x1b[31m${String(err)}\x1b[0m\r\n`);
           }
@@ -1441,7 +1503,7 @@ function TierTerminalImpl({
           if (mounted && liveToken) {
             const live = appStateRef.current.terminals.find((item) => item.id === sessionId);
             if (live && live.resumeToken !== liveToken) {
-              dispatch({ type: 'SET_RESUME_TOKEN', id: sessionId, token: liveToken });
+              dispatch({ type: 'SET_RESUME_TOKEN', id: sessionId, token: liveToken, authoritativeRuntime: true });
             }
           }
         } catch {
@@ -1567,6 +1629,7 @@ function TierTerminalImpl({
 
     return () => {
       mounted = false;
+      ptyReadyRef.current = false;
       unregisterFocus();
       ro.disconnect();
       if (resizeTimer !== null) clearTimeout(resizeTimer);
@@ -1701,6 +1764,52 @@ function TierTerminalImpl({
         }, 150);
         return true;
       },
+      submitVisiblePrompt: async (text: string): Promise<boolean> => {
+        const term = xtermRef.current;
+        if (!term || !ptyReadyRef.current || !bootstrapInputCleanRef.current) return false;
+        const normalized = normalizePasteNewlines(text).trim();
+        if (!normalized) return false;
+        if (tool === 'grok') {
+          grokAuthoritativeIdleRef.current = false;
+        }
+        bootstrapSubmissionRef.current = true;
+        try {
+          term.paste(normalized);
+          await lastInputWriteRef.current;
+          // Keep Enter separate from the bracketed-paste close. This mirrors
+          // the proven Gambit path while making both native writes observable.
+          await new Promise<void>(resolve => window.setTimeout(resolve, 150));
+          markNotifySoundPromptSubmitted(sessionId, tool);
+          await commands.tierTerminalInput(sessionId, '\r');
+          bootstrapInputCleanRef.current = true;
+          return true;
+        } catch {
+          // The text may already be visible in the TUI. Mark the prompt dirty
+          // so a retry cannot append a duplicate or submit partial input.
+          bootstrapInputCleanRef.current = false;
+          return false;
+        } finally {
+          bootstrapSubmissionRef.current = false;
+        }
+      },
+      bootstrapSafety: () => ({
+        // A resolved spawn alone is too early: Grok may still be drawing its
+        // initial TUI. Require real output followed by a short quiet window.
+        ready: (() => {
+          const live = appStateRef.current.terminals.find(item => item.id === sessionId);
+          return Boolean(xtermRef.current)
+            && ptyReadyRef.current
+            && hasOutputRef.current
+            && lastOutputAtRef.current > 0
+            && Date.now() - lastOutputAtRef.current >= 600
+            && grokAuthoritativeIdleRef.current
+            && live?.agentStatus !== 'working'
+            && live?.agentStatus !== 'wait_input'
+            && !live?.chatPending
+            && !live?.gambitDraft?.trim();
+        })(),
+        clean: bootstrapInputCleanRef.current,
+      }),
       insertText: (text: string): boolean => {
         const term = xtermRef.current;
         if (!term) return false;

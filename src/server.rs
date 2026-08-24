@@ -2,13 +2,16 @@ use crate::terminal;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{State, Manager, Emitter};
 use tauri_plugin_dialog::DialogExt;
 
 /// Shared app state
 pub struct AppState {
     pub terminal_session: terminal::SharedSession,
+    /// Optional so a collaboration DB/transport failure can never prevent
+    /// ordinary terminal use or application startup.
+    pub collaboration: Option<Arc<crate::collaboration::runtime::CollaborationRuntime>>,
     /// Active OS fs watcher (one per app instance). Some(...) while a
     /// workspace folder is open; None otherwise. Swapping this Mutex'd
     /// Option replaces the watcher atomically on folder switch.
@@ -681,10 +684,12 @@ async fn tier_terminal_start(
     // until the spawn returned. Running in the terminal directly avoids
     // this because no IPC layer is involved — the shell forks directly.
     let terminal_session = state.terminal_session.clone();
+    let collaboration = state.collaboration.clone();
     tauri::async_runtime::spawn_blocking(move || {
         tier_terminal_start_blocking(
             session_id, tool, tool_data, cols, rows,
             theme_mode, locale, cwd, resume_token, shell, app, terminal_session,
+            collaboration,
         )
     })
     .await
@@ -704,6 +709,7 @@ fn tier_terminal_start_blocking(
     shell: Option<String>,
     app: tauri::AppHandle,
     terminal_session: terminal::SharedSession,
+    collaboration: Option<Arc<crate::collaboration::runtime::CollaborationRuntime>>,
 ) -> Result<(), String> {
     // CWD resolution order (first non-empty wins):
     //   1. cwd passed from the frontend (launchpad's folder picker / per-tab cwd)
@@ -903,6 +909,52 @@ fn tier_terminal_start_blocking(
         _ => (cmd, args),
     };
 
+    // ── Opt-in Grok collaboration launch ─────────────────────────────────
+    // A normal launch remains byte-for-byte unchanged unless all gates match:
+    // global switch, enabled team, exact native Grok session binding, exact
+    // canonical workspace, supported Grok version and private broker.
+    let (cmd, args, extra_env, collaboration_generation) = if tool.as_deref() == Some("grok") {
+        if let (Some(native_session_id), Some(runtime)) = (
+            resume_token.as_deref().filter(|value| !value.is_empty()),
+            collaboration.as_ref(),
+        ) {
+            let live_grok_sessions = terminal_session
+                .lock()
+                .map_err(|_| "terminal session registry was poisoned".to_string())?
+                .iter()
+                .filter(|(_, session)| session.tool_name.as_deref() == Some("grok"))
+                .filter_map(|(terminal_id, session)| {
+                    session
+                        .session_token
+                        .lock()
+                        .ok()
+                        .and_then(|token| token.clone())
+                        .map(|token| (terminal_id.clone(), token))
+                })
+                .collect::<Vec<_>>();
+            match runtime.prepare_grok_resume(
+                &session_id,
+                &cmd,
+                &args,
+                &dir,
+                native_session_id,
+                &live_grok_sessions,
+            )? {
+                Some(prepared) => (
+                    prepared.program,
+                    prepared.args,
+                    prepared.extra_env,
+                    Some(prepared.generation),
+                ),
+                None => (cmd, args, Vec::new(), None),
+            }
+        } else {
+            (cmd, args, Vec::new(), None)
+        }
+    } else {
+        (cmd, args, Vec::new(), None)
+    };
+
     // If a session with the same ID already exists (e.g. restart-in-place),
     // forcefully kill and remove it before spawning a fresh one.
     {
@@ -930,11 +982,42 @@ fn tier_terminal_start_blocking(
 
     eprintln!("[Tier Terminal] Starting tool={:?}, cmd={}, args={:?}, cwd={:?}", tool, cmd, args, spawn_cwd);
 
-    // Per-pane env overrides (reserved). Independent-split and
-    // single-terminal panes spawn with no extra env today.
-    let extra_env: Vec<(String, String)> = Vec::new();
+    let exit_hook = match (collaboration.as_ref(), collaboration_generation) {
+        (Some(runtime), Some(generation)) => {
+            let runtime = runtime.clone();
+            Some(Arc::new(move |terminal_session_id: &str| {
+                runtime.revoke_terminal_generation(terminal_session_id, generation, "process_exit");
+            }) as terminal::TerminalExitHook)
+        }
+        _ => None,
+    };
 
-    terminal::spawn(
+    let session_token_hook = match (
+        collaboration.as_ref(),
+        collaboration_generation,
+        resume_token
+            .as_deref()
+            .map(str::trim)
+            .filter(|token| !token.is_empty()),
+    ) {
+        (Some(runtime), Some(generation), Some(expected_native_session_id)) => {
+            let runtime = runtime.clone();
+            let expected_native_session_id = expected_native_session_id.to_string();
+            Some(Arc::new(
+                move |terminal_session_id: &str, observed_native_session_id: &str| {
+                    runtime.observe_terminal_native_session(
+                        terminal_session_id,
+                        generation,
+                        &expected_native_session_id,
+                        observed_native_session_id,
+                    );
+                },
+            ) as terminal::TerminalSessionTokenHook)
+        }
+        _ => None,
+    };
+
+    if let Err(error) = terminal::spawn(
         app.clone(),
         session_id.clone(),
         terminal_session.clone(),
@@ -948,7 +1031,43 @@ fn tier_terminal_start_blocking(
         theme_mode,
         locale,
         extra_env,
-    ).map_err(|e| format!("Failed to spawn PTY: {}", e))?;
+        exit_hook,
+        session_token_hook,
+    ) {
+        if let (Some(runtime), Some(generation)) =
+            (collaboration.as_ref(), collaboration_generation)
+        {
+            runtime.revoke_terminal_generation(&session_id, generation, "spawn_failed");
+        }
+        return Err(format!("Failed to spawn PTY: {error}"));
+    }
+
+    // Grok (and several other CLIs) does not print its native session id on
+    // resume, so the output parser cannot rediscover it. Preserve the already
+    // validated resume token in the backend-owned live registry. Launch-plan
+    // collision checks must never depend on a frontend tab's local state.
+    if let Some(token) = resume_token
+        .as_deref()
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+    {
+        let map = terminal_session
+            .lock()
+            .map_err(|_| "terminal session registry was poisoned".to_string())?;
+        if let Some(session) = map.get(&session_id) {
+            let mut current = session
+                .session_token
+                .lock()
+                .map_err(|_| "terminal session token lock was poisoned".to_string())?;
+            // The parser may already have observed a newer native session ID
+            // before `spawn` returned. Never overwrite that evidence with the
+            // requested resume token; the collaboration token hook will have
+            // revoked the stale binding in that case.
+            if current.is_none() {
+                *current = Some(token.to_string());
+            }
+        }
+    }
 
     // Emit the initial CWD to the frontend so the left panel can map immediately.
     // On Windows, cmd.exe does not emit OSC 7, and full-screen agents enter alt-screen
@@ -1046,9 +1165,16 @@ fn set_session_active(session_id: String, active: bool, state: State<'_, AppStat
 
 #[tauri::command]
 fn tier_terminal_kill(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let map = state.terminal_session.lock().unwrap();
-    if let Some(session) = map.get(&session_id) {
-        let _ = session.kill_tx.send(());
+    let kill_tx = state
+        .terminal_session
+        .lock()
+        .ok()
+        .and_then(|map| map.get(&session_id).map(|session| session.kill_tx.clone()));
+    if let Some(kill_tx) = kill_tx {
+        let _ = kill_tx.send(());
+    }
+    if let Some(runtime) = state.collaboration.as_ref() {
+        runtime.revoke_terminal(&session_id, "user_closed_terminal");
     }
     Ok(())
 }
@@ -5111,9 +5237,242 @@ pub fn set_tool_config(
     crate::tool_config::set(&tool, entry).map_err(|e| e.to_string())
 }
 
+// ─── Grok Build collaboration settings ─────────────────────────────────────
+
+fn collaboration_runtime(
+    state: &State<'_, AppState>,
+) -> Result<Arc<crate::collaboration::runtime::CollaborationRuntime>, String> {
+    state.collaboration.clone().ok_or_else(|| {
+        "collaboration backend is unavailable; ordinary terminals are unaffected".to_string()
+    })
+}
+
+fn collaboration_live_terminal_sessions(
+    terminal_session: &terminal::SharedSession,
+) -> Result<Vec<crate::collaboration::management::LiveTerminalSessionEntry>, String> {
+    let sessions = terminal_session
+        .lock()
+        .map_err(|_| "terminal session registry was poisoned".to_string())?;
+    sessions
+        .iter()
+        .map(|(terminal_session_id, session)| {
+            let native_session_id = session
+                .session_token
+                .lock()
+                .map_err(|_| "terminal session token lock was poisoned".to_string())?
+                .clone();
+            Ok(crate::collaboration::management::LiveTerminalSessionEntry {
+                terminal_session_id: terminal_session_id.clone(),
+                tool: session.tool_name.clone().unwrap_or_default(),
+                native_session_id,
+            })
+        })
+        .collect()
+}
+
+#[tauri::command]
+fn collaboration_get_snapshot(
+    state: State<'_, AppState>,
+) -> Result<crate::collaboration::management::CollaborationSnapshotDto, String> {
+    let runtime = collaboration_runtime(&state)?;
+    crate::collaboration::management::get_snapshot(runtime.service())
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn collaboration_set_enabled(enabled: bool, state: State<'_, AppState>) -> Result<(), String> {
+    collaboration_runtime(&state)?.set_enabled(enabled)
+}
+
+#[tauri::command]
+fn collaboration_save_team(
+    team: crate::collaboration::management::CollaborationTeamDto,
+    state: State<'_, AppState>,
+) -> Result<crate::collaboration::management::CollaborationTeamDto, String> {
+    let runtime = collaboration_runtime(&state)?;
+    let mutation = crate::collaboration::management::save_team(runtime.service(), team)
+        .map_err(|error| error.to_string())?;
+    runtime.reconcile_lifecycle(&mutation.lifecycle)?;
+    Ok(mutation.value)
+}
+
+#[tauri::command]
+fn collaboration_set_team_paused(
+    team_id: String,
+    paused: bool,
+    state: State<'_, AppState>,
+) -> Result<crate::collaboration::management::CollaborationTeamDto, String> {
+    let runtime = collaboration_runtime(&state)?;
+    let mutation =
+        crate::collaboration::management::set_team_paused(runtime.service(), &team_id, paused)
+            .map_err(|error| error.to_string())?;
+    runtime.reconcile_lifecycle(&mutation.lifecycle)?;
+    Ok(mutation.value)
+}
+
+#[tauri::command]
+fn collaboration_archive_team(team_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    let runtime = collaboration_runtime(&state)?;
+    let mutation = crate::collaboration::management::archive_team(runtime.service(), &team_id)
+        .map_err(|error| error.to_string())?;
+    runtime.reconcile_lifecycle(&mutation.lifecycle)?;
+    Ok(())
+}
+
+#[tauri::command]
+fn collaboration_get_member_launch_plan(
+    team_id: String,
+    member_id: String,
+    expected_revision: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<crate::collaboration::management::MemberLaunchPlanDto, String> {
+    let runtime = collaboration_runtime(&state)?;
+    let live_terminals = collaboration_live_terminal_sessions(&state.terminal_session)?;
+    crate::collaboration::management::get_member_launch_plan(
+        runtime.service(),
+        &team_id,
+        &member_id,
+        expected_revision,
+        runtime.is_broker_running(),
+        &live_terminals,
+    )
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn collaboration_begin_bootstrap(
+    team_id: String,
+    member_id: String,
+    terminal_session_id: String,
+    expected_generation: i64,
+    state: State<'_, AppState>,
+) -> Result<crate::collaboration::management::BootstrapAttemptDto, String> {
+    let runtime = collaboration_runtime(&state)?;
+    let helper = runtime.collaboration_helper()?;
+    let live_terminals = collaboration_live_terminal_sessions(&state.terminal_session)?;
+    crate::collaboration::management::begin_bootstrap(
+        runtime.service(),
+        &helper,
+        &team_id,
+        &member_id,
+        &terminal_session_id,
+        expected_generation,
+        runtime.is_broker_running(),
+        &live_terminals,
+    )
+    .map_err(|error| error.to_string())
+}
+
+/// Mirror only the Grok TUI's native activity state onto an already-attested
+/// collaboration runtime. The webview supplies a terminal id and a small
+/// activity enum; it never supplies a member id or generation. Runtime owns
+/// that mapping and ignores ordinary, connecting, stale, or revoked sessions.
+#[tauri::command]
+fn collaboration_observe_terminal_activity(
+    terminal_session_id: String,
+    activity: String,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    use crate::collaboration::model::RuntimeState;
+
+    let runtime_state = match activity.as_str() {
+        "idle" => RuntimeState::Idle,
+        "working" => RuntimeState::Busy,
+        "wait_input" => RuntimeState::WaitingUser,
+        _ => return Err("unsupported Grok collaboration activity".to_string()),
+    };
+    collaboration_runtime(&state)?.observe_terminal_activity(&terminal_session_id, runtime_state)
+}
+
+#[tauri::command]
+async fn collaboration_list_grok_sessions(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::collaboration::management::GrokSessionOptionDto>, String> {
+    use crate::collaboration::management::{
+        CollaborationMemberStatusDto, GrokSessionStateDto, NativeSessionRegistryEntry,
+    };
+
+    let runtime = collaboration_runtime(&state)?;
+    let live_tokens = state
+        .terminal_session
+        .lock()
+        .map_err(|_| "terminal session registry was poisoned".to_string())?
+        .values()
+        .filter(|session| session.tool_name.as_deref() == Some("grok"))
+        .filter_map(|session| {
+            session
+                .session_token
+                .lock()
+                .ok()
+                .and_then(|token| token.clone())
+        })
+        .collect::<Vec<_>>();
+    let history = tauri::async_runtime::spawn_blocking(load_native_history_blocking)
+        .await
+        .map_err(|error| format!("Grok history task failed: {error}"))??;
+    let mut entries = history
+        .into_iter()
+        .filter(|session| session.tool.eq_ignore_ascii_case("grok"))
+        .map(|session| NativeSessionRegistryEntry {
+            tool: session.tool,
+            native_session_id: session.session_token,
+            label: session.name,
+            workspace: session.cwd,
+            state: GrokSessionStateDto::Saved,
+        })
+        .collect::<Vec<_>>();
+    entries.extend(
+        live_tokens
+            .into_iter()
+            .map(|token| NativeSessionRegistryEntry {
+                tool: "grok".to_string(),
+                native_session_id: Some(token.clone()),
+                label: token,
+                workspace: String::new(),
+                state: GrokSessionStateDto::Live,
+            }),
+    );
+
+    if let Ok(snapshot) = crate::collaboration::management::get_snapshot(runtime.service()) {
+        for team in snapshot.teams {
+            for member in std::iter::once(team.leader).chain(team.workers) {
+                if member.native_session_id.is_empty() {
+                    continue;
+                }
+                let state = match member.status {
+                    CollaborationMemberStatusDto::Ready => GrokSessionStateDto::Ready,
+                    CollaborationMemberStatusDto::Busy => GrokSessionStateDto::Busy,
+                    CollaborationMemberStatusDto::WaitingUser => GrokSessionStateDto::WaitingUser,
+                    CollaborationMemberStatusDto::Connecting => GrokSessionStateDto::Live,
+                    CollaborationMemberStatusDto::Unbound
+                    | CollaborationMemberStatusDto::Offline
+                    | CollaborationMemberStatusDto::Error => GrokSessionStateDto::Offline,
+                };
+                entries.push(NativeSessionRegistryEntry {
+                    tool: "grok".to_string(),
+                    native_session_id: Some(member.native_session_id),
+                    label: member.display_name,
+                    workspace: team.workspace.clone(),
+                    state,
+                });
+            }
+        }
+    }
+    Ok(crate::collaboration::management::list_grok_sessions(
+        entries,
+    ))
+}
+
 pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow::Result<()> {
     // Create shared session BEFORE the builder so we can clone it for the exit handler
     let terminal_session = terminal::SharedSession::default();
+    let collaboration = match crate::collaboration::runtime::CollaborationRuntime::open_default() {
+        Ok(runtime) => Some(Arc::new(runtime)),
+        Err(error) => {
+            eprintln!("[collaboration] unavailable; ordinary terminals are unaffected: {error}");
+            None
+        }
+    };
 
     let builder = tauri::Builder::default();
 
@@ -5154,6 +5513,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(AppState {
             terminal_session,
+            collaboration,
             fs_watcher: Mutex::new(None),
             pending_launch: Mutex::new(pending_launch),
         })
@@ -5208,6 +5568,15 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             get_tool_config,
             get_all_tool_configs,
             set_tool_config,
+            collaboration_get_snapshot,
+            collaboration_set_enabled,
+            collaboration_save_team,
+            collaboration_set_team_paused,
+            collaboration_archive_team,
+            collaboration_get_member_launch_plan,
+            collaboration_begin_bootstrap,
+            collaboration_observe_terminal_activity,
+            collaboration_list_grok_sessions,
             crate::git::git_changes,
             crate::git::git_show_file,
             crate::git::git_init,
@@ -5361,6 +5730,9 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
                         "[Tier Terminal] App exiting — sent kill_tx to {} session(s)",
                         n
                     );
+                }
+                if let Some(runtime) = state.collaboration.as_ref() {
+                    runtime.shutdown();
                 }
             }
         });

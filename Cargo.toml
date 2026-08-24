@@ -2,6 +2,8 @@
 name = "teak-cli"
 version = "0.0.5"
 edition = "2021"
+autobins = false
+default-run = "teak-cli"
 description = "Teak CLI — native desktop workspace for AI CLIs (fork of Coffee CLI)"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Dloading666/teak-cli"
