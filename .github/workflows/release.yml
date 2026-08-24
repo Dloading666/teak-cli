@@ -167,13 +167,11 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0" --locked
 
-      # ── macOS: build .app, re-sign without hardened runtime, then bundle DMG ──
-      # tauri-bundler's default codesign for adhoc identities adds
-      # --options runtime, which without Apple notarization causes Gatekeeper
-      # to silently reject the GUI launch (click icon, nothing happens). We
-      # build the .app first, codesign --deep WITHOUT runtime, then bundle
-      # the DMG from the re-signed .app. Gatekeeper accepts adhoc-signed
-      # apps that aren't claiming hardened runtime.
+      # ── macOS: build and seal .app, then bundle and verify DMG ──
+      # Ad-hoc signing with hardened runtime enabled causes Gatekeeper to
+      # silently reject the GUI launch because there is no Apple notarization.
+      # Keep hardened runtime off, seal resources, and verify the rebuilt app
+      # inside the DMG rather than assuming the standalone .app was reused.
       - name: Build .app only (macOS)
         if: runner.os == 'macOS'
         run: cargo tauri build --bundles app ${{ matrix.args }}
@@ -200,9 +198,67 @@ jobs:
             exit 1
           fi
 
-      - name: Build DMG from re-signed .app (macOS)
+      - name: Build DMG with sealed ad-hoc app (macOS)
         if: runner.os == 'macOS'
-        run: cargo tauri bundle --bundles dmg ${{ matrix.args }}
+        # `tauri bundle --bundles dmg` reconstructs the .app from the raw
+        # release binary; it does not reuse the app signed in the previous
+        # step. Carry the same ad-hoc/no-hardened-runtime intent into this
+        # second bundling pass so the app inside the DMG has sealed resources.
+        run: >-
+          cargo tauri bundle --bundles dmg
+          --config '{"bundle":{"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'
+          ${{ matrix.args }}
+
+      - name: Verify app embedded in DMG (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          DMG=$(find "target/${{ matrix.target }}/release/bundle/dmg" -maxdepth 1 -name "*.dmg" -print -quit)
+          if [ -z "$DMG" ]; then
+            echo "::error::No DMG found"
+            exit 1
+          fi
+
+          ATTACH_LOG="$RUNNER_TEMP/teak-dmg-attach.log"
+          MOUNT=""
+          cleanup() {
+            if [ -n "$MOUNT" ]; then
+              hdiutil detach "$MOUNT" || hdiutil detach "$MOUNT" -force || true
+            fi
+          }
+          trap cleanup EXIT
+
+          hdiutil attach -readonly -nobrowse -noautoopen "$DMG" | tee "$ATTACH_LOG"
+          MOUNT=$(sed -nE 's#^.*(/Volumes/.*)$#\1#p' "$ATTACH_LOG" | tail -1)
+          if [ -z "$MOUNT" ] || [ ! -d "$MOUNT" ]; then
+            echo "::error::Could not resolve the mounted DMG path"
+            exit 1
+          fi
+          APP=$(find "$MOUNT" -maxdepth 1 -name "*.app" -print -quit)
+          if [ -z "$APP" ]; then
+            echo "::error::No app found inside DMG"
+            exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=4 "$APP"
+          SIGNATURE=$(codesign -dv --verbose=4 "$APP" 2>&1)
+          echo "$SIGNATURE"
+          if grep -q "Sealed Resources=none" <<<"$SIGNATURE"; then
+            echo "::error::App inside DMG has no sealed resources"
+            exit 1
+          fi
+          if grep -qE "flags=.*runtime" <<<"$SIGNATURE"; then
+            echo "::error::App inside DMG unexpectedly enables hardened runtime"
+            exit 1
+          fi
+
+          EXECUTABLE_COUNT=$(find "$APP/Contents/MacOS" -maxdepth 1 -type f | wc -l | tr -d '[:space:]')
+          if [ "$EXECUTABLE_COUNT" != "1" ] || [ ! -x "$APP/Contents/MacOS/teak-cli" ]; then
+            echo "::error::App must contain only the teak-cli executable"
+            find "$APP/Contents/MacOS" -maxdepth 1 -type f -print
+            exit 1
+          fi
 
       # ── Windows / Linux: standard one-shot bundle build ──
       - name: Build all bundles (Windows / Linux)
