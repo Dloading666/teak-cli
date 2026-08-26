@@ -1,0 +1,247 @@
+/* VS Code Dark+/Light+ editor chrome, independent of the PTY surface. */
+
+.file-editor {
+  --fe-bg: #1e1e1e;
+  --fe-gutter-bg: #1e1e1e;
+  --fe-bc-bg: #252526;
+  --fe-bc: #bbbbbb;
+  --fe-bc-file: #cccccc;
+  --fe-num: #6e7681;
+  --fe-num-active: #cccccc;
+  --fe-line-active: #2a2d2e;
+  --fe-sel: #264f78;
+  --fe-caret: #aeafad;
+  --fe-text: #d4d4d4;
+  --fe-border: #3c3c3c;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--fe-bg);
+  color: var(--fe-text);
+}
+
+[data-theme="light"] .file-editor {
+  --fe-bg: #ffffff;
+  --fe-gutter-bg: #ffffff;
+  --fe-bc-bg: #f3f3f3;
+  --fe-bc: #616161;
+  --fe-bc-file: #3b3b3b;
+  --fe-num: #237893;
+  --fe-num-active: #0b216f;
+  --fe-line-active: #eeeeee;
+  --fe-sel: #add6ff;
+  --fe-caret: #000000;
+  --fe-text: #3b3b3b;
+  --fe-border: #e5e5e5;
+}
+
+.file-editor-bc {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0;
+  min-height: 22px;
+  padding: 0 12px;
+  background: var(--fe-bc-bg);
+  border-bottom: 1px solid var(--fe-border);
+  font-size: 12px;
+  line-height: 22px;
+  color: var(--fe-bc);
+  user-select: none;
+}
+
+.file-editor-bc-item {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.file-editor-bc-sep {
+  margin: 0 6px;
+  color: color-mix(in srgb, var(--fe-bc) 55%, transparent);
+}
+
+.file-editor-bc-dir,
+.file-editor-bc-file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.file-editor-bc-file {
+  color: var(--fe-bc-file);
+  font-weight: 600;
+}
+
+.file-editor-status {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding-left: 12px;
+  font-size: 11px;
+  color: var(--fe-num);
+}
+
+.file-editor-status.is-saved {
+  color: #89d185;
+}
+
+.file-editor-status.is-error {
+  color: #f14c4c;
+}
+
+.file-editor-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--fe-num);
+  font-size: 13px;
+  background: var(--fe-bg);
+}
+
+.file-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: auto;
+  background: var(--fe-bg);
+}
+
+.file-editor-body::-webkit-scrollbar {
+  display: block !important;
+  width: 14px !important;
+  height: 14px !important;
+  background: var(--fe-bg) !important;
+}
+.file-editor-body::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 0;
+  border: 3px solid var(--fe-bg);
+  background-clip: padding-box;
+}
+.file-editor-body::-webkit-scrollbar-thumb:hover {
+  background: #4f4f4f;
+  background-clip: padding-box;
+}
+.file-editor-body::-webkit-scrollbar-corner {
+  background: var(--fe-bg) !important;
+}
+.file-editor-body {
+  scrollbar-width: thin !important;
+  scrollbar-color: #424242 var(--fe-bg) !important;
+}
+
+.file-editor-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex-shrink: 0;
+  min-width: 48px;
+  padding: 4px 0 28px;
+  text-align: right;
+  user-select: none;
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, Menlo, monospace;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--fe-num);
+  background: var(--fe-gutter-bg);
+}
+
+.file-editor-gutter-row {
+  position: relative;
+  height: 19px;
+  padding: 0 12px 0 8px;
+  box-sizing: border-box;
+}
+
+.file-editor-gutter-row.is-active {
+  color: var(--fe-num-active);
+}
+
+.file-editor-gutter-row.is-mod::after,
+.file-editor-gutter-row.is-add::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+.file-editor-gutter-row.is-mod::after {
+  background: #0078d4;
+}
+
+.file-editor-gutter-row.is-add::after {
+  background: #3dd68c;
+}
+
+.file-editor-main {
+  position: relative;
+  flex: 1 0 auto;
+  min-width: 100%;
+}
+
+.file-editor-hl,
+.file-editor-ta {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px 16px 28px 8px;
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, Menlo, monospace;
+  font-size: 13px;
+  line-height: 19px;
+  tab-size: 4;
+  white-space: pre;
+}
+
+.file-editor-hl {
+  display: inline-block;
+  min-width: 100%;
+  min-height: 100%;
+  pointer-events: none;
+}
+
+.file-editor-hl-line {
+  height: 19px;
+  min-width: 100%;
+}
+
+.file-editor-hl-line.is-active {
+  background: var(--fe-line-active);
+}
+
+.file-editor-ta {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--fe-caret);
+  overflow: hidden;
+}
+
+.file-editor-ta::selection {
+  background: var(--fe-sel);
+  color: transparent;
+}
+
+.chrome-tab.chrome-tab--file.active {
+  background: #1e1e1e;
+  color: #cccccc;
+}
+
+[data-theme="light"] .chrome-tab.chrome-tab--file.active {
+  background: #ffffff;
+  color: #3b3b3b;
+}
+
+:is([data-shape="glass"], [data-shape="carbon"], [data-shape="monogram"]) .panel-center .file-editor {
+  background: var(--fe-bg) !important;
+}

@@ -93,13 +93,10 @@ interface DiffPanelProps {
   commitHash?: string;
   onClose: () => void;
   /** Which surface this panel renders on:
-   *  - 'overlay' = right-bottom half-height (anchored inside ChangesBoard)
+   *  - 'overlay' = unused (right-panel overlay removed)
    *  - 'tab'     = center tab, fills the panel area (mounted by CenterPanel) */
   mode: 'overlay' | 'tab';
-  /** Expand the overlay to a center tab, or (in tab mode) fold back to the
-   *  overlay. The glyph swaps per mode: overlay shows ⤢ (expand), tab shows
-   *  the "fold to bottom-right" glyph. */
-  onToggleExpanded: () => void;
+  onToggleExpanded?: () => void;
   /** Height percent (0-100) for the half-paper bottom overlay.
    *  Ignored in expanded mode (which uses fixed-inset modal sizing).
    *  When omitted, the CSS default (55%) applies. */
@@ -111,7 +108,7 @@ interface DiffPanelProps {
   deleted?: number;
 }
 
-export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode, onToggleExpanded, heightPercent, added, deleted }: DiffPanelProps) {
+export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode, heightPercent, added, deleted }: DiffPanelProps) {
   const t = useT();
   const dataTheme = useDataAttr('data-theme');
   const [result, setResult] = useState<DiffResult>({ state: 'loading' });
@@ -252,7 +249,11 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
 
         // Fold unchanged runs into gaps for rendering; counts stay sourced
         // from the full flat list above.
-        const rows = collapseToHunks(tokenized);
+        // A clean file (workspace click with no git delta) is a source
+        // view: keep every line, do not fold the whole buffer into one gap.
+        const rows = addedLines + deletedLines === 0
+          ? tokenized.map(line => ({ type: 'line' as const, line }))
+          : collapseToHunks(tokenized);
         setResult({ state: 'ok', rows, added: addedLines, deleted: deletedLines });
       } catch {
         if (cancelled) return;
@@ -278,57 +279,18 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
         <span className="diff-header-path">{path}</span>
       )}
       <div className="diff-header-actions">
-        {expanded ? (
-          // Tab mode: fold back to the bottom-right overlay. The glyph is an
-          // outer frame with a filled inner box pinned to the bottom-right —
-          // the inner box IS the overlay's corner position, so the icon says
-          // "shrink toward there". Close is handled by the tab's own X
-          // (rendered by CenterPanel), so no close button here.
+        {mode === 'overlay' && (
           <button
             type="button"
             className="diff-header-btn"
-            onClick={onToggleExpanded}
-            aria-label="Fold diff back to panel"
+            onClick={onClose}
+            aria-label="Close diff"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <rect x="11" y="11" width="9" height="9" rx="1" fill="currentColor" stroke="none"/>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
-        ) : (
-          // Overlay mode: expand to a center tab. The glyph is an outer frame
-          // with a filled inner box centered — the visual inverse of the tab-
-          // mode fold icon (inner box at bottom-right). Together the pair reads
-          // as "center = tab surface, corner = overlay surface". Close button
-          // too — the overlay has no outer tab to provide an X.
-          <>
-            <button
-              type="button"
-              className="diff-header-btn"
-              onClick={onToggleExpanded}
-              aria-label="Expand diff to tab"
-            >
-              {/* Outer frame + centered vertical bar — the bar reads as the
-                  center tab column the diff expands into (taller than wide =
-                  a tab/pane, not a square). Visual inverse of the tab-mode
-                  fold icon (bar at bottom-right = overlay corner). */}
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <rect x="9" y="6" width="6" height="12" rx="1" fill="currentColor" stroke="none"/>
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="diff-header-btn"
-              onClick={onClose}
-              aria-label="Close diff"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </>
         )}
       </div>
     </div>
@@ -368,10 +330,7 @@ export function DiffPanel({ path, repoRoot, rel, kind, commitHash, onClose, mode
             </div>
           </div>
         )}
-        {result.state === 'ok' && result.added === 0 && result.deleted === 0 && (
-          <div className="diff-empty">{t('diff.no_changes') || 'No changes'}</div>
-        )}
-        {result.state === 'ok' && (result.added > 0 || result.deleted > 0) && (
+        {result.state === 'ok' && (
           <pre className="diff-pre">
             {result.rows.map(row => {
               if (row.type === 'line') return renderDiffLine(row.line);

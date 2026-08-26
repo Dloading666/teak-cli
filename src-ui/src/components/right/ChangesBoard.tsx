@@ -9,10 +9,9 @@
 //               shown as a 已提交 (Committed) group instead of an empty panel,
 //               so the board isn't blank right after a commit.
 //
-// Layout (unchanged from the snapshot version): full-height list, click a row
-// → DiffPanel mounts as a bottom overlay (~55%); ⤢ promotes it to a
-// full-window modal; ⤓ back to half; × / Esc closes. Right-click a row = the
-// read-only file-actions menu.
+// Layout: full-height list. Click a row opens the file in the center tab
+// (same surface as clicking it in the workspace tree). Right-click a row =
+// the read-only file-actions menu.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppState, resolveDiffContext, type DiffSelection } from '../../store/app-state';
@@ -23,31 +22,10 @@ import { ScrollPanel } from '../common/ScrollPanel';
 import { ContextMenu } from '../left/Explorer';
 import type { CtxMenuState } from '../left/Explorer';
 import { beginExplorerDrag } from '../../lib/explorer-drag';
-import { DiffPanel } from './DiffPanel';
-import { prefGetWith, prefSet } from '../../lib/prefs';
 import './ChangesBoard.css';
 
 interface ChangesBoardProps {
   selectedPath: string | null;
-  diffMode: 'overlay' | 'tab';
-}
-
-const DIFF_HEIGHT_KEY = 'diff-half-height';
-const DIFF_HEIGHT_LEGACY = 'coffee:diff-half-height';
-const DIFF_HEIGHT_MIN = 20;
-const DIFF_HEIGHT_MAX = 90;
-const DIFF_HEIGHT_DEFAULT = 55;
-
-function loadStoredDiffHeight(): number {
-  try {
-    const raw = prefGetWith(DIFF_HEIGHT_KEY, DIFF_HEIGHT_LEGACY);
-    if (!raw) return DIFF_HEIGHT_DEFAULT;
-    const n = parseFloat(raw);
-    if (!Number.isFinite(n)) return DIFF_HEIGHT_DEFAULT;
-    return Math.min(DIFF_HEIGHT_MAX, Math.max(DIFF_HEIGHT_MIN, n));
-  } catch {
-    return DIFF_HEIGHT_DEFAULT;
-  }
 }
 
 // One group of changed files. `kind` travels with the group so a selected
@@ -92,7 +70,7 @@ function formatCommitTime(epochSec: number, t: ReturnType<typeof useT>, lang: st
   return new Date(epochSec * 1000).toLocaleDateString(lang, { month: 'short', day: 'numeric' });
 }
 
-export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
+export function ChangesBoard({ selectedPath }: ChangesBoardProps) {
   const t = useT();
   const { state, dispatch } = useAppState();
   const activeSession = state.terminals.find(s => s.id === state.activeTerminalId);
@@ -103,7 +81,6 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
   useGitPollingGate();
   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [diffHeight, setDiffHeight] = useState<number>(loadStoredDiffHeight);
   const [initializing, setInitializing] = useState(false);
   // Session-commit expand state + lazy file cache. Expanding a session commit
   // fetches its files via `gitCommitFiles` (cached), so the poll stays cheap
@@ -111,34 +88,6 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
   // expand.
   const [expandedCommits, setExpandedCommits] = useState<Set<string>>(new Set());
   const [commitFiles, setCommitFiles] = useState<Map<string, GitFileEntry[]>>(new Map());
-
-  const startResize = (e: React.PointerEvent) => {
-    if (diffMode === 'tab') return;
-    const container = containerRef.current;
-    if (!container) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = container.getBoundingClientRect();
-    const onMove = (ev: PointerEvent) => {
-      const fromBottomPx = rect.bottom - ev.clientY;
-      const pct = (fromBottomPx / rect.height) * 100;
-      setDiffHeight(Math.min(DIFF_HEIGHT_MAX, Math.max(DIFF_HEIGHT_MIN, pct)));
-    };
-    const onUp = () => {
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-    document.body.style.cursor = 'ns-resize';
-    document.body.style.userSelect = 'none';
-  };
-
-  useEffect(() => {
-    prefSet(DIFF_HEIGHT_KEY, String(diffHeight));
-  }, [diffHeight]);
 
   const repoRoot = changes?.state === 'ok' ? changes.repo_root : null;
 
@@ -283,10 +232,6 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
   for (const e of changes.uncommitted) { totalAdded += e.added; totalDeleted += e.deleted; }
   for (const e of changes.untracked) { totalAdded += e.added; totalDeleted += e.deleted; }
 
-  // The resize handle sits at the overlay's top edge. In tab mode the overlay
-  // isn't rendered here (the diff lives in the center tab), so hide the handle.
-  const handleStyle = diffMode === 'tab' ? { display: 'none' as const } : { bottom: `${diffHeight}%` };
-
   return (
     <div className="changes-fullview" ref={containerRef}>
       <div className="changes-branch-header">
@@ -386,24 +331,6 @@ export function ChangesBoard({ selectedPath, diffMode }: ChangesBoardProps) {
           {visibleCount < items.length && <div ref={sentinelRef} className="changes-sentinel" aria-hidden="true" />}
         </div>
       </ScrollPanel>
-      {diffMode === 'overlay' && state.diffSelection && (
-        <>
-          <div className="diff-resize-handle" style={handleStyle} onPointerDown={startResize} aria-label="Resize diff" />
-          <DiffPanel
-            mode="overlay"
-            path={state.diffSelection.path}
-            repoRoot={state.diffSelection.repoRoot}
-            rel={state.diffSelection.rel}
-            kind={state.diffSelection.kind}
-            commitHash={state.diffSelection.commitHash}
-            onClose={() => dispatch({ type: 'CLEAR_DIFF' })}
-            onToggleExpanded={() => dispatch({ type: 'SET_DIFF_MODE', mode: 'tab' })}
-            heightPercent={diffHeight}
-            added={state.diffSelection.added}
-            deleted={state.diffSelection.deleted}
-          />
-        </>
-      )}
        </>
       )}
       {ctxMenu && <ContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />}

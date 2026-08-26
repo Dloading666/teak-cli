@@ -232,7 +232,7 @@
     align-items: center;
     gap: 8px;
     padding: 5px 8px;
-    cursor: default;
+    cursor: pointer;
     border-radius: var(--radius-sm);
     color: var(--text-2);
 }
@@ -242,6 +242,11 @@
 .tree-dir-header:hover,
 .tree-dir-header.renaming {
     background: var(--bg-hover);
+    color: var(--text-1);
+}
+
+.tree-file.is-open {
+    background: var(--bg-active);
     color: var(--text-1);
 }
 

@@ -1,8 +1,4 @@
-/* Full-height container. List sits naturally in the flow (full panel
- * height); when a file is selected, DiffPanel mounts as a bottom-anchored
- * overlay (~55% of this container's height) — so the upper half of the
- * list stays visible while the diff is open. position:relative anchors
- * the absolutely-positioned diff overlay to this box. */
+/* Full-height file list. Clicking a row opens the file in the center tab. */
 .changes-fullview {
   position: relative;
   display: flex;

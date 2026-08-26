@@ -109,7 +109,6 @@ export function TaskBoard() {
   // SAME file keep distinct keys (else collapse leaves stale/duplicate rows).
   // Must mirror ChangesBoard's committed-file key encoder exactly.
   const diffSelection = state.diffSelection;
-  const diffMode = state.diffMode;
   const selectedChangePath = diffSelection
     ? diffSelection.kind === 'committed'
       ? `committed\x00${diffSelection.commitHash ?? ''}\x00${diffSelection.path}`
@@ -865,7 +864,6 @@ export function TaskBoard() {
     {activeTab === 'changes' && (
       <ChangesBoard
         selectedPath={selectedChangePath}
-        diffMode={diffMode}
       />
     )}
 

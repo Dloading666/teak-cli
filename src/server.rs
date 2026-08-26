@@ -398,6 +398,22 @@ fn read_text_file(path: String) -> Option<String> {
     Some(String::from_utf8_lossy(&bytes).into_owned())
 }
 
+const WRITE_TEXT_MAX: usize = 2_000_000;
+
+/// Overwrite a UTF-8 text file. Used by the workspace editor's autosave.
+/// Rejects directories, system-root paths, and oversized payloads.
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    if contents.len() > WRITE_TEXT_MAX {
+        return Err("File too large to save from the editor".into());
+    }
+    let p = validate_fs_path(&path)?;
+    if p.is_dir() {
+        return Err("Cannot write a directory".into());
+    }
+    std::fs::write(&p, contents.as_bytes()).map_err(|e| format!("Write failed: {e}"))
+}
+
 
 /// Save a base64-encoded clipboard image to a temp file.
 /// Used by the Gambit compose window so pasted screenshots can be referenced
@@ -5549,6 +5565,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             read_clipboard_image,
             list_directory,
             read_text_file,
+            write_text_file,
             show_in_folder,
             fs_delete,
             fs_rename,

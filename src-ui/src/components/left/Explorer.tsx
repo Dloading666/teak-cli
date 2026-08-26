@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useAppState } from '../../store/app-state';
+import { useAppState, resolveDiffContext, type DiffSelection } from '../../store/app-state';
 import type { IconTheme, ToolType } from '../../store/app-state';
 import { useT } from '../../i18n/useT';
 import { isMaskTintTheme } from '../../lib/personalization';
 import { ScrollPanel } from '../common/ScrollPanel';
 import { clipboardWrite } from '../../lib/clipboard';
 import { beginExplorerDrag } from '../../lib/explorer-drag';
-import { useFileStats, useDirtyDirs } from '../../lib/git-status';
+import { useFileStats, useDirtyDirs, useGitStatus, useGitPollingGate } from '../../lib/git-status';
 import { refreshHistory } from '../../lib/history-cache';
 import { commands } from '../../tauri';
 import type { DirEntryInfo } from '../../tauri';
@@ -469,14 +469,27 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
 }
 
 /** A leaf file node inside the My Computer tree with inline rename support. */
+function repoRel(abs: string, root: string): string {
+  const a = abs.replace(/\\/g, '/');
+  const r = root.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (r && a.toLowerCase().startsWith(r.toLowerCase() + '/')) return a.slice(r.length + 1);
+  return a.split('/').pop() || a;
+}
+
 function BrowserFileNode({ entry, parentDirPath, onCtxMenu }: {
   entry: DirEntryInfo;
   parentDirPath: string;
   onCtxMenu: (menu: CtxMenuState) => void;
 }) {
-  const { state: { iconTheme } } = useAppState();
+  const { state, dispatch } = useAppState();
+  const iconTheme = state.iconTheme;
   const fileStats = useFileStats();
+  const changes = useGitStatus();
   const stats = fileStats?.get(normPath(entry.path));
+  const openPath = state.diffSelection?.path
+    ? normPath(state.diffSelection.path)
+    : null;
+  const isOpen = openPath === normPath(entry.path);
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState(entry.name);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -512,11 +525,38 @@ function BrowserFileNode({ entry, parentDirPath, onCtxMenu }: {
     beginExplorerDrag(entry.path, e);
   };
 
+  const openFile = () => {
+    const folderPath = resolveDiffContext(
+      state.terminals.find(t => t.id === state.activeTerminalId),
+    )?.folderPath ?? '';
+    const abs = entry.path.replace(/\\/g, '/');
+    const repoRoot = changes?.state === 'ok' ? changes.repo_root : folderPath;
+    const root = (repoRoot || folderPath).replace(/\\/g, '/').replace(/\/+$/, '');
+    const rel = repoRel(abs, root);
+    let kind: DiffSelection['kind'] = 'uncommitted';
+    if (changes?.state === 'ok' && changes.untracked.some(e => normPath(e.path) === abs)) {
+      kind = 'untracked';
+    }
+    dispatch({
+      type: 'SET_DIFF_SELECTION',
+      selection: {
+        repoRoot: root,
+        folderPath,
+        path: abs,
+        rel,
+        kind,
+        added: stats?.added,
+        deleted: stats?.deleted,
+      },
+    });
+  };
+
   return (
     <div
-      className={`tree-file ${renaming ? 'renaming' : ''}`}
+      className={`tree-file${renaming ? ' renaming' : ''}${isOpen ? ' is-open' : ''}`}
       onContextMenu={handleCtxMenu}
       onMouseDown={onFileMouseDown}
+      onClick={() => { if (!renaming) openFile(); }}
     >
       <span className="tree-icon">
         <ThemedIcon
@@ -552,6 +592,11 @@ function BrowserFileNode({ entry, parentDirPath, onCtxMenu }: {
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────
+
+function WorkspaceGitPoll() {
+  useGitPollingGate();
+  return null;
+}
 
 export function Explorer() {
   const { state, dispatch } = useAppState();
@@ -708,6 +753,8 @@ export function Explorer() {
           </span>
         </button>
       )}
+
+      {activeTab === 'workspace' && <WorkspaceGitPoll />}
 
       {/* File list Content */}
       <div className="panel-content explorer-content">

@@ -732,14 +732,14 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, taskViewMode: action.mode };
     }
     case 'SET_DIFF_SELECTION':
-      // In tab mode, selecting a file focuses the diff tab immediately (the
-      // user's pref is the center surface, so a click should show it there,
-      // not just park an unfocused tab in the strip). Overlay mode leaves
-      // diffTabActive alone — the overlay renders regardless of focus.
+      // File views always open as a center tab (the right-panel overlay was
+      // removed). Persist tab mode so a later restore does not fall back.
+      prefSet('diff-mode', 'tab');
       return {
         ...state,
         diffSelection: action.selection,
-        diffTabActive: state.diffMode === 'tab' ? true : state.diffTabActive,
+        diffMode: 'tab',
+        diffTabActive: true,
       };
     case 'CLEAR_DIFF':
       // Dropping the selection also folds the diff tab: a tab only renders

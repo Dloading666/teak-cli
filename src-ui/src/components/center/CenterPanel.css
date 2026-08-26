@@ -9,6 +9,14 @@
   border-radius: 0; /* Fully flush, edge to edge */
 }
 
+.main-content:has(.file-editor-slot) {
+  background: #1e1e1e;
+}
+
+[data-theme="light"] .main-content:has(.file-editor-slot) {
+  background: #ffffff;
+}
+
 /* Tool-tab strip. Portaled into the titlebar (#titlebar-tab-slot) so the tabs
    sit on the drag bar like Windows Terminal / Chrome instead of a separate row
    inside the content. Fixed height, bottom-aligned in the taller bar (via

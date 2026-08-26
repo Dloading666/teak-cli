@@ -278,6 +278,8 @@ export const commands = {
   // and for untracked files, which have no git blob to `show`.
   readTextFile: (path: string) =>
     invoke<string | null>('read_text_file', { path }),
+  writeTextFile: (path: string, contents: string) =>
+    invoke<void>('write_text_file', { path, contents }),
 
   // File system operations
   fsDelete: (path: string) => invoke<void>('fs_delete', { path }),

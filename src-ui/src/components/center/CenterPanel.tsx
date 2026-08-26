@@ -8,7 +8,7 @@ import { FourSplitGrid } from './FourSplitGrid';
 import { ToolConfigModal } from './ToolConfigModal';
 import { ContributionHeatmap } from './ContributionHeatmap';
 import { ErrorBoundary } from '../common/ErrorBoundary';
-import { DiffPanel } from '../right/DiffPanel';
+import { FileEditor } from './FileEditor';
 import { supportsNativeAgentStatus, useAppState, type ToolType } from '../../store/app-state';
 import { isFrostShape } from '../../lib/personalization';
 import { prefGetWith, prefSet } from '../../lib/prefs';
@@ -1399,7 +1399,7 @@ export function CenterPanel() {
             diff entirely. No status-grid (diff has no agent state). */}
         {diffTabVisible && (
           <div
-            className={`chrome-tab chrome-tab--keep ${diffTabActive ? 'active' : ''}`}
+            className={`chrome-tab chrome-tab--keep chrome-tab--file ${diffTabActive ? 'active' : ''}`}
             onClick={() => dispatch({ type: 'SET_DIFF_TAB_ACTIVE', active: true })}
           >
             {/* Diff tab glyph: a document with text lines — reads as "file
@@ -1539,22 +1539,13 @@ export function CenterPanel() {
           </div>
         ) : null)}
 
-        {/* Diff tab content — fills the content area when the diff tab is
-            focused. The DiffPanel body handles its own loading/error/too-large
-            states; mode="tab" makes it fill this slot (no portal/backdrop). */}
         {diffTabVisible && diffTabActive && state.diffSelection && (
-          <div className="terminal-wrapper" style={{ display: 'flex', width: '100%', height: '100%', position: 'relative' }}>
-            <DiffPanel
-              mode="tab"
+          <div className="terminal-wrapper file-editor-slot" style={{ display: 'flex', width: '100%', height: '100%', position: 'relative' }}>
+            <FileEditor
               path={state.diffSelection.path}
               repoRoot={state.diffSelection.repoRoot}
               rel={state.diffSelection.rel}
-              kind={state.diffSelection.kind}
-              commitHash={state.diffSelection.commitHash}
-              onClose={() => dispatch({ type: 'CLEAR_DIFF' })}
-              onToggleExpanded={() => dispatch({ type: 'SET_DIFF_MODE', mode: 'overlay' })}
-              added={state.diffSelection.added}
-              deleted={state.diffSelection.deleted}
+              kind={state.diffSelection.kind === 'committed' ? 'uncommitted' : state.diffSelection.kind}
             />
           </div>
         )}
