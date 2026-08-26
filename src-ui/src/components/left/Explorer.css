@@ -187,7 +187,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.15s ease;
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.32, 1);
     width: 16px;
     height: 16px;
     color: var(--text-3);
@@ -196,6 +196,28 @@
 
 .tree-arrow.closed {
     transform: rotate(-90deg);
+}
+
+.tree-fold {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 240ms cubic-bezier(0.22, 1, 0.32, 1);
+}
+
+.tree-fold.is-collapsed {
+    grid-template-rows: 0fr;
+}
+
+.tree-fold-inner {
+    min-height: 0;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 160ms ease;
+}
+
+.tree-fold.is-collapsed .tree-fold-inner {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .tree-children {
@@ -434,5 +456,13 @@
 .update-ring-progress {
   stroke: #e85454;
   transition: stroke-dashoffset 0.2s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-arrow,
+  .tree-fold,
+  .tree-fold-inner {
+    transition: none;
+  }
 }
 

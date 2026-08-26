@@ -339,7 +339,12 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
   );
 
   const toggle = async () => {
-    if (!open && children === null) {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    if (children === null) {
       setLoading(true);
       try {
         const entries = await commands.listDirectory(dirPath);
@@ -350,7 +355,6 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
       }
       setLoading(false);
     }
-    setOpen(!open);
   };
 
   const [renaming, setRenaming] = useState(false);
@@ -414,11 +418,12 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
     <div className="tree-dir">
       <div
         className={`tree-dir-header ${renaming ? 'renaming' : ''}${hasDirtyDescendant ? ' has-dirty' : ''}`}
+        aria-expanded={open}
         onClick={() => !renaming && toggle()}
         onContextMenu={handleDirCtxMenu}
         onMouseDown={onDirMouseDown}
       >
-        <span className={`tree-arrow ${open ? '' : 'closed'}`}>
+        <span className={`tree-arrow ${open ? '' : 'closed'}`} aria-hidden>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </span>
         <span className="tree-icon">
@@ -439,24 +444,26 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
           onClick={e => e.stopPropagation()}
         />
       </div>
-      {open && (
-        <div className="tree-children">
-          {loading ? (
-            <div style={{ padding: '6px 8px', color: 'var(--text-3)', fontSize: 12 }}>Loading...</div>
-          ) : children && children.length === 0 ? (
-            <div style={{ padding: '6px 8px', color: 'var(--text-3)', fontSize: 12, opacity: 0.5 }}>(empty)</div>
-          ) : children?.slice().sort((a, b) => {
-            if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-            return a.name.localeCompare(b.name);
-          }).map(entry => (
-            entry.is_dir ? (
-              <BrowserDirNode key={entry.path} name={entry.name} dirPath={entry.path} onCtxMenu={onCtxMenu} />
-            ) : (
-              <BrowserFileNode key={entry.path} entry={entry} parentDirPath={dirPath} onCtxMenu={onCtxMenu} />
-            )
-          ))}
+      <div className={`tree-fold${open ? '' : ' is-collapsed'}`} aria-hidden={!open}>
+        <div className="tree-fold-inner">
+          <div className="tree-children">
+            {loading ? (
+              <div style={{ padding: '6px 8px', color: 'var(--text-3)', fontSize: 12 }}>Loading...</div>
+            ) : children && children.length === 0 ? (
+              <div style={{ padding: '6px 8px', color: 'var(--text-3)', fontSize: 12, opacity: 0.5 }}>(empty)</div>
+            ) : children?.slice().sort((a, b) => {
+              if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
+              return a.name.localeCompare(b.name);
+            }).map(entry => (
+              entry.is_dir ? (
+                <BrowserDirNode key={entry.path} name={entry.name} dirPath={entry.path} onCtxMenu={onCtxMenu} />
+              ) : (
+                <BrowserFileNode key={entry.path} entry={entry} parentDirPath={dirPath} onCtxMenu={onCtxMenu} />
+              )
+            ))}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

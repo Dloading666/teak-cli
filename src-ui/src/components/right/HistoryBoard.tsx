@@ -701,7 +701,11 @@ export function HistoryBoard() {
               {isPinnedGroup ? (
                 <div className="nav-pinned-header">{group.label}</div>
               ) : (
-                <div className="nav-project-header" onClick={() => toggleCollapsed(group.key)}>
+                <div
+                  className="nav-project-header"
+                  onClick={() => toggleCollapsed(group.key)}
+                  aria-expanded={!isCollapsed}
+                >
                   <svg
                     className={`nav-project-chevron${isCollapsed ? ' is-collapsed' : ''}`}
                     width="12"
@@ -735,7 +739,9 @@ export function HistoryBoard() {
                   </button>
                 </div>
               )}
-              {!isCollapsed && group.rows.map((row, rowIdx) => {
+              <div className={`nav-project-body${isCollapsed ? ' is-collapsed' : ''}`} aria-hidden={isCollapsed}>
+                <div className="nav-project-body-inner">
+              {group.rows.map((row, rowIdx) => {
                 const session = row.saved;
                 const sessionKey = `${session.tool ?? ''}:${session.id}`;
                 const tokenForName = session.session_token ?? row.live?.resumeToken;
@@ -890,6 +896,8 @@ export function HistoryBoard() {
                   </div>
                 );
               })}
+                </div>
+              </div>
             </div>
           );
         })}
