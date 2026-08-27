@@ -1,54 +1,54 @@
 <details open>
 <summary><b>🇨🇳 简体中文</b></summary>
 
-### Teak CLI v0.0.8
+### Teak CLI v0.0.9
 
-- **工作区文件可以在中间栏直接编辑。** 点左侧文件树或更改列表里的文件，会在中间打开编辑器，带语法高亮、行号和 git 标记。
-- **编辑会自动保存。** 输入后短暂延迟写入磁盘，也可以用 ⌘/Ctrl+S 立刻保存。
-- **右侧不再弹出半高 diff 叠层。** 文件一律走中间 tab，更改列表只负责列出文件。
+- **中间栏编辑器更接近工作台。** 支持查找、跳转行、换行、缩略图，以及图片/视频/音频/PDF 预览。
+- **左侧文件树可以筛选和一键收起。** 按文件名搜索工作区，不必把整棵树点开。
+- **协作成员可以绑定新的 Grok 会话。** 用 `--session-id` 创建真实会话；Grok 小版本升级不再被写死的版本白名单挡住。
 
 </details>
 
 <details>
 <summary><b>🇬🇧 English</b></summary>
 
-### Teak CLI v0.0.8
+### Teak CLI v0.0.9
 
-- **Workspace files open in the center pane.** Click a file in the tree or the changes list to edit it with syntax highlighting, line numbers, and a git gutter.
-- **Edits autosave.** A short delay writes to disk; ⌘/Ctrl+S saves immediately.
-- **The half-height diff overlay is gone.** Files always open as a center tab; the changes list only lists files.
+- **The center editor is closer to a work surface.** Find, go-to-line, wrap, a minimap, and image/video/audio/PDF preview.
+- **The file tree can filter and collapse.** Search workspace filenames without expanding every folder.
+- **Collab members can bind a new Grok session.** Teak creates it with `--session-id`; Grok patch releases no longer fail a hard-coded version allowlist.
 
 </details>
 
 <details>
 <summary><b>🇹🇼 繁體中文</b></summary>
 
-### Teak CLI v0.0.8
+### Teak CLI v0.0.9
 
-- **工作區檔案可以在中間欄直接編輯。** 點左側檔案樹或變更列表裡的檔案，會在中間開啟編輯器，帶語法高亮、行號與 git 標記。
-- **編輯會自動儲存。** 輸入後短暫延遲寫入磁碟，也可以用 ⌘/Ctrl+S 立刻儲存。
-- **右側不再彈出半高 diff 疊層。** 檔案一律走中間 tab，變更列表只負責列出檔案。
+- **中間欄編輯器更接近工作台。** 支援尋找、跳轉行、換行、縮圖，以及圖片/影片/音訊/PDF 預覽。
+- **左側檔案樹可以篩選與一鍵收合。** 依檔名搜尋工作區，不必把整棵樹點開。
+- **協作成員可以綁定新的 Grok 工作階段。** 用 `--session-id` 建立真實工作階段；Grok 小版本升級不再被寫死的版本白名單擋住。
 
 </details>
 
 <details>
 <summary><b>🇯🇵 日本語</b></summary>
 
-### Teak CLI v0.0.8
+### Teak CLI v0.0.9
 
-- **ワークスペースのファイルを中央ペインで編集できます。** 左のツリーか変更リストをクリックすると、シンタックスハイライト・行番号・git ガター付きのエディタが開きます。
-- **編集は自動保存です。** 入力後すこし遅れてディスクへ書き、⌘/Ctrl+S ですぐ保存もできます。
-- **右パネルの半高 diff オーバーレイは廃止しました。** ファイルは常に中央タブで開き、変更リストは一覧だけです。
+- **中央エディタが作業面に近づきました。** 検索、行ジャンプ、折り返し、ミニマップ、画像/動画/音声/PDF プレビュー。
+- **左のファイルツリーで絞り込みと一括折りたたみができます。** ファイル名でワークスペースを探せます。
+- **コラボメンバーに新しい Grok セッションを縛れます。** `--session-id` で実セッションを作り、Grok のパッチ更新は固定バージョン許可リストで落ちません。
 
 </details>
 
 <details>
 <summary><b>🇰🇷 한국어</b></summary>
 
-### Teak CLI v0.0.8
+### Teak CLI v0.0.9
 
-- **워크스페이스 파일을 가운데 칸에서 편집할 수 있습니다.** 왼쪽 트리나 변경 목록의 파일을 누르면 구문 강조, 줄 번호, git 거터가 있는 편집기가 열립니다.
-- **편집은 자동 저장됩니다.** 입력 후 잠시 뒤 디스크에 쓰고, ⌘/Ctrl+S로 바로 저장할 수도 있습니다.
-- **오른쪽 반높이 diff 오버레이는 없앴습니다.** 파일은 항상 가운데 탭으로 열리고, 변경 목록은 목록만 보여 줍니다.
+- **가운데 편집기가 작업 화면에 더 가깝습니다.** 찾기, 줄 이동, 줄바꿈, 미니맵, 이미지/영상/오디오/PDF 미리보기.
+- **왼쪽 파일 트리에서 필터와 한 번에 접기를 할 수 있습니다.** 파일 이름으로 워크스페이스를 검색합니다.
+- **협업 멤버에 새 Grok 세션을 묶을 수 있습니다.** `--session-id`로 실제 세션을 만들고, Grok 패치 버전이 고정 허용 목록에 막히지 않습니다.
 
 </details>
