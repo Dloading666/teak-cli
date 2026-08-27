@@ -88,6 +88,17 @@ function sameBootstrapAuthorization(
     && authorized.runtimeGeneration === preview.runtimeGeneration;
 }
 
+function sessionBoundToAnotherMember(
+  snapshot: CollaborationSnapshotDto,
+  nativeSessionId: string,
+  memberId: string,
+): boolean {
+  if (!nativeSessionId) return false;
+  return snapshot.teams.some(team => collaborationMembers(team).some(candidate => (
+    candidate.id !== memberId && candidate.nativeSessionId === nativeSessionId
+  )));
+}
+
 export function CollaborationSettings({
   onDirtyChange,
 }: {
@@ -100,6 +111,12 @@ export function CollaborationSettings({
   const [snapshot, setSnapshot] = useState<CollaborationSnapshotDto>(EMPTY_COLLABORATION_SNAPSHOT);
   const [persistence, setPersistence] = useState<CollaborationPersistence>('draft');
   const [sessions, setSessions] = useState<GrokSessionOptionDto[]>([]);
+  const [pendingNewSession, setPendingNewSession] = useState<{
+    terminalId: string;
+    teamId: string;
+    memberId: string;
+    nativeSessionId: string;
+  } | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,22 +131,23 @@ export function CollaborationSettings({
 
   useEffect(() => {
     let cancelled = false;
-    void loadCollaborationSettings().then(async result => {
+    void loadCollaborationSettings().then(result => {
       if (cancelled) return;
       setSnapshot(result.snapshot);
       setPersistence(result.persistence);
       const first = result.snapshot.teams.find(team => !team.archived) ?? result.snapshot.teams[0];
       setSelectedTeamId(first?.id ?? null);
       setSelectedMemberId(first?.leader.id ?? null);
-      try {
-        const options = await loadGrokSessionOptions(result.persistence);
+      // Rendering the roster must not wait for a potentially large native
+      // history scan. Session choices hydrate independently in the background.
+      setLoading(false);
+      void loadGrokSessionOptions(result.persistence).then(options => {
         if (!cancelled) setSessions(options);
-      } catch {
+      }).catch(() => {
         if (!cancelled) setSessions([]);
-      }
+      });
     }).catch(() => {
       if (!cancelled) setErrorKey('collab.error.load');
-    }).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
@@ -202,6 +220,92 @@ export function CollaborationSettings({
         : item),
     });
   };
+
+  const createAndBindGrokSession = () => {
+    if (
+      !team
+      || !member
+      || !canEdit
+      || pendingNewSession
+      || member.nativeSessionId.trim()
+      || !team.workspace.trim()
+    ) return;
+    const terminalId = crypto.randomUUID();
+    const nativeSessionId = crypto.randomUUID();
+    setPendingNewSession({ terminalId, teamId: team.id, memberId: member.id, nativeSessionId });
+    setMemberActionMessage(t('collab.member.session_new_waiting'));
+    dispatch({
+      type: 'ADD_TERMINAL',
+      session: {
+        id: terminalId,
+        tool: 'grok',
+        folderPath: team.workspace.trim(),
+        newSessionToken: nativeSessionId,
+        toolTitle: `${member.displayName} · ${t('nav.new_agent')}`,
+        viewMode: 'terminal',
+      },
+    });
+  };
+
+  useEffect(() => {
+    if (!pendingNewSession) return;
+    const terminal = state.terminals.find(item => item.id === pendingNewSession.terminalId);
+    const nativeSessionId = terminal?.resumeToken?.trim();
+    if (nativeSessionId !== pendingNewSession.nativeSessionId) return;
+
+    const target = snapshot.teams.find(item => item.id === pendingNewSession.teamId);
+    const canBind = Boolean(
+      target
+      && target.paused
+      && !target.archived
+      && collaborationMembers(target).some(candidate => candidate.id === pendingNewSession.memberId)
+      && !sessionBoundToAnotherMember(snapshot, nativeSessionId, pendingNewSession.memberId)
+    );
+
+    if (canBind && target) {
+      const patch = (candidate: CollaborationMemberDto): CollaborationMemberDto => (
+        candidate.id === pendingNewSession.memberId
+          ? { ...candidate, nativeSessionId, status: 'offline' }
+          : candidate
+      );
+      setSnapshot(current => {
+        const currentTarget = current.teams.find(item => item.id === pendingNewSession.teamId) ?? target;
+        return replaceTeam(current, {
+          ...currentTarget,
+          leader: patch(currentTarget.leader),
+          workers: currentTarget.workers.map(patch),
+        });
+      });
+      setDirtyTeamIds(current => new Set(current).add(pendingNewSession.teamId));
+      setSessions(current => current.some(option => option.nativeSessionId === nativeSessionId)
+        ? current
+        : [...current, {
+          nativeSessionId,
+          label: terminal?.toolTitle || nativeSessionId,
+          workspace: terminal?.folderPath || '',
+          state: 'live',
+        }]);
+      setMemberActionMessage(t('collab.member.session_new_bound'));
+    } else {
+      setMemberActionMessage(t('collab.member.action_failed'));
+    }
+    const terminalId = pendingNewSession.terminalId;
+    setPendingNewSession(null);
+    // This was only a native-session creation tab. Closing it prevents the
+    // ordinary-live collision that would otherwise block collaboration launch.
+    window.setTimeout(() => dispatch({ type: 'REMOVE_TERMINAL', id: terminalId }), 1_000);
+  }, [pendingNewSession, snapshot, state.terminals]);
+
+  useEffect(() => {
+    if (!pendingNewSession) return;
+    const pending = pendingNewSession;
+    const timer = window.setTimeout(() => {
+      setPendingNewSession(null);
+      setMemberActionMessage(t('collab.member.action_failed'));
+      dispatch({ type: 'REMOVE_TERMINAL', id: pending.terminalId });
+    }, 15_000);
+    return () => window.clearTimeout(timer);
+  }, [pendingNewSession]);
 
   const createTeam = () => {
     if (saving || memberActionBusy) return;
@@ -932,26 +1036,60 @@ export function CollaborationSettings({
                 </button>
               </div>
 
-              <label className="collab-field">
+              <div className="collab-field">
                 <span>{t('collab.member.session')}</span>
-                <input
-                  list="collab-grok-sessions"
-                  value={member.nativeSessionId}
-                  disabled={!canEdit}
-                  placeholder={t('collab.member.session_placeholder')}
-                  spellCheck={false}
-                  onChange={event => patchMember(member.id, {
-                    nativeSessionId: event.target.value,
-                    status: event.target.value ? 'offline' : 'unbound',
-                  })}
-                />
+                <div className="collab-session-picker">
+                  <select
+                    value={member.nativeSessionId}
+                    disabled={!canEdit || Boolean(pendingNewSession)}
+                    onChange={event => patchMember(member.id, {
+                      nativeSessionId: event.target.value,
+                      status: event.target.value ? 'offline' : 'unbound',
+                    })}
+                  >
+                    <option value="">{t('collab.member.session_select')}</option>
+                    {member.nativeSessionId && !sessions.some(option => option.nativeSessionId === member.nativeSessionId) && (
+                      <option value={member.nativeSessionId}>{member.nativeSessionId}</option>
+                    )}
+                    {sessions.map(option => {
+                      const taken = sessionBoundToAnotherMember(snapshot, option.nativeSessionId, member.id);
+                      const detail = option.workspace && option.workspace !== team.workspace
+                        ? `${option.label} · ${option.workspace}`
+                        : option.label;
+                      return (
+                        <option key={option.nativeSessionId} value={option.nativeSessionId} disabled={taken}>
+                          {detail}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    type="button"
+                    className="collab-session-new"
+                    disabled={!canEdit || Boolean(pendingNewSession) || Boolean(member.nativeSessionId.trim()) || !team.workspace.trim()}
+                    onClick={createAndBindGrokSession}
+                  >
+                    {t('nav.new_agent')}
+                  </button>
+                </div>
                 <small>{sessions.length ? t('collab.member.session_hint') : t('collab.member.no_sessions')}</small>
-              </label>
-              <datalist id="collab-grok-sessions">
-                {sessions.map(option => (
-                  <option key={option.nativeSessionId} value={option.nativeSessionId}>{option.label}</option>
-                ))}
-              </datalist>
+                {pendingNewSession?.memberId === member.id && (
+                  <small className="collab-session-progress" role="status">{t('collab.member.session_new_waiting')}</small>
+                )}
+                <details className="collab-session-manual">
+                  <summary>{t('collab.member.session_manual')}</summary>
+                  <input
+                    value={member.nativeSessionId}
+                    disabled={!canEdit || Boolean(pendingNewSession)}
+                    placeholder={t('collab.member.session_placeholder')}
+                    spellCheck={false}
+                    onChange={event => patchMember(member.id, {
+                      nativeSessionId: event.target.value,
+                      status: event.target.value ? 'offline' : 'unbound',
+                    })}
+                  />
+                </details>
+              </div>
 
               <div className="collab-member-actions" aria-label={t('collab.member.connection_actions')}>
                 <button type="button" disabled={!canUseMemberActions || memberActionBusy || saving} onClick={() => { void launchMember(); }}>

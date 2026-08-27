@@ -16,12 +16,6 @@ use std::io::Write;
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
-pub const SUPPORTED_GROK_VERSION: GrokVersion = GrokVersion {
-    major: 1,
-    minor: 0,
-    patch: 5,
-};
-
 pub const ENV_ENDPOINT: &str = "TEAK_COLLAB_ENDPOINT";
 pub const ENV_MEMBER: &str = "TEAK_COLLAB_MEMBER";
 pub const ENV_MEMBER_ID: &str = "TEAK_COLLAB_MEMBER_ID";
@@ -143,11 +137,11 @@ pub fn probe_grok(binary: &Path) -> Result<GrokProbe, GrokAdapterError> {
     let help_text = String::from_utf8_lossy(&help_output.stdout);
     let capabilities = capabilities_from_help(&help_text);
 
-    let unsupported_reason = if version != SUPPORTED_GROK_VERSION {
-        Some(format!(
-            "Grok {version} is not in the collaboration compatibility matrix (expected {SUPPORTED_GROK_VERSION})"
-        ))
-    } else if !capabilities.supports_collaboration_launch() {
+    // Version numbers are informational. Collaboration compatibility is a
+    // capability contract so Grok patch/minor releases do not require a Teak
+    // release merely to enter a hard-coded allowlist. Versions that do not
+    // expose every security- and lifecycle-critical flag still fail closed.
+    let unsupported_reason = if !capabilities.supports_collaboration_launch() {
         let missing = REQUIRED_FLAGS
             .iter()
             .filter(|flag| !help_text.contains(**flag))
@@ -895,9 +889,21 @@ mod tests {
     fn parses_verified_grok_version_shape() {
         assert_eq!(
             parse_grok_version("grok 1.0.5 (5115b46bc909)\n").unwrap(),
-            SUPPORTED_GROK_VERSION
+            GrokVersion {
+                major: 1,
+                minor: 0,
+                patch: 5,
+            }
         );
         assert!(parse_grok_version("grok development").is_err());
+        assert_eq!(
+            parse_grok_version("grok 1.0.11 (6870d7b2fdb7)\n").unwrap(),
+            GrokVersion {
+                major: 1,
+                minor: 0,
+                patch: 11,
+            }
+        );
     }
 
     #[test]

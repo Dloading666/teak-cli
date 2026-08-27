@@ -19,6 +19,9 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
+#[cfg(debug_assertions)]
+const ENV_DEBUG_ROOT: &str = "TEAK_COLLAB_DEBUG_ROOT";
+
 #[cfg(unix)]
 struct OwnerLock {
     _file: File,
@@ -60,6 +63,15 @@ pub struct CollaborationRuntime {
 
 impl CollaborationRuntime {
     pub fn open_default() -> Result<Self, String> {
+        #[cfg(debug_assertions)]
+        if let Some(root) = std::env::var_os(ENV_DEBUG_ROOT).filter(|value| !value.is_empty()) {
+            let root = PathBuf::from(root);
+            if !root.is_absolute() {
+                return Err(format!("{ENV_DEBUG_ROOT} must be an absolute path"));
+            }
+            return Self::open_at(&root);
+        }
+
         let home = dirs::home_dir()
             .ok_or_else(|| "could not locate the user home directory".to_string())?;
         let root = home.join(".teak-cli").join("collaboration");

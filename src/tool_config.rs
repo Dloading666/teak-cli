@@ -72,6 +72,14 @@ pub type ToolConfig = HashMap<String, ToolConfigEntry>;
 /// `~/.coffee-cli` tree is present, rename it once so sessions and tools.json
 /// survive the rebrand.
 pub fn config_dir() -> Option<PathBuf> {
+    #[cfg(debug_assertions)]
+    if let Some(root) = std::env::var_os("TEAK_DEBUG_CONFIG_ROOT").filter(|value| !value.is_empty()) {
+        let root = PathBuf::from(root);
+        // A relative override would make test state depend on the process CWD
+        // and could accidentally overlap a repository. Fail closed instead.
+        return root.is_absolute().then_some(root);
+    }
+
     let home = dirs::home_dir()?;
     let teak = home.join(".teak-cli");
     if !teak.exists() {

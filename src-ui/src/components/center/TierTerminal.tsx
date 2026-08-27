@@ -388,6 +388,8 @@ interface TierTerminalProps {
    *  effect passes it to tierTerminalStart, which spawns the tool with
    *  `--resume <token>` instead of a fresh launch. */
   resumeToken?: string;
+  /** Create this exact Grok UUID with `--session-id`; never reinterpret it as resume. */
+  newSessionToken?: string;
   hasBg?: boolean;
   bgUrl?: string;
   bgType?: 'image' | 'video' | 'none';
@@ -411,7 +413,7 @@ interface RemoteTerminalConfig {
 
 function TierTerminalImpl({
   sessionId, tool, toolName, theme, lang, isActive, conversationActive = false,
-  toolData, folderPath, resumeToken, hasBg, bgUrl, bgType, termColorScheme, termFont,
+  toolData, folderPath, resumeToken, newSessionToken, hasBg, bgUrl, bgType, termColorScheme, termFont,
 }: TierTerminalProps) {
   // Raw shells (local terminal / remote SSH) have no TUI painting its own
   // caret — the xterm cursor is the only input-position indicator, so these
@@ -1452,7 +1454,12 @@ function TierTerminalImpl({
           // the ref lookup in the same tick either way.
           const liveAtSpawn = appStateRef.current.terminals.find((item) => item.id === sessionId);
           const exactResumeToken = liveAtSpawn?.exactResumeToken === true;
-          let spawnResumeToken = liveAtSpawn?.resumeToken ?? resumeToken;
+          const spawnNewSessionToken = liveAtSpawn?.newSessionToken ?? newSessionToken;
+          // History/title heuristics may race a newly-created tab. An explicit
+          // new-session intent always wins and must never turn into `--resume`.
+          let spawnResumeToken = spawnNewSessionToken
+            ? undefined
+            : liveAtSpawn?.resumeToken ?? resumeToken;
           // A restored tab may still hold the pre-fork id. Wait briefly for
           // native history so OSC/ai-title can point `--resume` at the
           // conversation the CLI actually last ran.
@@ -1483,7 +1490,15 @@ function TierTerminalImpl({
             }
             if (!mounted) return;
           }
-          await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined, spawnResumeToken, appStateRef.current.defaultShell);
+          await commands.tierTerminalStart(sessionId, tool, initialCols, initialRows, theme, lang, toolData, folderPath ?? undefined, spawnResumeToken, appStateRef.current.defaultShell, spawnNewSessionToken);
+          if (spawnNewSessionToken) {
+            dispatch({
+              type: 'SET_RESUME_TOKEN',
+              id: sessionId,
+              token: spawnNewSessionToken,
+              authoritativeRuntime: true,
+            });
+          }
           ptyReadyRef.current = true;
         } catch (err) {
           // Resume / launch validation failures (missing cwd, bad token

@@ -161,8 +161,8 @@ export const commands = {
   windowClose: () => invoke<void>('window_close'),
 
   // Tier Terminal API
-  tierTerminalStart: (sessionId: string, tool: string | null, cols: number, rows: number, themeMode: string, locale?: string, toolData?: string, cwd?: string, resumeToken?: string, shell?: string) =>
-    invoke<void>('tier_terminal_start', { sessionId, tool, toolData: toolData ?? null, cols, rows, themeMode, locale: locale ?? null, cwd: cwd ?? null, resumeToken: resumeToken ?? null, shell: shell ?? null }),
+  tierTerminalStart: (sessionId: string, tool: string | null, cols: number, rows: number, themeMode: string, locale?: string, toolData?: string, cwd?: string, resumeToken?: string, shell?: string, newSessionToken?: string) =>
+    invoke<void>('tier_terminal_start', { sessionId, tool, toolData: toolData ?? null, cols, rows, themeMode, locale: locale ?? null, cwd: cwd ?? null, resumeToken: resumeToken ?? null, shell: shell ?? null, newSessionToken: newSessionToken ?? null }),
   tierTerminalInput: (sessionId: string, data: string) => 
     invoke<void>('tier_terminal_input', { sessionId, data }),
   /** Raw write used for system-generated input (auto-skip prompts, etc.). */
@@ -287,6 +287,8 @@ export const commands = {
   fsPaste: (action: string, srcPath: string, targetDir: string) =>
     invoke<void>('fs_paste', { action, srcPath, targetDir }),
   showInFolder: (path: string) => invoke<void>('show_in_folder', { path }),
+  searchDirectory: (root: string, query: string) =>
+    invoke<DirEntryInfo[]>('search_directory', { root, query }),
 
   // Task Board persistence (~/.teak-cli/tasks.json)
   loadTasks: () => invoke<string>('load_tasks'),

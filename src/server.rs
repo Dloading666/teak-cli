@@ -355,6 +355,71 @@ fn list_directory(path: String) -> Result<Vec<DirEntry>, String> {
     Ok(entries)
 }
 
+/// Filename search under `root`. Skips heavy/generated directories, does not
+/// follow symlinks, and stops after 80 hits or 5000 visited entries so a
+/// workspace filter cannot walk the whole disk.
+#[tauri::command]
+fn search_directory(root: String, query: String) -> Result<Vec<DirEntry>, String> {
+    let q = query.trim().to_lowercase();
+    if q.len() < 2 {
+        return Ok(Vec::new());
+    }
+    let root_path = std::path::Path::new(&root);
+    if !root_path.is_dir() {
+        return Err(format!("Not a directory: {}", root));
+    }
+    const SKIP: &[&str] = &[
+        "node_modules", ".git", "target", "dist", ".next", "build",
+        "__pycache__", "vendor", ".cache", "coverage", ".turbo", "out",
+        "Pods", ".output",
+    ];
+    let mut out: Vec<DirEntry> = Vec::new();
+    let mut queue: std::collections::VecDeque<std::path::PathBuf> = std::collections::VecDeque::new();
+    queue.push_back(root_path.to_path_buf());
+    let mut visited = 0usize;
+    while let Some(dir) = queue.pop_front() {
+        visited += 1;
+        if visited > 5000 || out.len() >= 80 {
+            break;
+        }
+        let read_dir = match std::fs::read_dir(&dir) {
+            Ok(rd) => rd,
+            Err(_) => continue,
+        };
+        for entry in read_dir.flatten() {
+            let ft = match entry.file_type() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            if ft.is_symlink() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            if ft.is_dir() {
+                if SKIP.iter().any(|s| name.eq_ignore_ascii_case(s)) {
+                    continue;
+                }
+                queue.push_back(entry.path());
+                continue;
+            }
+            if name.to_lowercase().contains(&q) {
+                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                out.push(DirEntry {
+                    name,
+                    path: entry.path().to_string_lossy().to_string(),
+                    is_dir: false,
+                    size,
+                });
+                if out.len() >= 80 {
+                    break;
+                }
+            }
+        }
+    }
+    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(out)
+}
+
 
 fn stats_is_text(bytes: &[u8]) -> bool {
     // Same heuristic git uses: any null byte in first 8 KB → treat as binary.
@@ -388,11 +453,16 @@ pub(crate) fn normalize_path_key(path: &str) -> String {
 
 
 /// Read a text file from disk as UTF-8 string. `None` when the file doesn't
-/// exist, can't be read, or fails the text-vs-binary heuristic. Pairs with
-/// `get_baseline_content` to feed the right-side Diff panel: baseline +
-/// current = both sides of the diff.
+/// exist, can't be read, is larger than 8 MB, or fails the text-vs-binary
+/// heuristic. The size cap is so clicking a multi-GB movie in the workspace
+/// tree cannot pull the whole file into RAM before the binary check.
 #[tauri::command]
 fn read_text_file(path: String) -> Option<String> {
+    const MAX: u64 = 8_000_000;
+    let meta = std::fs::metadata(&path).ok()?;
+    if meta.len() > MAX {
+        return None;
+    }
     let bytes = std::fs::read(&path).ok()?;
     if !stats_is_text(&bytes) { return None; }
     Some(String::from_utf8_lossy(&bytes).into_owned())
@@ -690,6 +760,7 @@ async fn tier_terminal_start(
     cwd: Option<String>,
     resume_token: Option<String>,
     shell: Option<String>,
+    new_session_token: Option<String>,
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
@@ -704,7 +775,7 @@ async fn tier_terminal_start(
     tauri::async_runtime::spawn_blocking(move || {
         tier_terminal_start_blocking(
             session_id, tool, tool_data, cols, rows,
-            theme_mode, locale, cwd, resume_token, shell, app, terminal_session,
+            theme_mode, locale, cwd, resume_token, shell, new_session_token, app, terminal_session,
             collaboration,
         )
     })
@@ -723,6 +794,7 @@ fn tier_terminal_start_blocking(
     cwd: Option<String>,
     resume_token: Option<String>,
     shell: Option<String>,
+    new_session_token: Option<String>,
     app: tauri::AppHandle,
     terminal_session: terminal::SharedSession,
     collaboration: Option<Arc<crate::collaboration::runtime::CollaborationRuntime>>,
@@ -857,7 +929,23 @@ fn tier_terminal_start_blocking(
     // from the agent preset. Validation mirrors the deleted tier_terminal_resume:
     // cwd existence (don't silently resume into the wrong project) + token-
     // format anti-injection.
-    let (cmd, args): (String, Vec<String>) = if let Some(token) = resume_token.as_deref().filter(|t| !t.is_empty()) {
+    if resume_token.as_deref().is_some_and(|token| !token.is_empty())
+        && new_session_token.as_deref().is_some_and(|token| !token.is_empty())
+    {
+        return Err("A terminal launch cannot create and resume a session at the same time".to_string());
+    }
+    let (cmd, args): (String, Vec<String>) = if let Some(token) = new_session_token.as_deref().filter(|t| !t.is_empty()) {
+        if tool.as_deref() != Some("grok") {
+            return Err("Only Grok supports an explicit new session ID".to_string());
+        }
+        let launch_dir = cwd.as_deref().unwrap_or("").trim();
+        if !std::path::Path::new(launch_dir).is_dir() {
+            return Err("Could not verify the new Grok session workspace".to_string());
+        }
+        uuid::Uuid::parse_str(token)
+            .map_err(|_| "Invalid new Grok session ID".to_string())?;
+        (cmd, vec!["--session-id".to_string(), token.to_string()])
+    } else if let Some(token) = resume_token.as_deref().filter(|t| !t.is_empty()) {
         let tool_name = tool.as_deref()
             .ok_or_else(|| "Resume requires a tool, but none was set".to_string())?;
         let preset = terminal::find_preset(tool_name)
@@ -1058,12 +1146,13 @@ fn tier_terminal_start_blocking(
         return Err(format!("Failed to spawn PTY: {error}"));
     }
 
-    // Grok (and several other CLIs) does not print its native session id on
-    // resume, so the output parser cannot rediscover it. Preserve the already
-    // validated resume token in the backend-owned live registry. Launch-plan
-    // collision checks must never depend on a frontend tab's local state.
-    if let Some(token) = resume_token
+    // Grok (and several other CLIs) does not always print its native session
+    // id on create/resume. Preserve the already validated token in the
+    // backend-owned live registry. Launch-plan collision checks must never
+    // depend on a frontend tab's local state.
+    if let Some(token) = new_session_token
         .as_deref()
+        .or_else(|| resume_token.as_deref())
         .map(str::trim)
         .filter(|token| !token.is_empty())
     {
@@ -5564,6 +5653,7 @@ pub fn start_ui(pending_launch: Option<crate::launch::LaunchRequest>) -> anyhow:
             save_clipboard_image,
             read_clipboard_image,
             list_directory,
+            search_directory,
             read_text_file,
             write_text_file,
             show_in_folder,

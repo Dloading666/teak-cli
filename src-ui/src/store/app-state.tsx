@@ -162,6 +162,9 @@ export interface TerminalSession {
   /// which spawns the tool with its `--resume <token>` flag instead of a
   /// fresh launch. Cleared on any subsequent SET_TERMINAL_TOOL.
   resumeToken?: string;
+  /** A Teak-generated Grok UUID that must be created with `--session-id`.
+   *  This is an ephemeral launch intent, not an existing resumable session. */
+  newSessionToken?: string;
   /** The resume token came from a collaboration launch plan and is the exact
    *  native identity Rust must receive at PTY spawn. Pre-spawn history/title
    *  discovery may not replace it. A different token reported by the running
@@ -468,20 +471,21 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_TERMINAL_TOOL':
       return {
         ...state,
-        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, exactResumeToken: action.exactResumeToken ? true : undefined, toolTitle: undefined, agentStatus: undefined, viewMode: 'terminal', chatPending: undefined, startedAt: Date.now() } : t)
+        terminals: state.terminals.map(t => t.id === action.id ? { ...t, tool: action.tool, toolData: action.toolData, resumeToken: action.resumeToken, newSessionToken: undefined, exactResumeToken: action.exactResumeToken ? true : undefined, toolTitle: undefined, agentStatus: undefined, viewMode: 'terminal', chatPending: undefined, startedAt: Date.now() } : t)
       };
     case 'SET_RESUME_TOKEN': {
       const token = action.token.trim();
       if (!token) return state;
       const terminal = state.terminals.find(t => t.id === action.id);
       if (!terminal) return state;
-      if (terminal.resumeToken === token && (!action.exactResumeToken || terminal.exactResumeToken)) return state;
+      if (terminal.resumeToken === token && (!action.exactResumeToken || terminal.exactResumeToken) && !terminal.newSessionToken) return state;
       if (terminal.exactResumeToken && !action.authoritativeRuntime) return state;
       return {
         ...state,
         terminals: state.terminals.map(t => t.id === action.id ? {
           ...t,
           resumeToken: token,
+          newSessionToken: undefined,
           exactResumeToken: action.exactResumeToken
             ? true
             : action.authoritativeRuntime

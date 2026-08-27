@@ -229,7 +229,8 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.collab-field input {
+.collab-field input,
+.collab-field select {
   width: 100%;
   box-sizing: border-box;
   padding: 8px 9px;
@@ -241,9 +242,36 @@
   font: inherit;
   font-size: 11.5px;
 }
-.collab-field input:focus { border-color: var(--accent, #c4956a); }
-.collab-field input:disabled { opacity: 0.48; }
+.collab-field select { appearance: none; cursor: pointer; }
+.collab-field input:focus,
+.collab-field select:focus { border-color: var(--accent, #c4956a); }
+.collab-field input:disabled,
+.collab-field select:disabled { opacity: 0.48; }
 .collab-field small { color: var(--text-3, rgba(255, 255, 255, 0.43)); font-size: 10px; line-height: 1.4; }
+.collab-session-picker { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.collab-session-new {
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent, #c4956a) 42%, transparent);
+  border-radius: var(--radius-sm, 8px);
+  background: color-mix(in srgb, var(--accent, #c4956a) 9%, transparent);
+  color: var(--text-1, #fff);
+  font: inherit;
+  font-size: 10.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.collab-session-new:hover:not(:disabled) { background: color-mix(in srgb, var(--accent, #c4956a) 16%, transparent); }
+.collab-session-new:disabled { opacity: 0.4; cursor: not-allowed; }
+.collab-session-progress { color: var(--accent, #c4956a) !important; }
+.collab-session-manual { margin-top: 1px; }
+.collab-session-manual summary {
+  width: fit-content;
+  color: var(--text-3, rgba(255, 255, 255, 0.43));
+  font-size: 9.5px;
+  cursor: pointer;
+  user-select: none;
+}
+.collab-session-manual[open] summary { margin-bottom: 5px; }
 
 .collab-roster-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 2px; }
 .collab-roster-heading > div:first-child { display: flex; align-items: baseline; gap: 7px; }

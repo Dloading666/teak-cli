@@ -8,7 +8,7 @@ import { FourSplitGrid } from './FourSplitGrid';
 import { ToolConfigModal } from './ToolConfigModal';
 import { ContributionHeatmap } from './ContributionHeatmap';
 import { ErrorBoundary } from '../common/ErrorBoundary';
-import { FileEditor } from './FileEditor';
+import { FileEditor, FileKindIcon } from './FileEditor';
 import { supportsNativeAgentStatus, useAppState, type ToolType } from '../../store/app-state';
 import { isFrostShape } from '../../lib/personalization';
 import { prefGetWith, prefSet } from '../../lib/prefs';
@@ -1402,16 +1402,7 @@ export function CenterPanel() {
             className={`chrome-tab chrome-tab--keep chrome-tab--file ${diffTabActive ? 'active' : ''}`}
             onClick={() => dispatch({ type: 'SET_DIFF_TAB_ACTIVE', active: true })}
           >
-            {/* Diff tab glyph: a document with text lines — reads as "file
-                content view" (the diff is a read-only file viewer), in the
-                same icon family as the terminal/tool tabs. currentColor so
-                it follows the theme like the other tab icons. */}
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="8" y1="13" x2="16" y2="13"/>
-              <line x1="8" y1="17" x2="16" y2="17"/>
-            </svg>
+            <FileKindIcon name={diffTabTitle} size={16} />
             <span className="tab-title" style={{ flex: '0 1 auto', minWidth: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{diffTabTitle}</span>
             <div className="tab-actions tab-actions--close-only">
               <button
@@ -1488,6 +1479,7 @@ export function CenterPanel() {
                       toolData={t.toolData}
                       folderPath={t.folderPath}
                       resumeToken={t.resumeToken}
+                      newSessionToken={t.newSessionToken}
                       hasBg={hasBg && t.viewMode !== 'chat'}
                       bgUrl={t.viewMode === 'chat' ? '' : bgUrl}
                       bgType={bgType}
@@ -2011,4 +2003,3 @@ export function CenterPanel() {
     </>
   );
 }
-

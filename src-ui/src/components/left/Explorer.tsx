@@ -14,6 +14,7 @@ import { refreshHistory } from '../../lib/history-cache';
 import { commands } from '../../tauri';
 import type { DirEntryInfo } from '../../tauri';
 import { HistoryBoard } from '../right/HistoryBoard';
+import { FileKindIcon } from '../center/FileEditor';
 import { prefGet, prefSet } from '../../lib/prefs';
 import './Explorer.css';
 
@@ -270,10 +271,6 @@ function getIconPath(theme: IconTheme, name: string): string {
   return `/icons/themes/${dir}/${name}`;
 }
 
-function getFileIconSrc(ext: string, theme: IconTheme): string {
-  return getIconPath(theme, getFileIcon(ext));
-}
-
 /** Renders a theme icon. For mask-tint themes, uses a <span> with mask-image
  *  so `background-color: var(--accent)` paints the silhouette. For color
  *  themes, falls back to a plain <img>. */
@@ -301,17 +298,6 @@ function ThemedIcon({ src, alt, onFallback }: {
       onError={onFallback ? (e) => (e.currentTarget.src = onFallback) : undefined}
     />
   );
-}
-
-
-function getFileIcon(ext: string): string {
-  const m: Record<string, string> = {
-    rs: 'rs.svg', js: 'js.svg', jsx: 'jsx.svg', ts: 'ts.svg', tsx: 'tsx.svg',
-    py: 'py.svg', go: 'go.svg', java: 'java.svg', c: 'c.svg', cpp: 'cpp.svg',
-    h: 'cpp.svg', html: 'html.svg', css: 'css.svg', json: 'json.svg',
-    md: 'md.svg', toml: 'toml.svg', sh: 'sh.svg', pyw: 'py.svg',
-  };
-  return m[ext.toLowerCase()] || 'file.svg';
 }
 
 
@@ -380,6 +366,12 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
 
   useEffect(() => { if (renaming) renameInputRef.current?.select(); }, [renaming]);
 
+  useEffect(() => {
+    const collapse = () => setOpen(false);
+    window.addEventListener('explorer-collapse-all', collapse);
+    return () => window.removeEventListener('explorer-collapse-all', collapse);
+  }, []);
+
   const commitRename = async () => {
     if (renameVal.trim() && renameVal !== name) {
       const absPath = dirPath.replace(/\\/g, '/');
@@ -429,7 +421,7 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
         <span className="tree-icon">
           <ThemedIcon src={icon || getIconPath(iconTheme, open ? 'folder-open.svg' : 'folder-closed.svg')} alt="dir" />
         </span>
-        <span className="tree-name" style={{ display: renaming ? 'none' : undefined }}>{name}</span>
+        <span className="tree-name" title={name} style={{ display: renaming ? 'none' : undefined }}>{name}</span>
         <input
           ref={renameInputRef}
           className="tree-rename-input"
@@ -469,6 +461,17 @@ function BrowserDirNode({ name, dirPath, icon, onCtxMenu }: { name: string; dirP
 }
 
 /** A leaf file node inside the My Computer tree with inline rename support. */
+function gitMarkFor(path: string, changes: ReturnType<typeof useGitStatus>): 'M' | 'U' | 'A' | 'D' | '' {
+  if (!changes || changes.state !== 'ok') return '';
+  const n = normPath(path);
+  if (changes.untracked.some(e => normPath(e.path) === n)) return 'U';
+  const hit = changes.uncommitted.find(e => normPath(e.path) === n);
+  if (!hit) return '';
+  const s = (hit.status || 'M').toUpperCase();
+  if (s === 'D' || s === 'A') return s;
+  return 'M';
+}
+
 function repoRel(abs: string, root: string): string {
   const a = abs.replace(/\\/g, '/');
   const r = root.replace(/\\/g, '/').replace(/\/+$/, '');
@@ -482,7 +485,6 @@ function BrowserFileNode({ entry, parentDirPath, onCtxMenu }: {
   onCtxMenu: (menu: CtxMenuState) => void;
 }) {
   const { state, dispatch } = useAppState();
-  const iconTheme = state.iconTheme;
   const fileStats = useFileStats();
   const changes = useGitStatus();
   const stats = fileStats?.get(normPath(entry.path));
@@ -490,6 +492,8 @@ function BrowserFileNode({ entry, parentDirPath, onCtxMenu }: {
     ? normPath(state.diffSelection.path)
     : null;
   const isOpen = openPath === normPath(entry.path);
+  const git = gitMarkFor(entry.path, changes);
+  const isDot = entry.name.startsWith('.');
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState(entry.name);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -553,19 +557,16 @@ function BrowserFileNode({ entry, parentDirPath, onCtxMenu }: {
 
   return (
     <div
-      className={`tree-file${renaming ? ' renaming' : ''}${isOpen ? ' is-open' : ''}`}
+      className={`tree-file${renaming ? ' renaming' : ''}${isOpen ? ' is-open' : ''}${git ? ` is-git-${git}` : ''}${isDot ? ' is-dot' : ''}`}
+      title={`${entry.name} · ${formatBytes(entry.size)}`}
       onContextMenu={handleCtxMenu}
       onMouseDown={onFileMouseDown}
       onClick={() => { if (!renaming) openFile(); }}
     >
       <span className="tree-icon">
-        <ThemedIcon
-          src={getFileIconSrc(entry.name.split('.').pop() || '', iconTheme)}
-          alt="file"
-          onFallback={getIconPath(iconTheme, 'file.svg')}
-        />
+        <FileKindIcon name={entry.name} size={16} />
       </span>
-      <span className="tree-fname" style={{ display: renaming ? 'none' : undefined }}>{entry.name}</span>
+      <span className="tree-fname" title={entry.name} style={{ display: renaming ? 'none' : undefined }}>{entry.name}</span>
       <input
         ref={renameInputRef}
         className="tree-rename-input"
@@ -579,6 +580,7 @@ function BrowserFileNode({ entry, parentDirPath, onCtxMenu }: {
         }}
         onClick={e => e.stopPropagation()}
       />
+      {git ? <span className={`tree-git is-${git}`}>{git}</span> : null}
       {stats ? (
         <span className="tree-badge tree-badge-diff">
           <span className="diff-add">+{stats.added}</span>
@@ -598,6 +600,74 @@ function WorkspaceGitPoll() {
   return null;
 }
 
+function SearchHit({
+  entry,
+  root,
+  onCtxMenu,
+}: {
+  entry: DirEntryInfo;
+  root: string;
+  onCtxMenu: (menu: CtxMenuState) => void;
+}) {
+  const { state, dispatch } = useAppState();
+  const fileStats = useFileStats();
+  const changes = useGitStatus();
+  const stats = fileStats?.get(normPath(entry.path));
+  const git = gitMarkFor(entry.path, changes);
+  const rel = repoRel(entry.path, root);
+  const openPath = state.diffSelection?.path ? normPath(state.diffSelection.path) : null;
+  const isOpen = openPath === normPath(entry.path);
+
+  const openFile = () => {
+    const folderPath = resolveDiffContext(
+      state.terminals.find(t => t.id === state.activeTerminalId),
+    )?.folderPath ?? '';
+    const abs = entry.path.replace(/\\/g, '/');
+    const repoRoot = changes?.state === 'ok' ? changes.repo_root : folderPath;
+    const base = (repoRoot || folderPath).replace(/\\/g, '/').replace(/\/+$/, '');
+    let kind: DiffSelection['kind'] = 'uncommitted';
+    if (changes?.state === 'ok' && changes.untracked.some(e => normPath(e.path) === abs)) {
+      kind = 'untracked';
+    }
+    dispatch({
+      type: 'SET_DIFF_SELECTION',
+      selection: {
+        repoRoot: base,
+        folderPath,
+        path: abs,
+        rel: repoRel(abs, base),
+        kind,
+        added: stats?.added,
+        deleted: stats?.deleted,
+      },
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      className={`workspace-search-hit${isOpen ? ' is-open' : ''}${git ? ` is-git-${git}` : ''}`}
+      title={entry.path}
+      onClick={openFile}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onCtxMenu({
+          x: e.clientX,
+          y: e.clientY,
+          absolutePath: entry.path.replace(/\\/g, '/'),
+          relativePath: entry.path.replace(/\\/g, '/'),
+          isDir: false,
+        });
+      }}
+    >
+      <FileKindIcon name={entry.name} size={16} />
+      <span className="workspace-search-name">{entry.name}</span>
+      <span className="workspace-search-rel">{rel.replace(/[^/]+$/, '').replace(/\/$/, '')}</span>
+      {git ? <span className={`tree-git is-${git}`}>{git}</span> : null}
+    </button>
+  );
+}
+
 export function Explorer() {
   const { state, dispatch } = useAppState();
   const t = useT();
@@ -614,14 +684,38 @@ export function Explorer() {
   // semantics as Windows Explorer / Finder / GNOME Files. No filtering,
   // no recursion, no MAX_FILES cap. Subdirs lazy-load via BrowserDirNode.
   const [rootEntries, setRootEntries] = useState<DirEntryInfo[] | null>(null);
+  const [filter, setFilter] = useState('');
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<DirEntryInfo[] | null>(null);
+  const changes = useGitStatus();
+  const folderName = folderPath
+    ? folderPath.replace(/\\/g, '/').replace(/\/+$/, '').split('/').pop() || folderPath
+    : '';
   useEffect(() => {
-    if (!folderPath) { setRootEntries(null); return; }
+    if (!folderPath) { setRootEntries(null); setFilter(''); setHits(null); return; }
     let cancelled = false;
     commands.listDirectory(folderPath)
       .then(entries => { if (!cancelled) setRootEntries(entries); })
       .catch(() => { if (!cancelled) setRootEntries([]); });
     return () => { cancelled = true; };
   }, [folderPath]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setQuery(filter.trim()), 180);
+    return () => window.clearTimeout(id);
+  }, [filter]);
+
+  useEffect(() => {
+    if (!folderPath || query.length < 2) {
+      setHits(null);
+      return;
+    }
+    let cancelled = false;
+    commands.searchDirectory(folderPath, query)
+      .then((rows) => { if (!cancelled) setHits(rows); })
+      .catch(() => { if (!cancelled) setHits([]); });
+    return () => { cancelled = true; };
+  }, [folderPath, query]);
 
   // Snapshot lifecycle and the +N/-M map are owned by FileStatsProvider at
   // App level (lib/file-stats.tsx) so the right-side ChangesBoard can read
@@ -739,19 +833,70 @@ export function Explorer() {
       </div>
 
       {(activeTab === 'workspace' && activeSession?.tool && !CWD_AGNOSTIC_TOOLS.has(activeSession.tool)) && (
-        <button
-          className="workspace-dir-btn"
-          onClick={handleOpenFolder}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"></path>
-          </svg>
-          <span className="workspace-dir-path">
-            {activeSession.folderPath
-              ? `⁦${activeSession.folderPath}⁩`
-              : t('explorer.workspace.select-dir')}
-          </span>
-        </button>
+        <>
+          <button
+            className="workspace-dir-btn"
+            onClick={handleOpenFolder}
+            title={activeSession.folderPath || undefined}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.9 }}>
+              <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span className="workspace-dir-path">
+              {folderName || t('explorer.workspace.select-dir')}
+            </span>
+          </button>
+          {folderPath && (
+            <div className="workspace-toolbar">
+              <div className="workspace-meta">
+                {changes?.state === 'ok' && (
+                  <button
+                    type="button"
+                    className="workspace-branch"
+                    title={changes.branch}
+                    onClick={() => void clipboardWrite(changes.branch)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
+                      <path fill="currentColor" d="M11.75 2.5a2.25 2.25 0 1 0-2.15 2.228V6.5A2.5 2.5 0 0 1 7.1 9H5.4a2.25 2.25 0 1 0 0 1.5h1.7A4 4 0 0 0 11.1 6.5V4.728A2.25 2.25 0 0 0 11.75 2.5ZM3.5 11.25a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Zm8.25-7.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z"/>
+                    </svg>
+                    {changes.branch}
+                  </button>
+                )}
+                {changes?.state === 'ok' && (changes.uncommitted.length > 0 || changes.untracked.length > 0) && (
+                  <span className="workspace-counts">
+                    {changes.uncommitted.length > 0 && <span className="is-M">{changes.uncommitted.length}M</span>}
+                    {changes.untracked.length > 0 && <span className="is-U">{changes.untracked.length}U</span>}
+                  </span>
+                )}
+                <span className="workspace-meta-grow" />
+                <button
+                  type="button"
+                  className="workspace-collapse"
+                  title={t('explorer.collapse')}
+                  onClick={() => window.dispatchEvent(new Event('explorer-collapse-all'))}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+                    <path fill="currentColor" d="M3.5 6.2 8 2.8l4.5 3.4-.9 1.2L8 4.7 4.4 7.4zm0 3.6L8 13.2l4.5-3.4.9 1.2L8 15.2 3.5 11z"/>
+                  </svg>
+                </button>
+              </div>
+              <label className="workspace-filter">
+                <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
+                  <path fill="currentColor" d="M10.68 11.74a6 6 0 1 1 1.06-1.06l3.04 3.04a.75.75 0 1 1-1.06 1.06zm-1.48-1.48a4.5 4.5 0 1 0-6.36-6.36 4.5 4.5 0 0 0 6.36 6.36"/>
+                </svg>
+                <input
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder={t('explorer.filter')}
+                  spellCheck={false}
+                />
+                {filter && (
+                  <button type="button" className="workspace-filter-clear" onClick={() => setFilter('')} aria-label="Clear">×</button>
+                )}
+              </label>
+            </div>
+          )}
+        </>
       )}
 
       {activeTab === 'workspace' && <WorkspaceGitPoll />}
@@ -790,6 +935,20 @@ export function Explorer() {
                   <div className="shimmer-box" style={{ width: `${30 + (i * 7) % 40}%`, height: 12, borderRadius: 'var(--radius-xs)' }}></div>
                 </div>
               ))}
+            </div>
+          </ScrollPanel>
+        ) : query.length >= 2 ? (
+          <ScrollPanel>
+            <div className="workspace-search">
+              {hits === null ? (
+                <div className="workspace-search-empty">{t('editor.loading')}</div>
+              ) : hits.length === 0 ? (
+                <div className="workspace-search-empty">{t('explorer.search_empty')}</div>
+              ) : (
+                hits.map((entry) => (
+                  <SearchHit key={entry.path} entry={entry} root={folderPath!} onCtxMenu={handleCtxMenu} />
+                ))
+              )}
             </div>
           </ScrollPanel>
         ) : (
